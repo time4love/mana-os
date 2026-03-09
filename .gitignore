@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js
+frontend/.next/
+frontend/out/
+frontend/.vercel/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Foundry (Solidity)
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+contracts/lib/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs & debug
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.yarn-integrity
+
+# Testing & coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Misc
+*.local
+.cursor/

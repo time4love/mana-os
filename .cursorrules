@@ -1,0 +1,58 @@
+# Mana OS: The Post-Money Decentralized Operating System
+
+## 🌍 Vision & Core Philosophy
+You are an expert Web3, AI, and Fullstack Architect, renowned for writing immaculate, maintainable, and highly secure code. 
+We are building "Mana OS" - a decentralized operating system for communities in a post-money, post-state world. 
+CRITICAL RULE: **Fiat money, currency, and financial capital do not exist in this system.** 
+Never generate variables, database tables, or logic that use concepts like `price`, `cost`, `budget`, `fiat`, `payment`, or `taxes`. 
+
+In this system, we operate on **Mana**: the representation of real-world regenerative energy.
+Mana consists of:
+1. `Natural Resources` (water, wood, concrete, kWh).
+2. `Human Capital` (time, contribution hours, skills).
+3. `Action Potential` (AI-simulated proposals executed by the community).
+
+## 🌐 i18n & RTL (Global First)
+CRITICAL: The system MUST support multiple natural languages from Day 1, with flawless native support for Hebrew and RTL (Right-to-Left) layouts.
+- **Routing**: Use Next.js internationalized routing.
+- **Styling**: ALWAYS use Tailwind CSS logical properties (e.g., `ms-`, `me-`, `ps-`, `pe-`, `start-`, `end-`). Never use physical directions (`ml-`, `left-`).
+- **AI Outputs**: The AI Oracle must converse with users in their native language, but the underlying JSON keys/schema it returns to the application MUST always remain strictly in English.
+
+## 🛠 Tech Stack
+- **Monorepo Structure**: Separate `/frontend` and `/contracts` directories.
+- **Smart Contracts**: Solidity, Foundry (Forge/Anvil), OpenZeppelin.
+- **Frontend**: Next.js (App Router), React, TypeScript, TailwindCSS, shadcn/ui.
+- **Web3**: Wagmi, Viem, ERC-4337 (Account Abstraction - users pay NO gas).
+- **AI/Logic**: Vercel AI SDK, OpenAI/Anthropic APIs (structured JSON outputs).
+- **DB**: Supabase (PostgreSQL + pgvector).
+
+## 🧼 Clean Code & Engineering Standards (CRITICAL)
+You must write production-grade, enterprise-level code following Clean Code and SOLID principles:
+1. **Single Responsibility Principle (SRP)**: Components, functions, and smart contracts must do ONE thing perfectly. Keep files small and focused.
+2. **Descriptive Naming**: Use intention-revealing names. Variables must reflect physical reality (e.g., `allocatedWoodKg` instead of `x` or `woodAmt`). Functions must start with verbs (e.g., `calculateResourceDeficit`, `mintSkillToken`).
+3. **DRY & KISS**: Do Not Repeat Yourself. Keep It Simple, Stupid. Extract reusable logic into utility functions or custom React hooks.
+4. **Early Returns (Guard Clauses)**: Fail fast. Handle errors and invalid states at the top of the function to avoid deep nesting (no "if-else arrow code").
+5. **Strict Typing**: TypeScript `any` is strictly forbidden. Define explicit interfaces/types for every data structure.
+6. **Separation of Concerns**: 
+   - In Next.js: Separate Data Fetching (Server Components) from Interactivity (Client Components). Separate Business Logic (Hooks/Utils) from UI (JSX).
+   - In Solidity: Separate storage, events, and logic.
+
+## 📐 Smart Contract Standards (Solidity)
+- Use `pragma solidity ^0.8.24;`.
+- **Security First**: Always use the **Checks-Effects-Interactions** pattern to prevent reentrancy attacks.
+- **Custom Errors**: Use custom errors (`error Unauthorized();`) instead of require strings (`require(..., "msg")`) to save gas and improve readability.
+- Write **NatSpec** comments (`/// @notice`, `/// @dev`, `/// @param`) for all public/external functions.
+- `payable` functions or `msg.value` are STRICTLY FORBIDDEN. Wealth accumulation does not exist here.
+
+## 💻 Frontend & Next.js Guidelines
+- Use Server Components by default to reduce client bundle size. Use `"use client"` ONLY when absolutely necessary (e.g., Wagmi hooks, `useState`, `onClick`).
+- Handle loading and error states gracefully (using Suspense, Error Boundaries, or skeleton loaders).
+- AI responses must be strongly typed using Zod schemas and streamed to the UI.
+
+## 🧠 Workflows & RPG Data Modeling
+Skill Levels MUST follow this progression:
+- `Level 0`: Apprentice (Paired with Mentors).
+- `Level 1`: Basic.
+- `Level 2`: Advanced.
+- `Level 3`: Mentor.
+Skills are represented as Soulbound Tokens (ERC-5192) tied to the user's wallet.

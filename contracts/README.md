@@ -17,6 +17,24 @@ forge build
 forge test
 ```
 
+## Deploy locally (Anvil)
+
+```bash
+anvil
+# In another terminal:
+cd contracts
+forge script script/DeployManaSkills.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
+```
+
+The script prints **ManaSkills deployed at: 0x...** to the terminal. Use that address in the frontend:
+
+```bash
+# frontend/.env.local
+NEXT_PUBLIC_MANA_SKILLS_ADDRESS=0x<paste_deployed_address_here>
+```
+
+You can also read the address from `broadcast/DeployManaSkills.s.sol/31337/run-latest.json` (see the `contractAddress` of the deployment transaction).
+
 ## Layout
 
 - `src/` — Solidity sources (e.g. `ManaSkills.sol` SBT)

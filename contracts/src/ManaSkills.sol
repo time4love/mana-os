@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import { ERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title ManaSkills
@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * @notice Soulbound Token (SBT) representing Human Capital. Tokens are permanently bound to the
  *         holder and cannot be transferred. Each token represents a skill record with category,
  *         proficiency level, and contributed hours.
- * @dev Inherits ERC721 but overrides all transfer functions to revert, enforcing soulbound semantics.
+ * @dev Inherits ERC721 but overrides _update to revert on any transfer (from != address(0)), enforcing soulbound semantics.
  *      No payable functions; this contract is part of a post-money resource-based system.
  */
 contract ManaSkills is ERC721, Ownable {
@@ -47,25 +47,14 @@ contract ManaSkills is ERC721, Ownable {
     constructor(address initialOwner) ERC721("ManaSkills", "MSK") Ownable(initialOwner) {}
 
     // -------------------------------------------------------------------------
-    // Soulbound: disable all transfers
+    // Soulbound: disable all transfers via _update hook (OZ ERC721 uses _update for mints and transfers)
     // -------------------------------------------------------------------------
 
-    /// @inheritdoc ERC721
-    /// @dev Overridden to revert. Soulbound tokens cannot be transferred.
-    function transferFrom(address, address, uint256) public pure override {
-        revert ManaSkillsSoulbound();
-    }
-
-    /// @inheritdoc ERC721
-    /// @dev Overridden to revert. Soulbound tokens cannot be transferred.
-    function safeTransferFrom(address, address, uint256) public pure override {
-        revert ManaSkillsSoulbound();
-    }
-
-    /// @inheritdoc ERC721
-    /// @dev Overridden to revert. Soulbound tokens cannot be transferred.
-    function safeTransferFrom(address, address, uint256, bytes memory) public pure override {
-        revert ManaSkillsSoulbound();
+    /// @dev Reverts if the token already exists (i.e. any transfer). Mints (from == address(0)) are allowed.
+    function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
+        address from = _ownerOf(tokenId);
+        if (from != address(0)) revert ManaSkillsSoulbound();
+        return super._update(to, tokenId, auth);
     }
 
     // -------------------------------------------------------------------------
