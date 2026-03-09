@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAccount, useConnect, useDisconnect, useReadContract } from "wagmi";
 import { anvil } from "@/lib/wagmi";
@@ -8,17 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-
-const PROFICIENCY_LABELS: Record<number, string> = {
-  0: "שוליה",
-  1: "בסיסי",
-  2: "מתקדם",
-  3: "מנחה",
-};
-
-function getProficiencyLabel(level: number): string {
-  return PROFICIENCY_LABELS[level] ?? "—";
-}
+import { useLocale } from "@/lib/i18n/context";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 /** Normalize contract return: getTokenIdsOf returns uint256[] (bigint[]). */
 function getTokenIdsArray(data: unknown): bigint[] {
@@ -26,29 +18,40 @@ function getTokenIdsArray(data: unknown): bigint[] {
   return [];
 }
 
-/** Safe read of skill record (tuple [category, level, hours] or object { category, level, hoursContributed }). */
+/**
+ * Safe read of skill record. Contract returns (string category, uint8 level, uint256 hoursContributed).
+ * Wagmi/viem may return a tuple [category, level, hours] or object { category, level, hoursContributed }.
+ * Level can be number or bigint (enum decoded as uint8).
+ */
 function getSkillRecordFields(
   record: unknown
 ): { category: string; level: number; hours: number } {
   if (record == null) return { category: "", level: 0, hours: 0 };
+  const toNum = (v: unknown): number =>
+    typeof v === "bigint" ? Number(v) : Number(v ?? 0);
+  const toStr = (v: unknown): string => (v != null ? String(v).trim() : "");
   if (Array.isArray(record))
     return {
-      category: String(record[0] ?? ""),
-      level: Number(record[1] ?? 0),
-      hours: Number(record[2] ?? 0),
+      category: toStr(record[0]),
+      level: toNum(record[1]),
+      hours: toNum(record[2]),
     };
   const o = record as Record<string, unknown>;
   return {
-    category: String(o.category ?? o[0] ?? ""),
-    level: Number(o.level ?? o[1] ?? 0),
-    hours: Number(o.hoursContributed ?? o[2] ?? 0),
+    category: toStr(o.category ?? o[0]),
+    level: toNum(o.level ?? o[1]),
+    hours: toNum(o.hoursContributed ?? o[2]),
   };
 }
 
 export default function ProfilePage() {
+  const [mounted, setMounted] = useState(false);
+  const { locale, t, getLevelDisplay, replace } = useLocale();
   const { address, isConnected, chainId: connectedChainId } = useAccount();
   const { connect, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
+
+  useEffect(() => setMounted(true), []);
 
   const {
     data: tokenIdsRaw,
@@ -85,11 +88,18 @@ export default function ProfilePage() {
   const showSkillsError =
     isConnected && (isErrorTokens || (hasTokenIds && isErrorRecord));
   const showSkills =
-    isConnected && tokensReady && hasTokenIds && !isErrorTokens && !isErrorRecord;
+    isConnected &&
+    tokensReady &&
+    hasTokenIds &&
+    !isErrorTokens &&
+    !isErrorRecord;
   const showSkillsLoading = isConnected && isLoadingTokens;
   const showSkillRecordLoading = isConnected && hasTokenIds && isLoadingRecord;
 
-  const isWrongChain = isConnected && connectedChainId !== undefined && connectedChainId !== anvil.id;
+  const isWrongChain =
+    isConnected &&
+    connectedChainId !== undefined &&
+    connectedChainId !== anvil.id;
   const showConnectedFallback =
     isConnected &&
     !showSkillsLoading &&
@@ -100,15 +110,53 @@ export default function ProfilePage() {
 
   const skillFields = getSkillRecordFields(skillRecord);
 
+  if (!mounted) {
+    return (
+      <main
+        className="min-h-screen p-8"
+        dir={locale === "he" ? "rtl" : "ltr"}
+      >
+        <div className="mx-auto max-w-2xl space-y-6">
+          <nav className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+            <Link
+              href="/"
+              className="text-emerald-400 underline underline-offset-2"
+            >
+              {t("navHome")}
+            </Link>
+            <LanguageSwitcher />
+          </nav>
+          <h1 className="text-2xl font-bold text-neutral-100 text-start">
+            {t("title")}
+          </h1>
+          <Card>
+            <CardContent className="p-6">
+              <p className="text-neutral-400">{t("loadingSkills")}</p>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    );
+  }
+
   return (
-    <main className="min-h-screen p-8" dir="rtl">
+    <main
+      className="min-h-screen p-8"
+      dir={locale === "he" ? "rtl" : "ltr"}
+    >
       <div className="mx-auto max-w-2xl space-y-6">
-        <nav className="mb-4 text-sm">
-          <Link href="/" className="text-emerald-400 underline underline-offset-2">
-            ← ראשי
+        <nav className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <Link
+            href="/"
+            className="text-emerald-400 underline underline-offset-2"
+          >
+            {t("navHome")}
           </Link>
+          <LanguageSwitcher />
         </nav>
-        <h1 className="text-2xl font-bold text-neutral-100 text-start">פרופיל המאנה שלי</h1>
+        <h1 className="text-2xl font-bold text-neutral-100 text-start">
+          {t("title")}
+        </h1>
 
         {isConnected && (
           <p className="text-sm text-neutral-500 font-mono">
@@ -118,17 +166,15 @@ export default function ProfilePage() {
               onClick={() => disconnect()}
               className="ms-2 text-emerald-400 hover:underline"
             >
-              התנתק
+              {t("disconnect")}
             </button>
           </p>
         )}
 
         {!isConnected && (
           <Card>
-            <CardContent className="p-6 space-y-4">
-              <p className="text-neutral-400">
-                התחבר עם הארנק שלך (Anvil) כדי לראות את כישורי המאנה שלך.
-              </p>
+            <CardContent className="space-y-4 p-6">
+              <p className="text-neutral-400">{t("connectPrompt")}</p>
               {connectors.map((connector) => (
                 <Button
                   key={connector.uid}
@@ -137,7 +183,7 @@ export default function ProfilePage() {
                   disabled={isPending}
                   onClick={() => connect({ connector, chainId: anvil.id })}
                 >
-                  {isPending ? "מתחבר…" : `התחבר עם ${connector.name}`}
+                  {isPending ? t("connecting") : `${t("connectWith")} ${connector.name}`}
                 </Button>
               ))}
             </CardContent>
@@ -147,7 +193,7 @@ export default function ProfilePage() {
         {showSkillsLoading && (
           <Card>
             <CardContent className="p-6">
-              <p className="text-neutral-400">טוען כישורים…</p>
+              <p className="text-neutral-400">{t("loadingSkills")}</p>
             </CardContent>
           </Card>
         )}
@@ -155,9 +201,7 @@ export default function ProfilePage() {
         {showSkillsError && (
           <Card>
             <CardContent className="p-6">
-              <p className="text-neutral-400">
-                לא ניתן לטעון כישורים. ודא שאתה ברשת Anvil (Chain ID 31337) ושהוגדר חוזה ManaSkills ב-NEXT_PUBLIC_MANA_SKILLS_ADDRESS.
-              </p>
+              <p className="text-neutral-400">{t("errorLoadSkills")}</p>
             </CardContent>
           </Card>
         )}
@@ -165,20 +209,14 @@ export default function ProfilePage() {
         {showWelcome && (
           <Card>
             <CardHeader>
-              <CardTitle>ברוך הבא</CardTitle>
+              <CardTitle>{t("welcomeTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-neutral-300">
-                עדיין אין לך כישורי מאנה רשומים. התחל את המסע שלך על ידי השגת אסימון שוליה (Apprentice)
-                — תוכל לצבור שעות ולעלות רמה דרך תרומה לקהילה.
-              </p>
+              <p className="text-neutral-300">{t("welcomeBody")}</p>
               <Button size="lg" className="w-full sm:w-auto">
-                התחל את מסע המאנה שלך
+                {t("startJourney")}
               </Button>
-              <p className="text-sm text-neutral-500">
-                כרגע: הרץ את סקריפט ה-CLI כדי להנפיק אסימון בדיקה (למשל Agriculture, בסיסי). בהמשך
-                אפשר לחבר כפתור זה לפעולת mint מתוך הממשק.
-              </p>
+              <p className="text-sm text-neutral-500">{t("startJourneyHint")}</p>
             </CardContent>
           </Card>
         )}
@@ -187,19 +225,19 @@ export default function ProfilePage() {
           <>
             <Card>
               <CardHeader>
-                <CardTitle>רמת מיומנות</CardTitle>
+                <CardTitle>{t("skillLevel")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
                   {skillFields.category ? (
                     <Badge variant="secondary">{skillFields.category}</Badge>
                   ) : null}
-                  <Badge>{getProficiencyLabel(skillFields.level)}</Badge>
+                  <Badge>{getLevelDisplay(skillFields.level)}</Badge>
                 </div>
                 <p className="text-sm text-neutral-400">
-                  רמת מיומנות:{" "}
+                  {t("proficiencyLabel")}:{" "}
                   <span className="font-medium text-neutral-200">
-                    {getProficiencyLabel(skillFields.level)}
+                    {getLevelDisplay(skillFields.level)}
                   </span>
                 </p>
               </CardContent>
@@ -207,13 +245,16 @@ export default function ProfilePage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>שעות תרומה</CardTitle>
+                <CardTitle>{t("contributionHours")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-3xl font-semibold text-emerald-400">
                   {skillFields.hours}
                 </p>
-                <Progress value={Math.min(skillFields.hours, 100)} max={100} />
+                <Progress
+                  value={Math.min(skillFields.hours, 100)}
+                  max={100}
+                />
               </CardContent>
             </Card>
           </>
@@ -222,7 +263,7 @@ export default function ProfilePage() {
         {showSkillRecordLoading && (
           <Card>
             <CardContent className="p-6">
-              <p className="text-neutral-400">טוען רשומת מיומנות…</p>
+              <p className="text-neutral-400">{t("loadingRecord")}</p>
             </CardContent>
           </Card>
         )}
@@ -231,10 +272,10 @@ export default function ProfilePage() {
           <Card>
             <CardContent className="p-6">
               <p className="text-neutral-300">
-                הארנק מחובר לרשת אחרת. עבור לרשת Anvil (Chain ID {anvil.id}) כדי לראות את כישורי המאנה שלך.
+                {replace(t("wrongChain"), { chainId: String(anvil.id) })}
               </p>
               <p className="mt-2 text-sm text-neutral-500">
-                ברשת הנכונה: RPC http://127.0.0.1:8545 (או הערך ב-NEXT_PUBLIC_RPC_URL)
+                {t("wrongChainRpc")}
               </p>
             </CardContent>
           </Card>
@@ -243,9 +284,9 @@ export default function ProfilePage() {
         {showConnectedFallback && !isWrongChain && (
           <Card>
             <CardContent className="p-6">
-              <p className="text-neutral-400">טוען כישורים…</p>
+              <p className="text-neutral-400">{t("loadingSkills")}</p>
               <p className="mt-2 text-sm text-neutral-500">
-                אם הדף נשאר ריק, ודא ש-NEXT_PUBLIC_MANA_SKILLS_ADDRESS מצביע על החוזה הנכון ושהאסימון הונפק לכתובת הארנק שלך (סקריפט ה-mint מנגיש ל-0xf39Fd…).
+                {t("fallbackHint")}
               </p>
             </CardContent>
           </Card>
@@ -253,14 +294,33 @@ export default function ProfilePage() {
 
         <Card className="border-neutral-600 bg-neutral-900/80">
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-neutral-400">לוג דיבוג (בקונסול: [Mana Profile])</CardTitle>
+            <CardTitle className="text-sm font-medium text-neutral-400">
+              {t("debugTitle")}
+            </CardTitle>
           </CardHeader>
-          <CardContent className="text-xs text-neutral-500 font-mono space-y-1">
-            <p>מחובר: {isConnected ? "כן" : "לא"}</p>
-            <p>כתובת: {address ?? "—"}</p>
-            <p>רשת ארנק: {connectedChainId ?? "—"} | אנוויל: {anvil.id}</p>
-            <p>טוקנים: {tokenIds.length} | טוען: {isLoadingTokens ? "כן" : "לא"} | שגיאה: {isErrorTokens ? "כן" : "לא"}</p>
-            <p>מציג: {showSkillsLoading && "טוען "} {showSkillsError && "שגיאה "} {showWelcome && "ברוך הבא "} {showSkills && "כישורים "} {showConnectedFallback && "fallback"}</p>
+          <CardContent className="space-y-1 font-mono text-xs text-neutral-500">
+            <p>
+              {t("debugConnected")}: {isConnected ? t("yes") : t("no")}
+            </p>
+            <p>
+              {t("debugAddress")}: {address ?? "—"}
+            </p>
+            <p>
+              {t("debugNetwork")}: {connectedChainId ?? "—"} | Anvil: {anvil.id}
+            </p>
+            <p>
+              {t("debugTokens")}: {tokenIds.length} | {t("loadingSkills")}:{" "}
+              {isLoadingTokens ? t("yes") : t("no")} | Error:{" "}
+              {isErrorTokens ? t("yes") : t("no")}
+            </p>
+            <p>
+              {t("debugShowing")}:{" "}
+              {showSkillsLoading && "loading "}
+              {showSkillsError && "error "}
+              {showWelcome && "welcome "}
+              {showSkills && "skills "}
+              {showConnectedFallback && "fallback"}
+            </p>
           </CardContent>
         </Card>
       </div>
