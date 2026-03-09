@@ -35,6 +35,9 @@ contract ManaSkills is ERC721, Ownable {
     /// @dev Mapping from token ID to skill record.
     mapping(uint256 tokenId => SkillRecord) private _skillRecords;
 
+    /// @dev Token IDs per owner (for enumeration without ERC721Enumerable).
+    mapping(address owner => uint256[]) private _ownerTokenIds;
+
     /// @dev Emitted when a new skill token is minted.
     event SkillMinted(address indexed to, uint256 indexed tokenId, string category, ProficiencyLevel level, uint256 hoursContributed);
 
@@ -54,7 +57,9 @@ contract ManaSkills is ERC721, Ownable {
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = _ownerOf(tokenId);
         if (from != address(0)) revert ManaSkillsSoulbound();
-        return super._update(to, tokenId, auth);
+        address result = super._update(to, tokenId, auth);
+        if (from == address(0)) _ownerTokenIds[to].push(tokenId);
+        return result;
     }
 
     // -------------------------------------------------------------------------
@@ -66,6 +71,13 @@ contract ManaSkills is ERC721, Ownable {
     /// @return The SkillRecord (category, level, hoursContributed).
     function getSkillRecord(uint256 tokenId) external view returns (SkillRecord memory) {
         return _skillRecords[tokenId];
+    }
+
+    /// @notice Returns all token IDs owned by an address (for profile/dashboard reads).
+    /// @param owner The address to query.
+    /// @return Array of token IDs held by owner.
+    function getTokenIdsOf(address owner) external view returns (uint256[] memory) {
+        return _ownerTokenIds[owner];
     }
 
     /// @notice Mints a new soulbound skill token to an address.
