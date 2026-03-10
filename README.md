@@ -1,62 +1,65 @@
-# Mana OS: The Post-Money Operating System
+# Mana OS: The Post-Money, Post-Time Operating System
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
 [![Foundry](https://img.shields.io/badge/Foundry-Smart_Contracts-blue)](https://book.getfoundry.sh/)
 [![Web3](https://img.shields.io/badge/Web3-ERC--4337-purple)](#)
-[![AI](https://img.shields.io/badge/AI-Resource_Oracle-green)](#)
+[![AI](https://img.shields.io/badge/AI-Socratic_Oracle-green)](#)
 
-> *"The system isn't broken. It's working exactly as designed: to keep you surviving, not thriving. It's time to write a new operating system for human coordination."*
+> *"The system isn't broken. It's working exactly as designed: to keep you surviving, not thriving. It's time to write a new operating system for human consciousness and coordination."*
 
-Welcome to **Mana OS**. 
-We are building an open-source, decentralized operating system for communities transitioning into a post-money, post-state, resource-based economy. 
+Welcome to **Mana OS**.
+We are building an open-source, decentralized **Healing Operating System** for communities transitioning into a post-money, post-state, and post-time economy.
 
-**⚠️ CRITICAL RULE FOR CONTRIBUTORS:** Money does not exist in this codebase. If you submit a PR containing variables like `price`, `fiat`, `budget`, or `payment_gateway`, it will be rejected. We do not trade in illusion. We trade in reality.
-
----
-
-## 🛑 The Problem: The Legacy Codebase of Society
-Humanity is running on a corrupted legacy operating system called "Fiat Economics." It utilizes engineered scarcity, infinite debt loops, and a parasitic managerial class (politicians, central banks, mega-corporations) to control the population. 
-
-Right now, humans have the technology, the natural resources, and the AI capabilities to ensure every human being lives in absolute abundance. Yet, we are trapped in "bullshit jobs" just to earn fictional tokens to pay for the right to exist. 
-
-We don't need a revolution of violence. We need a hard fork. We need to withdraw our consent and exit the system by building a better one.
+**⚠️ CRITICAL RULE FOR CONTRIBUTORS:** Money and Time-Tracking do not exist in this codebase. If you submit a PR containing variables like `price`, `budget`, `payment_gateway`, or `hoursContributed`, it will be rejected. We do not trade in the Matrix's illusions. We trade in energetic reality.
 
 ---
 
-## ⚡ The Solution: Mana OS
-Mana OS allows micro-communities, eco-villages, and decentralized networks to govern themselves, manage resources, and build infrastructure using **AI, Smart Contracts, and Direct Democracy**—without a single dollar exchanging hands.
+## 🛑 The Problem: The Matrix of Scarcity and Time
+Humanity is running on a corrupted legacy operating system called "Fiat Economics." It utilizes engineered scarcity, infinite debt loops, and coercion to control the population.
 
-We replace the concept of "Capital" with **Mana**.
-Mana is regenerative energy. It consists of:
-1. **Natural Resources:** Water, timber, concrete, solar kWh.
-2. **Human Capital:** Time, skills, mentorship.
-3. **Action Potential:** AI-simulated community projects.
+Furthermore, the Industrial Revolution infected us with the ultimate bug: **"Time is Money."** By measuring human value in "hours," the old system penalizes mastery (the master healer who cures pain in 5 minutes) and rewards inefficiency (the apprentice who drags it out for an hour). We are trapped in "bullshit jobs," forced to punch clocks just to earn fictional tokens for the right to exist.
+
+We don't need a revolution of violence. We need a hard fork. We need to withdraw our consent and exit the system by building a resilient, trauma-informed alternative.
+
+---
+
+## ⚡ The Solution: A Healing OS
+Mana OS allows micro-communities, eco-villages, and decentralized networks to govern themselves, manage resources, and build infrastructure using **AI, Smart Contracts, and Direct Democracy**—without a single dollar exchanging hands, and without forcing anyone into a quota.
+
+We replace "Capital" with **Mana** (Regenerative Energy), and we replace "Hours" with **Cycles of Resolution**.
+
+### 🏛 The 3 Layers of Sovereignty
+Mana OS is designed for sovereign, infinite beings. It inherently rejects coercion through three foundational pillars:
+1. **Unconditional Basic Abundance (UBA):** Survival is never conditional. The system holds no mechanism to withhold food, shelter, or care from any member. You do not need to "earn" your right to live.
+2. **Attraction-Based Resonance:** There are no "managers" assigning "tasks". The community board acts as a mirror of needs. Work is claimed purely by energetic attraction (Resonance). If a calling isn't claimed, it remains undone, reflecting the community's true frequency.
+3. **Dynamic Soul Contracts:** Instead of rigid weekly quotas, users periodically declare their seasonal capacity to the Oracle (e.g., "I am in a resting/healing phase," or "I am in a building phase"). The system forecasts capacity without ever inducing guilt or pressure.
 
 ---
 
 ## 🧠 Core Architecture & Features
 
-### 1. The AI Resource Oracle (Replacing Politicians)
-Instead of electing a corrupt politician to allocate budgets, users submit plain-text proposals (e.g., *"Let's build a community greenhouse"*). 
-Our AI Oracle (LLMs forced to output strict JSON schemas) acts as an objective physics simulator. It instantly breaks down the proposal into real-world costs: *"This requires 500kg of wood, 20 kWh of daily energy, 1 Advanced Carpenter, and 3 Apprentices."*
+### 1. The Socratic AI Oracle (Replacing Politicians & Planners)
+Instead of electing a politician, users chat with our AI Oracle to propose projects (e.g., *"Let's build a community greenhouse"*).
+The Oracle acts as a **Spiritual Architect**. It questions ego-driven requests gently, guiding users toward nature-aligned abundance. Once a vision is clear, it acts as an objective physics simulator, breaking down the proposal into a strict JSON plan of required Natural Resources and **Mana Cycles**.
 
-### 2. Direct On-Chain Consensus (Decentralized Democracy)
-Once the AI simulates the resource cost, the proposal is hashed and pushed to the blockchain. Every community member votes via Smart Contracts. No representatives, no lobbying. Pure, transparent, immutable consensus.
+### 2. Direct On-Chain Resonance (Decentralized Democracy)
+Once the Oracle formulates the resource plan, it is hashed on-chain. Every community member resonates (votes) via Smart Contracts. No representatives, no lobbying. Pure, transparent, immutable consensus.
 
-### 3. Gamified Human Capital & Apprenticeship (Soulbound Tokens)
-Jobs are replaced by **Contributions** (e.g., 4 hours a week). Skills are managed like an RPG leveling system:
-*   `Level 0`: Apprentice (Paired with Mentors to learn on the job).
-*   `Level 1`: Basic.
-*   `Level 2`: Advanced.
-*   `Level 3`: Mentor.
-When a member levels up, the DAO mints an **ERC-5192 Soulbound Token (SBT)** to their wallet. It’s an untransferable, unforgeable cryptographic proof of their real-world value and contribution.
+### 3. Mana Cycles & Realms of Mastery (Soulbound Tokens)
+We do not track hours. We track **Mana Cycles** (Resolutions).
+Contributions are divided into energetic **Realms**:
+*   **The Material Realm:** Agriculture, building, maintenance.
+*   **The Energetic Realm:** Medicine, psychology, conflict resolution, healing.
+*   **The Knowledge Realm:** Teaching, art, spiritual guidance, code.
+
+Mastery is managed via an RPG-like progression (Level 0 Apprentice to Level 3 Mentor). When a member completes a cycle, the receiver initiates a **Gratitude Loop**, minting/updating an **ERC-5192 Soulbound Token (SBT)** to their wallet. It's an untransferable, cryptographic proof of their energetic density and real-world value.
 
 ### 4. Gasless Web3 (Account Abstraction)
-Because money doesn't exist here, users cannot pay "Gas Fees" in crypto to vote. We utilize **ERC-4337 (Account Abstraction)** and Paymasters. The community infrastructure abstracts away the blockchain. Users just click "Vote" or "Volunteer" without ever worrying about wallet balances.
+Because money doesn't exist here, users cannot pay "Gas Fees" in crypto. We utilize **ERC-4337 (Account Abstraction)**. The community infrastructure abstracts away the blockchain. Users just click "Resonate" or "Claim Calling" without ever worrying about wallet balances or seed phrases.
 
 ### 5. Global First (i18n & Native RTL)
-This movement isn't localized. Mana OS is built from Day 1 to support any natural language, with flawless logical-property styling (Tailwind) to support Right-to-Left (RTL) languages like Hebrew and Arabic natively. 
+This movement isn't localized. Mana OS is built from Day 1 to support any natural language, with flawless logical-property styling (Tailwind) to support Right-to-Left (RTL) languages like Hebrew and Arabic natively.
 
 ---
 
@@ -68,12 +71,12 @@ We use a modern, developer-friendly Monorepo:
 *   **Framework:** Next.js (App Router), React, TypeScript.
 *   **Styling:** TailwindCSS (Logical Properties ONLY) + shadcn/ui.
 *   **Web3 Integration:** Wagmi, Viem.
-*   **AI:** Vercel AI SDK + OpenAI/Anthropic APIs (with RAG context).
+*   **AI:** Vercel AI SDK + OpenAI/Anthropic APIs.
 *   **Off-chain DB:** Supabase (PostgreSQL + pgvector).
 
 ### `Smart Contracts`
 *   **Environment:** Foundry (Forge, Anvil, Cast).
-*   **Language:** Solidity (`^0.8.20`).
+*   **Language:** Solidity (`^0.8.24`).
 *   **Standards:** OpenZeppelin (Access Control, ERC-5192 SBTs).
 
 ---
@@ -93,29 +96,18 @@ cd mana-os
 pnpm install
 ```
 
-### 2. Start the Local Blockchain (Anvil)
+### 2. Contracts (Foundry)
 ```bash
 cd contracts
 forge build
-anvil
+forge script script/DeployManaSkills.s.sol --rpc-url http://127.0.0.1:8545 --broadcast  # with Anvil running
 ```
 
-### 3. Start the Next.js App
+### 3. Frontend
 ```bash
 cd frontend
-# Create .env.local with NEXT_PUBLIC_MANA_SKILLS_ADDRESS, NEXT_PUBLIC_CHAIN_ID, NEXT_PUBLIC_RPC_URL.
-# For the AI Oracle (Phase 4): add OPENAI_API_KEY. Optional: OPENAI_ORACLE_MODEL (default: gpt-4o, fallback: gpt-4o-mini).
-pnpm run dev
+cp .env.example .env.local   # set NEXT_PUBLIC_MANA_SKILLS_ADDRESS, etc.
+pnpm dev
 ```
 
-## 🤝 Contributing: Join the Rebellion
-We don't need another DeFi protocol. We don't need another yield-farming Ponzi scheme. We need a new society.
-If you are a frontend wizard, a Solidity auditor, an AI prompt engineer, or a visionary architect, we need you.
-Check out the Issues tab for "Good First Issues".
-Read our .cursorrules to understand the coding philosophy.
-Fork the repo, write clean code, and submit a PR.
-History will not remember how comfortable we were. It will remember whether we wrote the code that set humanity free.
-
-### License: MIT. Free forever. For the people, by the people.
-
-
+For full development phases, deployment, and mint scripts, see **[PROJECT_ROADMAP.md](PROJECT_ROADMAP.md)**.
