@@ -19,14 +19,13 @@ function getTokenIdsArray(data: unknown): bigint[] {
 }
 
 /**
- * Safe read of skill record. Contract returns (string category, uint8 level, uint256 hoursContributed).
- * Wagmi/viem may return a tuple [category, level, hours] or object { category, level, hoursContributed }.
- * Level can be number or bigint (enum decoded as uint8).
+ * Safe read of skill record. Contract returns (string category, uint8 level, uint8 realm, uint256 manaCycles).
+ * Wagmi/viem may return a tuple [category, level, realm, manaCycles] or object.
  */
 function getSkillRecordFields(
   record: unknown
-): { category: string; level: number; hours: number } {
-  if (record == null) return { category: "", level: 0, hours: 0 };
+): { category: string; level: number; realm: number; manaCycles: number } {
+  if (record == null) return { category: "", level: 0, realm: 0, manaCycles: 0 };
   const toNum = (v: unknown): number =>
     typeof v === "bigint" ? Number(v) : Number(v ?? 0);
   const toStr = (v: unknown): string => (v != null ? String(v).trim() : "");
@@ -34,19 +33,21 @@ function getSkillRecordFields(
     return {
       category: toStr(record[0]),
       level: toNum(record[1]),
-      hours: toNum(record[2]),
+      realm: toNum(record[2]),
+      manaCycles: toNum(record[3]),
     };
   const o = record as Record<string, unknown>;
   return {
     category: toStr(o.category ?? o[0]),
     level: toNum(o.level ?? o[1]),
-    hours: toNum(o.hoursContributed ?? o[2]),
+    realm: toNum(o.realm ?? o[2]),
+    manaCycles: toNum(o.manaCycles ?? o[3]),
   };
 }
 
 export default function ProfilePage() {
   const [mounted, setMounted] = useState(false);
-  const { locale, t, getLevelDisplay, replace } = useLocale();
+  const { locale, t, tProposals, getLevelDisplay, getRealmDisplay, replace } = useLocale();
   const { address, isConnected, chainId: connectedChainId } = useAccount();
   const { connect, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
@@ -118,12 +119,21 @@ export default function ProfilePage() {
       >
         <div className="mx-auto max-w-2xl space-y-6">
           <nav className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
-            <Link
-              href="/"
-              className="text-emerald-400 underline underline-offset-2"
-            >
-              {t("navHome")}
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/"
+                className="text-emerald-400 underline underline-offset-2"
+              >
+                {t("navHome")}
+              </Link>
+              <span className="text-neutral-500">|</span>
+              <Link
+                href="/proposals/new"
+                className="text-emerald-400 underline underline-offset-2"
+              >
+                {tProposals("navNewProposal")}
+              </Link>
+            </div>
             <LanguageSwitcher />
           </nav>
           <h1 className="text-2xl font-bold text-neutral-100 text-start">
@@ -146,12 +156,21 @@ export default function ProfilePage() {
     >
       <div className="mx-auto max-w-2xl space-y-6">
         <nav className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
-          <Link
-            href="/"
-            className="text-emerald-400 underline underline-offset-2"
-          >
-            {t("navHome")}
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/"
+              className="text-emerald-400 underline underline-offset-2"
+            >
+              {t("navHome")}
+            </Link>
+            <span className="text-neutral-500">|</span>
+            <Link
+              href="/proposals/new"
+              className="text-emerald-400 underline underline-offset-2"
+            >
+              {tProposals("navNewProposal")}
+            </Link>
+          </div>
           <LanguageSwitcher />
         </nav>
         <h1 className="text-2xl font-bold text-neutral-100 text-start">
@@ -233,6 +252,9 @@ export default function ProfilePage() {
                     <Badge variant="secondary">{skillFields.category}</Badge>
                   ) : null}
                   <Badge>{getLevelDisplay(skillFields.level)}</Badge>
+                  <Badge variant="outline">
+                    {t("realmLabel")}: {getRealmDisplay(skillFields.realm)}
+                  </Badge>
                 </div>
                 <p className="text-sm text-neutral-400">
                   {t("proficiencyLabel")}:{" "}
@@ -245,14 +267,14 @@ export default function ProfilePage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>{t("contributionHours")}</CardTitle>
+                <CardTitle>{t("manaCycles")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-3xl font-semibold text-emerald-400">
-                  {skillFields.hours}
+                  {skillFields.manaCycles}
                 </p>
                 <Progress
-                  value={Math.min(skillFields.hours, 100)}
+                  value={Math.min(skillFields.manaCycles, 100)}
                   max={100}
                 />
               </CardContent>

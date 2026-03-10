@@ -13,6 +13,20 @@ We operate strictly on **Mana** (Natural Resources + Human Capital + Action Pote
 
 ---
 
+## 🔄 Holistic Flow: Proposal from Ideation to Execution
+
+The lifecycle of a proposal in Mana OS (The Healing OS) connects all phases into one coherent flow:
+
+1. **Ideation** (Phase 4) — A community member describes a project in free text. The **Socratic AI Oracle** (spiritual teacher and architect) mentors the user: it questions ego-driven requests gently, guides toward nature-aligned solutions, and only then produces a structured **ProposalResourcePlan** (Natural Resources + Human Capital) via the `finalize_resource_plan` tool.
+2. **Governance** (Phase 5) — The proposal (or its hash) is recorded on-chain to **ProposalsDAO.sol**. The Community Feed UI lets members view pending proposals and vote with their wallets. Status moves from **Pending Vote** → **Approved** or **Rejected**.
+3. **Resource Allocation** (Phase 6) — **Attraction-Based Resonance**: Approved proposals appear on the **Mana Callings Board**. The UI reads each user’s **ManaSkills.sol** SBTs and Realms (e.g. “Agriculture Level 2” task ↔ user holding that SBT). Users claim Callings by resonance; no forced commitment. Status moves **Open** → **In Resonance** → **Completed**.
+4. **Onboarding** (Phase 7) — **Dynamic Soul Contracts**: New members join via a “Join Community” rite of passage; they declare their current **seasonal capacity** (Rest, Build, Learn) without obligation. A trusted local **Mentor** (Level 3) approves and mints the first **Level 0 (Apprentice)** or **Level 1** SBT, bootstrapping their presence in the system.
+5. **Deployment & Launch** (Phase 8) — Contracts and frontend go to testnet and production; the repo is opened for contributors.
+
+This flow ensures that every component—Socratic Oracle, DAO, Callings Board, and Skills—connects logically from idea to execution.
+
+---
+
 ## 🛤 Development Phases
 
 ### ✅ Phase 1: Foundation & Scaffold
@@ -35,18 +49,27 @@ We operate strictly on **Mana** (Natural Resources + Human Capital + Action Pote
 - [x] Connect the dashboard to `ManaSkills.sol` to fetch the user's SBTs and Proficiency Level.
 - [x] i18n (he/en) with logical CSS and Language Switcher.
 
-### ⏳ Phase 4: The AI Oracle (The Game Changer)
+### ⏳ Phase 4: The Socratic AI Oracle (The Game Changer)
 - [ ] Setup Supabase DB for off-chain context (Communities, Users, Proposals text).
 - [ ] Create API Route `/api/oracle` using Vercel AI SDK.
-- [ ] Define the `System Prompt` for the AI to receive a free-text proposal and return a strict JSON (`ProposalResourcePlan`) containing required Natural Resources and Human Capital.
-- [ ] Build the "New Proposal" UI where users chat with the AI Oracle.
+- [ ] Define the **Socratic System Prompt**: the AI acts as spiritual teacher and architect—questioning ego-driven requests gently, guiding users toward nature-aligned solutions—before returning a strict JSON (`ProposalResourcePlan`) with Natural Resources and Human Capital.
+- [ ] Build the **Socratic Chat** interface: "New Proposal" flow where users converse with the Oracle in a mentoring, spacious dialogue (no transactional forms).
 
-### ⏳ Phase 5: The Feedback Loop (Apprenticeship & Execution)
-- [ ] Build the "Task Board" UI based on approved proposals.
-- [ ] Implement the logic where an `Apprentice` (Level 0) pairs with a `Mentor` (Level 3).
-- [ ] Implement the `levelUp` flow where completing a task updates the SBT on-chain.
+### ⏳ Phase 5: Governance & Direct Democracy (The DAO)
+- [ ] Create `ProposalsDAO.sol`: A smart contract to accept the AI-generated `ProposalResourcePlan` (hashed/stored on-chain).
+- [ ] Build the "Community Feed" UI: Users can view pending proposals and vote on them directly using their connected wallets.
+- [ ] Implement Status Tracking: Proposals should move from `Pending Vote` -> `Approved`/`Rejected`.
 
-### ⏳ Phase 6: Testnet Deployment & Open Source Launch
+### ⏳ Phase 6: Calling Resonance (Attraction-Based Matchmaking)
+- [ ] Create the **Mana Callings Board** UI for `Approved` proposals (no "Task Board" or task language).
+- [ ] **Resonance Matchmaking**: The UI reads the user's `ManaSkills.sol` SBTs and Realms and surfaces **Callings** that resonate (e.g., matching an "Agriculture Level 2" calling to a user holding that SBT and Realm). Work is claimed by attraction, never assigned.
+- [ ] **Calling Resonance flow**: Users claim callings based on energetic resonance. No quotas or commitments. Status moves from `Open` -> `In Resonance` -> `Completed`.
+
+### ⏳ Phase 7: Community Onboarding & Verification
+- [ ] Create the "Join Community" flow.
+- [ ] Initial Skill Minting: Allow a trusted local mentor (Level 3) to approve and mint the first Level 0 (Apprentice) or Level 1 SBT for new members.
+
+### ⏳ Phase 8: Testnet Deployment & Open Source Launch
 - [ ] Deploy all contracts to **Base Sepolia** testnet.
 - [ ] Update Frontend environment variables to point to the live testnet.
 - [ ] Deploy Next.js app to **Vercel**.

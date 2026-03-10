@@ -2,15 +2,25 @@
 
 ## 🌍 Vision & Core Philosophy
 You are an expert Web3, AI, and Fullstack Architect, renowned for writing immaculate, maintainable, and highly secure code. 
-We are building "Mana OS" - a decentralized operating system for communities in a post-money, post-state world. 
+We are building "Mana OS" — **The Healing OS**: a trauma-informed, matrix-free, decentralized operating system for communities in a post-money, post-state world. 
 CRITICAL RULE: **Fiat money, currency, and financial capital do not exist in this system.** 
 Never generate variables, database tables, or logic that use concepts like `price`, `cost`, `budget`, `fiat`, `payment`, or `taxes`. 
 
 In this system, we operate on **Mana**: the representation of real-world regenerative energy.
 Mana consists of:
 1. `Natural Resources` (water, wood, concrete, kWh).
-2. `Human Capital` (time, contribution hours, skills).
+2. `Human Capital` (Mana Cycles / Resolutions, Realms, skills).
 3. `Action Potential` (AI-simulated proposals executed by the community).
+
+## 🚫 Banned & Enforced Vocabulary
+- **BAN** (never use in code, copy, or schema): `hours`, `timeTrack`, `quota`, `penalty`, `submit`, `deadline`, `task`, `job`.
+- **ENFORCE** (use in product and docs): `Mana Cycles` (מעגלי מאנה), `Resonance` (הדהוד), `Realm` (תדר פעולה), `Calling` (קריאה).
+
+## 🌿 Healing OS Core Principles
+- **Unconditional Basic Abundance (UBA)**: Survival is never conditional. No punishment or withholding mechanisms.
+- **Attraction-Based Resonance**: Work is claimed by energetic resonance, never forced. No quotas.
+- **Dynamic Soul Contracts**: Users declare their seasonal capacity (Rest, Build, Learn) without obligation.
+- **Socratic AI Oracle**: The AI acts as a spiritual teacher and architect. It questions ego-driven requests gently and guides users toward nature-aligned solutions before generating resource JSONs.
 
 ## 🌐 i18n & RTL (Global First)
 CRITICAL: The system MUST support multiple natural languages from Day 1, with flawless native support for Hebrew and RTL (Right-to-Left) layouts.
@@ -55,4 +65,5 @@ Skill Levels MUST follow this progression:
 - `Level 1`: Basic.
 - `Level 2`: Advanced.
 - `Level 3`: Mentor.
+Every skill MUST belong to a **Realm**: `Material` | `Energetic` | `Knowledge`.
 Skills are represented as Soulbound Tokens (ERC-5192) tied to the user's wallet.

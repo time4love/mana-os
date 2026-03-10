@@ -103,7 +103,8 @@ anvil
 ### 3. Start the Next.js App
 ```bash
 cd frontend
-cp .env.example .env.local  # Add your OpenAI API key and Supabase details
+# Create .env.local with NEXT_PUBLIC_MANA_SKILLS_ADDRESS, NEXT_PUBLIC_CHAIN_ID, NEXT_PUBLIC_RPC_URL.
+# For the AI Oracle (Phase 4): add OPENAI_API_KEY. Optional: OPENAI_ORACLE_MODEL (default: gpt-4o, fallback: gpt-4o-mini).
 pnpm run dev
 ```
 

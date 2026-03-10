@@ -24,7 +24,11 @@ export const dictionaries: Record<
       startJourneyHint: string;
       skillLevel: string;
       proficiencyLabel: string;
-      contributionHours: string;
+      manaCycles: string;
+      realmLabel: string;
+      realmMaterial: string;
+      realmEnergetic: string;
+      realmKnowledge: string;
       wrongChain: string;
       wrongChainRpc: string;
       fallbackHint: string;
@@ -52,6 +56,23 @@ export const dictionaries: Record<
     common: {
       level: string;
     };
+    proposals: {
+      title: string;
+      navHome: string;
+      navProfile: string;
+      navNewProposal: string;
+      placeholder: string;
+      getResourcePlan: string;
+      loading: string;
+      error: string;
+      resultTitle: string;
+      naturalResources: string;
+      humanCapital: string;
+      chatPlaceholder: string;
+      chatSend: string;
+      oracleLabel: string;
+      youLabel: string;
+    };
   }
 > = {
   he: {
@@ -68,13 +89,17 @@ export const dictionaries: Record<
         "לא ניתן לטעון כישורים. ודא שאתה ברשת Anvil (Chain ID 31337) ושהוגדר חוזה ManaSkills ב-NEXT_PUBLIC_MANA_SKILLS_ADDRESS.",
       welcomeTitle: "ברוך הבא",
       welcomeBody:
-        "עדיין אין לך כישורי מאנה רשומים. התחל את המסע שלך על ידי השגת אסימון שוליה (Apprentice) — תוכל לצבור שעות ולעלות רמה דרך תרומה לקהילה.",
+        "עדיין אין לך כישורי מאנה רשומים. התחל את המסע שלך על ידי השגת אסימון שוליה (Apprentice) — תוכל לצבור מעגלי מאנה ולעלות רמה דרך תהודה והתמסרות לקהילה.",
       startJourney: "התחל את מסע המאנה שלך",
       startJourneyHint:
         "כרגע: הרץ את סקריפט ה-CLI כדי להנפיק אסימון בדיקה (למשל Agriculture, בסיסי). בהמשך אפשר לחבר כפתור זה לפעולת mint מתוך הממשק.",
       skillLevel: "רמת מיומנות",
       proficiencyLabel: "רמת מיומנות",
-      contributionHours: "שעות תרומה",
+      manaCycles: "מעגלי מאנה",
+      realmLabel: "תדר",
+      realmMaterial: "חומר",
+      realmEnergetic: "אנרגיה",
+      realmKnowledge: "ידע",
       wrongChain:
         "הארנק מחובר לרשת אחרת. עבור לרשת Anvil (Chain ID {chainId}) כדי לראות את כישורי המאנה שלך.",
       wrongChainRpc: "ברשת הנכונה: RPC http://127.0.0.1:8545 (או הערך ב-NEXT_PUBLIC_RPC_URL)",
@@ -105,6 +130,23 @@ export const dictionaries: Record<
     common: {
       level: "רמה",
     },
+    proposals: {
+      title: "הצעה חדשה — אורקל המאנה",
+      navHome: "← ראשי",
+      navProfile: "פרופיל",
+      navNewProposal: "הצעה חדשה",
+      placeholder: "תאר את ההצעה או הפרויקט הקהילתי שלך (טקסט חופשי)...",
+      getResourcePlan: "קבל תוכנית משאבים",
+      loading: "האורקל מנתח...",
+      error: "שגיאה ביצירת תוכנית משאבים.",
+      resultTitle: "תוכנית משאבים (מאנה)",
+      naturalResources: "משאבים טבעיים",
+      humanCapital: "הון אנושי",
+      chatPlaceholder: "הקלד הודעה...",
+      chatSend: "שלח",
+      oracleLabel: "אורקל המאנה",
+      youLabel: "את/ה",
+    },
   },
   en: {
     profile: {
@@ -120,13 +162,17 @@ export const dictionaries: Record<
         "Could not load skills. Ensure you are on Anvil (Chain ID 31337) and NEXT_PUBLIC_MANA_SKILLS_ADDRESS is set.",
       welcomeTitle: "Welcome",
       welcomeBody:
-        "You have no Mana skills yet. Start your journey by earning an Apprentice token — you can earn hours and level up through community contribution.",
+        "You have no Mana skills yet. Start your journey by earning an Apprentice token — you can grow mana cycles and level up through resonance and presence in the community.",
       startJourney: "Start your Mana journey",
       startJourneyHint:
         "For now: run the CLI mint script to mint a test token (e.g. Agriculture, Basic). Later this button can trigger mint from the UI.",
       skillLevel: "Skill level",
       proficiencyLabel: "Proficiency",
-      contributionHours: "Contribution hours",
+      manaCycles: "Mana Cycles",
+      realmLabel: "Realm",
+      realmMaterial: "Material",
+      realmEnergetic: "Energetic",
+      realmKnowledge: "Knowledge",
       wrongChain:
         "Wallet is on a different network. Switch to Anvil (Chain ID {chainId}) to view your Mana skills.",
       wrongChainRpc: "Correct network RPC: http://127.0.0.1:8545 (or set NEXT_PUBLIC_RPC_URL)",
@@ -157,6 +203,23 @@ export const dictionaries: Record<
     common: {
       level: "Level",
     },
+    proposals: {
+      title: "New Proposal — Mana Oracle",
+      navHome: "← Home",
+      navProfile: "Profile",
+      navNewProposal: "New proposal",
+      placeholder: "Describe your community proposal or project (free text)...",
+      getResourcePlan: "Get resource plan",
+      loading: "Oracle is analyzing...",
+      error: "Failed to generate resource plan.",
+      resultTitle: "Resource plan (Mana)",
+      naturalResources: "Natural resources",
+      humanCapital: "Human capital",
+      chatPlaceholder: "Type a message...",
+      chatSend: "Send",
+      oracleLabel: "Mana Oracle",
+      youLabel: "You",
+    },
   },
 };
 
@@ -171,4 +234,10 @@ export function getLevelDisplay(locale: Locale, level: number): string {
   const label = getProficiencyLabel(locale, level);
   const levelNum = Math.max(0, Math.min(level, 3));
   return `${dictionaries[locale].common.level} ${levelNum}: ${label}`;
+}
+
+const realmKeys = ["realmMaterial", "realmEnergetic", "realmKnowledge"] as const;
+export function getRealmDisplay(locale: Locale, realmIndex: number): string {
+  const key = realmKeys[Math.max(0, Math.min(realmIndex, 2))];
+  return dictionaries[locale].profile[key] ?? "—";
 }

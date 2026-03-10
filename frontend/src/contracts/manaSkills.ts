@@ -7,7 +7,7 @@ export const MANA_SKILLS_ADDRESS =
   (process.env.NEXT_PUBLIC_MANA_SKILLS_ADDRESS as `0x${string}`) ||
   "0x0000000000000000000000000000000000000000";
 
-/** Minimal ABI for reading skill records and token ownership. Level is enum (uint8): 0=Apprentice, 1=Basic, 2=Advanced, 3=Mentor. */
+/** Minimal ABI for reading skill records and token ownership. Level enum (uint8): 0=Apprentice, 1=Basic, 2=Advanced, 3=Mentor. Realm enum (uint8): 0=Material, 1=Energetic, 2=Knowledge. */
 export const MANA_SKILLS_ABI = [
   {
     inputs: [{ name: "tokenId", type: "uint256" }],
@@ -15,7 +15,8 @@ export const MANA_SKILLS_ABI = [
     outputs: [
       { name: "category", type: "string" },
       { name: "level", type: "uint8" },
-      { name: "hoursContributed", type: "uint256" },
+      { name: "realm", type: "uint8" },
+      { name: "manaCycles", type: "uint256" },
     ],
     stateMutability: "view",
     type: "function",
@@ -36,4 +37,4 @@ export const MANA_SKILLS_ABI = [
   },
 ] as const;
 
-export type ManaSkillsSkillRecord = readonly [string, number, bigint];
+export type ManaSkillsSkillRecord = readonly [string, number, number, bigint];

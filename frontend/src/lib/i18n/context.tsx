@@ -14,6 +14,7 @@ import {
   dictionaries,
   getProficiencyLabel as getProficiencyLabelI18n,
   getLevelDisplay as getLevelDisplayI18n,
+  getRealmDisplay as getRealmDisplayI18n,
 } from "./dictionaries";
 
 const STORAGE_KEY = "mana-os-locale";
@@ -35,8 +36,10 @@ type LocaleContextValue = {
   setLocale: (next: Locale) => void;
   t: (key: keyof (typeof dictionaries.he)["profile"]) => string;
   tError: (key: keyof (typeof dictionaries.he)["errorProfile"]) => string;
+  tProposals: (key: keyof (typeof dictionaries.he)["proposals"]) => string;
   getProficiencyLabel: (level: number) => string;
   getLevelDisplay: (level: number) => string;
+  getRealmDisplay: (realmIndex: number) => string;
   replace: (template: string, vars: Record<string, string | number>) => string;
 };
 
@@ -76,6 +79,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     [dict]
   );
 
+  const tProposals = useCallback(
+    (key: keyof (typeof dictionaries.he)["proposals"]) => dict.proposals[key],
+    [dict]
+  );
+
   const getProficiencyLabel = useCallback(
     (level: number) => getProficiencyLabelI18n(locale, level),
     [locale]
@@ -83,6 +91,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   const getLevelDisplay = useCallback(
     (level: number) => getLevelDisplayI18n(locale, level),
+    [locale]
+  );
+
+  const getRealmDisplay = useCallback(
+    (realmIndex: number) => getRealmDisplayI18n(locale, realmIndex),
     [locale]
   );
 
@@ -103,8 +116,10 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       setLocale,
       t,
       tError,
+      tProposals,
       getProficiencyLabel,
       getLevelDisplay,
+      getRealmDisplay,
       replace,
     }),
     [
@@ -112,8 +127,10 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       setLocale,
       t,
       tError,
+      tProposals,
       getProficiencyLabel,
       getLevelDisplay,
+      getRealmDisplay,
       replace,
     ]
   );

@@ -7,7 +7,7 @@ import { ManaSkills } from "../src/ManaSkills.sol";
 
 /**
  * @title MintInitialSkill
- * @notice Mints an initial Agriculture (Basic, 10h) skill token to a test address.
+ * @notice Mints an initial Agriculture (Basic, Realm Material, 10 mana cycles) skill token to a test address.
  * @dev Run against a deployed ManaSkills contract. Owner must be the broadcaster.
  *      Usage:
  *        1. Deploy ManaSkills: forge script script/DeployManaSkills.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
@@ -32,12 +32,13 @@ contract MintInitialSkill is Script {
             ANVIL_DEFAULT_RECIPIENT,
             "Agriculture",
             ManaSkills.ProficiencyLevel.Basic, // Level 1
-            10
+            ManaSkills.Realm.Material,
+            10 // mana cycles
         );
         vm.stopBroadcast();
 
         console2.log("Minted ManaSkills token ID:", tokenId);
         console2.log("Recipient:", ANVIL_DEFAULT_RECIPIENT);
-        console2.log("Category: Agriculture, Level: Basic (1), Hours: 10");
+        console2.log("Category: Agriculture, Level: Basic (1), Realm: Material, Mana Cycles: 10");
     }
 }
