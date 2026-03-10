@@ -59,6 +59,11 @@ You must write production-grade, enterprise-level code following Clean Code and 
 - Handle loading and error states gracefully (using Suspense, Error Boundaries, or skeleton loaders).
 - AI responses must be strongly typed using Zod schemas and streamed to the UI.
 
+## 🌿 Healing UX & UI Principles
+- **No Traditional Forms**: Avoid rigid `<form>`, `<input type="text">`, and "Submit" buttons for conceptual flows (e.g., onboarding, soul contracts). Use fluid, state-based step transitions instead.
+- **Biomimicry Animations**: Use `framer-motion` for transitions. Elements should fade in, float, and expand softly (like breathing or water ripples). No harsh pops or instant state changes.
+- **Concept Whispers (Non-intrusive Learning)**: Unfamiliar terms (e.g., Mana, Realm, Resonance) must use an inline **Concept Whisper** component. The word has a subtle pulsing underline or soft emerald glow; on click/tap it smoothly expands inline to reveal a short definition without modals or breaking flow.
+
 ## 🧠 Workflows & RPG Data Modeling
 Skill Levels MUST follow this progression:
 - `Level 0`: Apprentice (Paired with Mentors).

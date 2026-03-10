@@ -73,6 +73,25 @@ export const dictionaries: Record<
       oracleLabel: string;
       youLabel: string;
     };
+    onboarding: {
+      welcomeHome: string;
+      tapToContinue: string;
+      seasonQuestion: string;
+      seasonWinter: string;
+      seasonSpring: string;
+      seasonSummer: string;
+      realmQuestion: string;
+      realmQuestionPrefix: string;
+      realmQuestionSuffix: string;
+      manaTerm: string;
+      realmMaterialLabel: string;
+      realmEnergeticLabel: string;
+      realmKnowledgeLabel: string;
+      manaWhisperDefinition: string;
+      genesisText: string;
+      readyLabel: string;
+      navHome: string;
+    };
   }
 > = {
   he: {
@@ -147,6 +166,28 @@ export const dictionaries: Record<
       oracleLabel: "אורקל המאנה",
       youLabel: "את/ה",
     },
+    onboarding: {
+      welcomeHome:
+        "ברוך הבא הביתה. כאן אין מחירים, אין חובות ואין שעונים. זכותך להתקיים אינה מותנית. קח נשימה עמוקה...",
+      tapToContinue: "גע במעגל כדי להמשיך",
+      seasonQuestion: "הטבע נע במעגלים. באיזה עונה פנימית אתה או את נמצאים כרגע?",
+      seasonWinter: "חורף (מנוחה וריפוי)",
+      seasonSpring: "אביב (למידה וצמיחה)",
+      seasonSummer: "קיץ (יצירה והדהוד)",
+      realmQuestion: "לאן המאנה שלך רוצה לזרום העונה?",
+      realmQuestionPrefix: "לאן ",
+      realmQuestionSuffix: " שלך רוצה לזרום העונה?",
+      manaTerm: "המאנה",
+      realmMaterialLabel: "תדר חומר (אדמה)",
+      realmEnergeticLabel: "תדר אנרגיה (רוח)",
+      realmKnowledgeLabel: "תדר ידע (נפש)",
+      manaWhisperDefinition:
+        "מאנה היא האנרגיה המחדשת של הטבע ושל כוונה אנושית — במקום כסף.",
+      genesisText:
+        "חתימת האנרגיה שלך מוכנה. כדי להעיר אותה, פגש/י מנחה קהילתי מקומי פנים אל פנים. הם ימסרו לך את התהודה הראשונה שלך.",
+      readyLabel: "מוכן",
+      navHome: "← ראשי",
+    },
   },
   en: {
     profile: {
@@ -219,6 +260,28 @@ export const dictionaries: Record<
       chatSend: "Send",
       oracleLabel: "Mana Oracle",
       youLabel: "You",
+    },
+    onboarding: {
+      welcomeHome:
+        "Welcome home. Here, there are no prices, no debts, and no clocks. Your right to exist is unconditional. Take a deep breath...",
+      tapToContinue: "Tap the circle to continue",
+      seasonQuestion: "Nature moves in cycles. What internal season are you currently in?",
+      seasonWinter: "Winter (Rest & Healing)",
+      seasonSpring: "Spring (Learning & Growing)",
+      seasonSummer: "Summer (Creating & Resonating)",
+      realmQuestion: "Where does your Mana wish to flow this season?",
+      realmQuestionPrefix: "Where does your ",
+      realmQuestionSuffix: " wish to flow this season?",
+      manaTerm: "Mana",
+      realmMaterialLabel: "Material Realm (Earth)",
+      realmEnergeticLabel: "Energetic Realm (Spirit)",
+      realmKnowledgeLabel: "Knowledge Realm (Mind)",
+      manaWhisperDefinition:
+        "Mana is the regenerative energy of nature and human intention — it replaces money.",
+      genesisText:
+        "Your energetic signature is ready. To awaken it, meet a local community mentor eye-to-eye. They will grant your first resonance.",
+      readyLabel: "Ready",
+      navHome: "← Home",
     },
   },
 };

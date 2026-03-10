@@ -65,8 +65,8 @@ This flow ensures that every component—Socratic Oracle, DAO, Callings Board, a
 - [ ] **Resonance Matchmaking**: The UI reads the user's `ManaSkills.sol` SBTs and Realms and surfaces **Callings** that resonate (e.g., matching an "Agriculture Level 2" calling to a user holding that SBT and Realm). Work is claimed by attraction, never assigned.
 - [ ] **Calling Resonance flow**: Users claim callings based on energetic resonance. No quotas or commitments. Status moves from `Open` -> `In Resonance` -> `Completed`.
 
-### ⏳ Phase 7: Community Onboarding & Verification
-- [ ] Create the "Join Community" flow.
+### 🚧 Phase 7: Community Onboarding & Verification (Rite of Passage)
+- [x] Create the "Join Community" onboarding flow (Breath → Soul Contract/Seasons → Realm → Genesis Anchor) with fluid step transitions and Concept Whispers.
 - [ ] Initial Skill Minting: Allow a trusted local mentor (Level 3) to approve and mint the first Level 0 (Apprentice) or Level 1 SBT for new members.
 
 ### ⏳ Phase 8: Testnet Deployment & Open Source Launch
