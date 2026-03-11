@@ -1,6 +1,6 @@
 # 🗺 Mana OS - Project Roadmap & Architecture
 
-## 👁 The Vision
+## The Vision
 Mana OS is a decentralized, moneyless operating system for self-governing communities. 
 We operate strictly on **Mana** (Natural Resources + Human Capital + Action Potential). Fiat currency, prices, and traditional economic concepts DO NOT EXIST in this system.
 

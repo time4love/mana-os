@@ -64,7 +64,14 @@ export const dictionaries: Record<
       navHome: string;
       navProfile: string;
       navNewProposal: string;
+      navFeed: string;
       placeholder: string;
+      visionTitleLabel: string;
+      visionTitlePlaceholder: string;
+      resonateButtonLabel: string;
+      visionSproutingMessage: string;
+      feedTitle: string;
+      feedEmpty: string;
       getResourcePlan: string;
       loading: string;
       error: string;
@@ -76,6 +83,24 @@ export const dictionaries: Record<
       chatSend: string;
       oracleLabel: string;
       youLabel: string;
+      resonateWithVision: string;
+      resonanceCount: string;
+      sproutedLabel: string;
+      needSbtToResonate: string;
+      alreadyResonated: string;
+    };
+    communities: {
+      genesisTitle: string;
+      genesisPlaceholder: string;
+      seedManifestedMessage: string;
+      nurseryTitle: string;
+      nurserySubtitle: string;
+      nurseryEmpty: string;
+      waterTheSeed: string;
+      alreadyJoined: string;
+      criticalMass: string;
+      navSeeds: string;
+      navGenesis: string;
     };
     home: {
       welcomeTitle: string;
@@ -191,7 +216,14 @@ export const dictionaries: Record<
       navHome: "← ראשי",
       navProfile: "פרופיל",
       navNewProposal: "הצעה חדשה",
+      navFeed: "המדורה",
       placeholder: "תאר את ההצעה או הפרויקט הקהילתי שלך (טקסט חופשי)...",
+      visionTitleLabel: "שם החזון",
+      visionTitlePlaceholder: "כותרת קצרה לחזון",
+      resonateButtonLabel: "הדהד חזון זה לקהילה",
+      visionSproutingMessage: "החזון נובט בקהילה...",
+      feedTitle: "המדורה",
+      feedEmpty: "אין עדיין הצעות. היה/י הראשון/ה להדהד חזון.",
       getResourcePlan: "קבל תוכנית משאבים",
       loading: "האורקל מנתח...",
       error: "שגיאה ביצירת תוכנית משאבים.",
@@ -203,6 +235,24 @@ export const dictionaries: Record<
       chatSend: "שלח",
       oracleLabel: "אורקל המאנה",
       youLabel: "את/ה",
+      resonateWithVision: "הדהד עם החזון",
+      resonanceCount: "הדהודים",
+      sproutedLabel: "נבט — עבר לשלב ביצוע",
+      needSbtToResonate: "נדרש אסימון ManaSkills (SBT) כדי להדהד.",
+      alreadyResonated: "כבר הדהדת עם החזון הזה.",
+    },
+    communities: {
+      genesisTitle: "זרע קהילה חדשה",
+      genesisPlaceholder: "ספר/י לאורקל הגנסיס על החזון שלך...",
+      seedManifestedMessage: "הזרע נוצר. ממתין להגשמה במדור הזרעים.",
+      nurseryTitle: "משתלת הזרעים",
+      nurserySubtitle: "קהילות ממתינות להגשמה — השקה זרע והצטרף לחזון",
+      nurseryEmpty: "אין זרעים במשתלה. צור/י זרע חדש באורקל הגנסיס.",
+      waterTheSeed: "השקה את הזרע (הצטרף לחזון)",
+      alreadyJoined: "כבר הצטרפת לזרע הזה.",
+      criticalMass: "מסה קריטית",
+      navSeeds: "הזרעים",
+      navGenesis: "זרע חדש",
     },
     onboarding: {
       welcomeHome:
@@ -309,7 +359,14 @@ export const dictionaries: Record<
       navHome: "← Home",
       navProfile: "Profile",
       navNewProposal: "New proposal",
+      navFeed: "The Hearth",
       placeholder: "Describe your community proposal or project (free text)...",
+      visionTitleLabel: "Vision Title",
+      visionTitlePlaceholder: "A short title for your vision",
+      resonateButtonLabel: "Resonate Vision to Community",
+      visionSproutingMessage: "Vision is sprouting in the community…",
+      feedTitle: "The Community Hearth",
+      feedEmpty: "No proposals yet. Be the first to resonate a vision.",
       getResourcePlan: "Get resource plan",
       loading: "Oracle is analyzing...",
       error: "Failed to generate resource plan.",
@@ -321,6 +378,24 @@ export const dictionaries: Record<
       chatSend: "Send",
       oracleLabel: "Mana Oracle",
       youLabel: "You",
+      resonateWithVision: "Resonate with Vision",
+      resonanceCount: "Resonance",
+      sproutedLabel: "Sprouted — Ready for Action",
+      needSbtToResonate: "A ManaSkills SBT is required to resonate.",
+      alreadyResonated: "You have already resonated with this vision.",
+    },
+    communities: {
+      genesisTitle: "Plant a Community Seed",
+      genesisPlaceholder: "Tell the Genesis Oracle about your vision...",
+      seedManifestedMessage: "Seed created. Awaiting manifestation in the Nursery.",
+      nurseryTitle: "The Seed Nursery",
+      nurserySubtitle: "Communities pending manifestation — water a seed and join the vision",
+      nurseryEmpty: "No seeds in the nursery. Plant one with the Genesis Oracle.",
+      waterTheSeed: "Water the Seed (Resonate & Join)",
+      alreadyJoined: "You have already joined this seed.",
+      criticalMass: "Critical mass",
+      navSeeds: "Seeds",
+      navGenesis: "New seed",
     },
     onboarding: {
       welcomeHome:

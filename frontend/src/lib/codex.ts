@@ -6,7 +6,9 @@
 export type CodexChapterId =
   | "genesis-resonance"
   | "soul-contract-seasons"
-  | "what-is-mana";
+  | "what-is-mana"
+  | "sprouting-threshold"
+  | "sybil-resistance";
 
 export interface CodexChapter {
   title: string;

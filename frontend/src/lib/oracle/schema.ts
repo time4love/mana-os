@@ -34,6 +34,21 @@ export const ProposalResourcePlanSchema = z.object({
     .describe("List of labor requirements by skill and level"),
 });
 
+/**
+ * Genesis Oracle: community seed output. Minimum critical mass is calculated by the Oracle
+ * based on vision scope (e.g. garden = 3, clinic = 50). No money/hours.
+ */
+export const CommunitySeedSchema = z.object({
+  name: z.string().describe("Short name for the community"),
+  vision: z.string().describe("The vision or purpose of the community"),
+  requiredCriticalMass: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .describe("Minimum number of people needed to sustain this vision without burnout; you calculate from scope, location, and Realms"),
+});
+
 export type NaturalResourceItem = z.infer<typeof NaturalResourceItemSchema>;
 export type HumanCapitalItem = z.infer<typeof HumanCapitalItemSchema>;
 export type ProposalResourcePlan = z.infer<typeof ProposalResourcePlanSchema>;
+export type CommunitySeed = z.infer<typeof CommunitySeedSchema>;

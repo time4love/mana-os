@@ -5,7 +5,6 @@ import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/i18n/context";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 interface ProfileErrorProps {
   error: Error & { digest?: string };
@@ -35,7 +34,6 @@ export default function ProfileError({ error, reset }: ProfileErrorProps) {
           >
             {t("navHome")}
           </Link>
-          <LanguageSwitcher />
         </nav>
         <h1 className="text-2xl font-bold text-foreground text-start">
           {t("title")}

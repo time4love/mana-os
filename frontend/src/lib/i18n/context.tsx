@@ -37,6 +37,7 @@ type LocaleContextValue = {
   t: (key: keyof (typeof dictionaries.he)["profile"]) => string;
   tError: (key: keyof (typeof dictionaries.he)["errorProfile"]) => string;
   tProposals: (key: keyof (typeof dictionaries.he)["proposals"]) => string;
+  tCommunities: (key: keyof (typeof dictionaries.he)["communities"]) => string;
   tOnboarding: (key: keyof (typeof dictionaries.he)["onboarding"]) => string;
   tHome: (key: keyof (typeof dictionaries.he)["home"]) => string;
   getProficiencyLabel: (level: number) => string;
@@ -86,6 +87,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     [dict]
   );
 
+  const tCommunities = useCallback(
+    (key: keyof (typeof dictionaries.he)["communities"]) => dict.communities[key],
+    [dict]
+  );
+
   const tOnboarding = useCallback(
     (key: keyof (typeof dictionaries.he)["onboarding"]) => dict.onboarding[key],
     [dict]
@@ -129,6 +135,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       t,
       tError,
       tProposals,
+      tCommunities,
       tOnboarding,
       tHome,
       getProficiencyLabel,
@@ -142,6 +149,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       t,
       tError,
       tProposals,
+      tCommunities,
       tOnboarding,
       tHome,
       getProficiencyLabel,

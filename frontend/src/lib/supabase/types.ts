@@ -1,9 +1,27 @@
 /**
  * Supabase database types for Mana OS.
  * Profiles table: wallet → Soul Contract (season + realms).
+ * Proposals table: community proposals with Oracle resource plans.
  */
 
 export type ProfileStatus = "pending_genesis" | "anchored";
+
+export type ProposalStatus = "pending_resonance" | "approved" | "rejected";
+
+export type CommunityStatus = "pending_manifestation" | "manifested";
+
+export interface ProposalResourcePlanJson {
+  naturalResources: Array<{
+    resourceName: string;
+    quantity: number;
+    unit: string;
+  }>;
+  humanCapital: Array<{
+    requiredSkillCategory: string;
+    requiredLevel: number;
+    manaCycles: number;
+  }>;
+}
 
 export interface Database {
   public: {
@@ -31,8 +49,86 @@ export interface Database {
           created_at?: string;
         };
       };
+      proposals: {
+        Row: {
+          id: string;
+          creator_wallet: string;
+          title: string;
+          description: string;
+          resource_plan: ProposalResourcePlanJson;
+          status: ProposalStatus;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          creator_wallet: string;
+          title: string;
+          description: string;
+          resource_plan: ProposalResourcePlanJson;
+          status?: ProposalStatus;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          creator_wallet?: string;
+          title?: string;
+          description?: string;
+          resource_plan?: ProposalResourcePlanJson;
+          status?: ProposalStatus;
+          created_at?: string;
+        };
+      };
+      communities: {
+        Row: {
+          id: string;
+          founder_wallet: string;
+          name: string;
+          vision: string;
+          required_critical_mass: number;
+          status: CommunityStatus;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          founder_wallet: string;
+          name: string;
+          vision: string;
+          required_critical_mass: number;
+          status?: CommunityStatus;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          founder_wallet?: string;
+          name?: string;
+          vision?: string;
+          required_critical_mass?: number;
+          status?: CommunityStatus;
+          created_at?: string;
+        };
+      };
+      community_members: {
+        Row: {
+          community_id: string;
+          wallet_address: string;
+          joined_at: string;
+        };
+        Insert: {
+          community_id: string;
+          wallet_address: string;
+          joined_at?: string;
+        };
+        Update: {
+          community_id?: string;
+          wallet_address?: string;
+          joined_at?: string;
+        };
+      };
     };
   };
 }
 
 export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+export type ProposalRow = Database["public"]["Tables"]["proposals"]["Row"];
+export type CommunityRow = Database["public"]["Tables"]["communities"]["Row"];
+export type CommunityMemberRow = Database["public"]["Tables"]["community_members"]["Row"];

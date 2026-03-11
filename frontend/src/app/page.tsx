@@ -46,8 +46,11 @@ export default function HomePage() {
   const { address, isConnected } = useAccount();
   const { connectAsync, connectors, isPending: isConnecting } = useConnect();
   const [profile, setProfile] = useState<ProfileRow | null | undefined>(undefined);
+  const [mounted, setMounted] = useState(false);
 
   useProfileGuard();
+
+  useEffect(() => setMounted(true), []);
 
   const fetchProfile = useCallback(async (walletAddress: string) => {
     const result = await getProfileByWallet(walletAddress);
@@ -86,7 +89,9 @@ export default function HomePage() {
   const firstConnector = connectors[0];
   const isRtl = locale === "he";
 
-  if (!isConnected) {
+  // Defer connection-dependent UI until after mount to avoid hydration mismatch
+  // (server has no wallet; client may restore connection from storage)
+  if (!mounted || !isConnected) {
     return (
       <main
         className="flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center px-6 py-12"

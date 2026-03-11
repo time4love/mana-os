@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useLocale } from "@/lib/i18n/context";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { CodexSheet } from "@/components/ui/CodexSheet";
 import { getProfileByWallet, type ProfileRow } from "@/app/actions/onboarding";
 import { Leaf } from "lucide-react";
@@ -182,7 +181,6 @@ export default function ProfilePage() {
                 {tProposals("navNewProposal")}
               </Link>
             </div>
-            <LanguageSwitcher />
           </nav>
           <h1 className="text-2xl font-bold text-foreground text-start">
             {t("title")}
@@ -219,7 +217,6 @@ export default function ProfilePage() {
               {tProposals("navNewProposal")}
             </Link>
           </div>
-          <LanguageSwitcher />
         </nav>
         <h1 className="text-2xl font-bold text-foreground text-start">
           {t("title")}

@@ -1,17 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { useAccount } from "wagmi";
 import { useLocale } from "@/lib/i18n/context";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { ManaResourcePlanCard } from "@/components/proposals/ManaResourcePlanCard";
 import type { ProposalResourcePlan } from "@/lib/oracle/schema";
+import { resonateProposal } from "@/app/actions/proposals";
 
 export default function NewProposalPage() {
+  const router = useRouter();
   const { locale, tProposals } = useLocale();
+  const { address } = useAccount();
   const [input, setInput] = useState("");
 
   const { messages, sendMessage, status } = useChat({
@@ -29,6 +33,27 @@ export default function NewProposalPage() {
     sendMessage({ text: trimmed });
     setInput("");
   }
+
+  const lastUserMessageText = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        const textPart = messages[i].parts?.find((p) => p.type === "text");
+        if (textPart && "text" in textPart) return (textPart as { text: string }).text ?? "";
+        return "";
+      }
+    }
+    return "";
+  })();
+
+  const handleResonate = useCallback(
+    async (plan: ProposalResourcePlan, title: string, description: string) => {
+      if (!address) return { success: false as const, error: "Wallet not connected" };
+      const result = await resonateProposal(address, title, description, plan);
+      if (result.success) router.push("/feed");
+      return result;
+    },
+    [address, router]
+  );
 
   return (
     <main
@@ -52,7 +77,6 @@ export default function NewProposalPage() {
               {tProposals("navProfile")}
             </Link>
           </div>
-          <LanguageSwitcher />
         </nav>
 
         <h1 className="text-2xl font-bold text-foreground text-start mb-6">
@@ -118,6 +142,19 @@ export default function NewProposalPage() {
                               )}
                               humanCapitalLabel={tProposals("humanCapital")}
                               manaCyclesUnit={tProposals("manaCyclesUnit")}
+                              showResonateCTA={!!address}
+                              visionTitleLabel={tProposals("visionTitleLabel")}
+                              visionTitlePlaceholder={tProposals(
+                                "visionTitlePlaceholder"
+                              )}
+                              resonateButtonLabel={tProposals(
+                                "resonateButtonLabel"
+                              )}
+                              visionSproutingMessage={tProposals(
+                                "visionSproutingMessage"
+                              )}
+                              initialDescription={lastUserMessageText}
+                              onResonate={handleResonate}
                             />
                           );
                         }
