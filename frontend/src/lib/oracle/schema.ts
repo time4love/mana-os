@@ -11,13 +11,14 @@ export const NaturalResourceItemSchema = z.object({
 });
 
 /**
- * Human capital requirement: skill category, proficiency level, and time.
+ * Human capital requirement: skill category, proficiency level, and Mana Cycles.
  * Level 0=Apprentice, 1=Basic, 2=Advanced, 3=Mentor per Mana OS RPG model.
+ * Effort is measured in Mana Cycles only—never in hours or time.
  */
 export const HumanCapitalItemSchema = z.object({
   requiredSkillCategory: z.string().describe("Skill category, e.g. Agriculture, Construction, Teaching"),
   requiredLevel: z.coerce.number().int().min(0).max(3).describe("0=Apprentice, 1=Basic, 2=Advanced, 3=Mentor"),
-  estimatedHours: z.coerce.number().nonnegative().describe("Estimated person-hours of labor"),
+  manaCycles: z.coerce.number().nonnegative().describe("Number of Mana Cycles (resolutions) required for this role; you calculate this from the physical scope"),
 });
 
 /**

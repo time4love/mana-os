@@ -36,7 +36,7 @@ export interface NaturalResource {
 }
 
 // ---------------------------------------------------------------------------
-// Human Capital — skills and time required
+// Human Capital — skills and Mana Cycles required (no hours/time)
 // ---------------------------------------------------------------------------
 
 export interface HumanCapital {
@@ -44,8 +44,8 @@ export interface HumanCapital {
   skillCategory: string;
   /** Required proficiency level (0=Apprentice … 3=Mentor). */
   requiredLevel: ProficiencyLevel;
-  /** Estimated contribution hours. */
-  estimatedHours: number;
+  /** Number of Mana Cycles (resolutions) required; calculated by the Oracle from physical scope. */
+  manaCycles: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +55,7 @@ export interface HumanCapital {
 export interface ProposalResourcePlan {
   /** Natural resources required for the proposal. */
   naturalResources: NaturalResource[];
-  /** Human capital (skills + level + hours) required. */
+  /** Human capital (skills + level + Mana Cycles) required. */
   humanCapital: HumanCapital[];
   /**
    * Abstract score representing total energy required to execute the proposal.

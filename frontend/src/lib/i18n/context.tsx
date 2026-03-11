@@ -38,6 +38,7 @@ type LocaleContextValue = {
   tError: (key: keyof (typeof dictionaries.he)["errorProfile"]) => string;
   tProposals: (key: keyof (typeof dictionaries.he)["proposals"]) => string;
   tOnboarding: (key: keyof (typeof dictionaries.he)["onboarding"]) => string;
+  tHome: (key: keyof (typeof dictionaries.he)["home"]) => string;
   getProficiencyLabel: (level: number) => string;
   getLevelDisplay: (level: number) => string;
   getRealmDisplay: (realmIndex: number) => string;
@@ -90,6 +91,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     [dict]
   );
 
+  const tHome = useCallback(
+    (key: keyof (typeof dictionaries.he)["home"]) => dict.home[key],
+    [dict]
+  );
+
   const getProficiencyLabel = useCallback(
     (level: number) => getProficiencyLabelI18n(locale, level),
     [locale]
@@ -124,6 +130,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       tError,
       tProposals,
       tOnboarding,
+      tHome,
       getProficiencyLabel,
       getLevelDisplay,
       getRealmDisplay,
@@ -136,6 +143,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       tError,
       tProposals,
       tOnboarding,
+      tHome,
       getProficiencyLabel,
       getLevelDisplay,
       getRealmDisplay,

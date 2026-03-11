@@ -8,6 +8,7 @@ interface ManaResourcePlanCardProps {
   resultTitle: string;
   naturalResourcesLabel: string;
   humanCapitalLabel: string;
+  manaCyclesUnit?: string;
 }
 
 export function ManaResourcePlanCard({
@@ -15,6 +16,7 @@ export function ManaResourcePlanCard({
   resultTitle,
   naturalResourcesLabel,
   humanCapitalLabel,
+  manaCyclesUnit = "Mana Cycles",
 }: ManaResourcePlanCardProps) {
   return (
     <Card className="border-primary/30 bg-primary/5 shadow-soft">
@@ -47,7 +49,7 @@ export function ManaResourcePlanCard({
               {plan.humanCapital.map((h, i) => (
                 <li key={i}>
                   {h.requiredSkillCategory} (Level {h.requiredLevel}):{" "}
-                  {h.estimatedHours}h
+                  {h.manaCycles} {manaCyclesUnit}
                 </li>
               ))}
             </ul>

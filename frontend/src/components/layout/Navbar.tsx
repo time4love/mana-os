@@ -1,0 +1,110 @@
+"use client";
+
+import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { Menu } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetBody,
+  SheetClose,
+} from "@/components/ui/sheet";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useLocale } from "@/lib/i18n/context";
+
+export function Navbar() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { locale, tProposals } = useLocale();
+  const isRtl = locale === "he";
+
+  return (
+    <>
+      <header
+        className="sticky top-0 z-40 w-full border-border/40 border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/70"
+        dir={isRtl ? "rtl" : "ltr"}
+      >
+        <div className="flex h-14 items-center justify-between gap-3 px-4">
+          <Link
+            href="/"
+            className="flex shrink-0 items-center gap-3 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-lg"
+            aria-label="Mana OS — Home"
+          >
+            <Image
+              src="/logo.png"
+              alt=""
+              width={40}
+              height={40}
+              className="h-10 w-10 shrink-0 object-contain"
+            />
+            <span className="text-xl font-semibold text-primary tracking-tight">
+              Mana OS
+            </span>
+          </Link>
+
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              className="inline-flex size-10 items-center justify-center rounded-lg text-foreground/80 outline-none transition hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={isRtl ? "תפריט" : "Menu"}
+              aria-expanded={menuOpen}
+            >
+              <Menu className="size-6" aria-hidden />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+        <SheetContent
+          side="start"
+          className="flex flex-col gap-0"
+        >
+          <SheetHeader className="border-border/50 border-b pb-4">
+            <SheetTitle className="text-lg font-semibold text-foreground">
+              Mana OS
+            </SheetTitle>
+          </SheetHeader>
+          <SheetBody className="flex flex-col gap-1 pt-6">
+            <SheetClose asChild>
+              <Link
+                href="/"
+                className="block rounded-xl px-4 py-4 text-base font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground"
+              >
+                {tProposals("navHome")}
+              </Link>
+            </SheetClose>
+            <SheetClose asChild>
+              <Link
+                href="/profile"
+                className="block rounded-xl px-4 py-4 text-base font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground"
+              >
+                {tProposals("navProfile")}
+              </Link>
+            </SheetClose>
+            <SheetClose asChild>
+              <Link
+                href="/proposals/new"
+                className="block rounded-xl px-4 py-4 text-base font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground"
+              >
+                {tProposals("navNewProposal")}
+              </Link>
+            </SheetClose>
+            <SheetClose asChild>
+              <Link
+                href="/onboarding"
+                className="block rounded-xl px-4 py-4 text-base font-medium text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
+              >
+                {isRtl ? "הצטרף לקהילה" : "Join community"}
+              </Link>
+            </SheetClose>
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}

@@ -117,6 +117,7 @@ export default function NewProposalPage() {
                                 "naturalResources"
                               )}
                               humanCapitalLabel={tProposals("humanCapital")}
+                              manaCyclesUnit={tProposals("manaCyclesUnit")}
                             />
                           );
                         }

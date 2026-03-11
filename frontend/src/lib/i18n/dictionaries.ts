@@ -71,10 +71,22 @@ export const dictionaries: Record<
       resultTitle: string;
       naturalResources: string;
       humanCapital: string;
+      manaCyclesUnit: string;
       chatPlaceholder: string;
       chatSend: string;
       oracleLabel: string;
       youLabel: string;
+    };
+    home: {
+      welcomeTitle: string;
+      welcomeSubtitle: string;
+      awakenButton: string;
+      welcomeBack: string;
+      oracleCardTitle: string;
+      oracleCardDescription: string;
+      consultOracle: string;
+      seasonLabel: string;
+      manaCyclesLabel: string;
     };
     onboarding: {
       welcomeHome: string;
@@ -106,6 +118,17 @@ export const dictionaries: Record<
   }
 > = {
   he: {
+    home: {
+      welcomeTitle: "ברוך הבא ל-Mana OS",
+      welcomeSubtitle: "מערכת ההפעלה המרפאת.",
+      awakenButton: "התעורר (חבר ארנק)",
+      welcomeBack: "ברוך שובך. הקהילה מהדהדת.",
+      oracleCardTitle: "חזון חדש לקהילה",
+      oracleCardDescription: "יש לך רעיון לפרויקט? דבר עם האורקל הסוקרטי כדי לארוג תוכנית משאבי מאנה.",
+      consultOracle: "היוועץ באורקל",
+      seasonLabel: "עונה נוכחית",
+      manaCyclesLabel: "מעגלי מאנה",
+    },
     profile: {
       title: "פרופיל המאנה שלי",
       navHome: "← ראשי",
@@ -175,6 +198,7 @@ export const dictionaries: Record<
       resultTitle: "תוכנית משאבים (מאנה)",
       naturalResources: "משאבים טבעיים",
       humanCapital: "הון אנושי",
+      manaCyclesUnit: "מעגלי מאנה",
       chatPlaceholder: "הקלד הודעה...",
       chatSend: "שלח",
       oracleLabel: "אורקל המאנה",
@@ -212,6 +236,17 @@ export const dictionaries: Record<
     },
   },
   en: {
+    home: {
+      welcomeTitle: "Welcome to Mana OS",
+      welcomeSubtitle: "The Healing Operating System.",
+      awakenButton: "Awaken (Connect Wallet)",
+      welcomeBack: "Welcome back. The community is resonating.",
+      oracleCardTitle: "Dream a New Reality",
+      oracleCardDescription: "Have an idea for a project? Speak with the Socratic Oracle to weave a Mana Resource Plan.",
+      consultOracle: "Consult the Oracle",
+      seasonLabel: "Current Season",
+      manaCyclesLabel: "Mana Cycles",
+    },
     profile: {
       title: "My Mana Profile",
       navHome: "← Home",
@@ -281,6 +316,7 @@ export const dictionaries: Record<
       resultTitle: "Resource plan (Mana)",
       naturalResources: "Natural resources",
       humanCapital: "Human capital",
+      manaCyclesUnit: "Mana Cycles",
       chatPlaceholder: "Type a message...",
       chatSend: "Send",
       oracleLabel: "Mana Oracle",
