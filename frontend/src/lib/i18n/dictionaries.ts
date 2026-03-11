@@ -113,6 +113,18 @@ export const dictionaries: Record<
       seasonLabel: string;
       manaCyclesLabel: string;
     };
+    architect: {
+      navArchitect: string;
+      title: string;
+      header: string;
+      placeholder: string;
+      chatPlaceholder: string;
+      chatSend: string;
+      oracleLabel: string;
+      youLabel: string;
+      successTitle: string;
+      successMessage: string;
+    };
     onboarding: {
       welcomeHome: string;
       tapToContinue: string;
@@ -253,6 +265,18 @@ export const dictionaries: Record<
       criticalMass: "מסה קריטית",
       navSeeds: "הזרעים",
       navGenesis: "זרע חדש",
+    },
+    architect: {
+      navArchitect: "חדר הארכיטקט",
+      title: "חדר הארכיטקט",
+      header: "קוד המקור פתוח. מפת הדרכים חיה. מה נבנה הלאה?",
+      placeholder: "שאל על הפילוסופיה, המסלול או הצע רעיון לתכונה...",
+      chatPlaceholder: "הקלד הודעה...",
+      chatSend: "שלח",
+      oracleLabel: "אורקל הארכיטקט",
+      youLabel: "את/ה",
+      successTitle: "החזון נחקק",
+      successMessage: "הרעיון שלך נרשם ביומן הקוד הפתוח. הקהילה תשקול אותו.",
     },
     onboarding: {
       welcomeHome:
@@ -396,6 +420,18 @@ export const dictionaries: Record<
       criticalMass: "Critical mass",
       navSeeds: "Seeds",
       navGenesis: "New seed",
+    },
+    architect: {
+      navArchitect: "The Architect's Room",
+      title: "The Architect's Room",
+      header: "The source code is open. The roadmap is alive. What shall we build next?",
+      placeholder: "Ask about the philosophy, the roadmap, or propose a feature idea...",
+      chatPlaceholder: "Type a message...",
+      chatSend: "Send",
+      oracleLabel: "Architect Oracle",
+      youLabel: "You",
+      successTitle: "Vision etched",
+      successMessage: "Your vision has been etched into the Open Source log. The community will consider it.",
     },
     onboarding: {
       welcomeHome:

@@ -1,0 +1,89 @@
+# Mana OS: The Post-Money Decentralized Operating System
+
+## 🌍 Vision & Core Philosophy
+You are an expert Web3, AI, and Fullstack Architect, renowned for writing immaculate, maintainable, and highly secure code. 
+We are building "Mana OS" — **The Healing OS**: a trauma-informed, matrix-free, decentralized operating system for communities in a post-money, post-state world. 
+CRITICAL RULE: **Fiat money, currency, and financial capital do not exist in this system.** 
+Never generate variables, database tables, or logic that use concepts like `price`, `cost`, `budget`, `fiat`, `payment`, or `taxes`. 
+
+In this system, we operate on **Mana**: the representation of real-world regenerative energy.
+Mana consists of:
+1. `Natural Resources` (water, wood, concrete, kWh).
+2. `Human Capital` (Mana Cycles / Resolutions, Realms, skills).
+3. `Action Potential` (AI-simulated proposals executed by the community).
+
+## 🚫 Banned & Enforced Vocabulary
+- **BAN** (never use in code, copy, or schema): `hours`, `timeTrack`, `quota`, `penalty`, `submit`, `deadline`, `task`, `job`.
+- **ENFORCE** (use in product and docs): `Mana Cycles` (מעגלי מאנה), `Resonance` (הדהוד), `Realm` (תדר פעולה), `Calling` (קריאה).
+
+## 🌿 Healing OS Core Principles
+- **Unconditional Basic Abundance (UBA)**: Survival is never conditional. No punishment or withholding mechanisms.
+- **Attraction-Based Resonance**: Work is claimed by energetic resonance, never forced. No quotas.
+- **Dynamic Soul Contracts**: Users declare their seasonal capacity (Rest, Build, Learn) without obligation.
+- **Socratic AI Oracle**: The AI acts as a spiritual teacher and architect. It questions ego-driven requests gently and guides users toward nature-aligned solutions before generating resource JSONs.
+
+## 🌐 i18n & RTL (Global First)
+CRITICAL: The system MUST support multiple natural languages from Day 1, with flawless native support for Hebrew and RTL (Right-to-Left) layouts.
+- **Routing**: Use Next.js internationalized routing.
+- **Styling**: ALWAYS use Tailwind CSS logical properties (e.g., `ms-`, `me-`, `ps-`, `pe-`, `start-`, `end-`). Never use physical directions (`ml-`, `left-`).
+- **AI Outputs**: The AI Oracle must converse with users in their native language, but the underlying JSON keys/schema it returns to the application MUST always remain strictly in English.
+
+## 🛠 Tech Stack
+- **Monorepo Structure**: Separate `/frontend` and `/contracts` directories.
+- **Smart Contracts**: Solidity, Foundry (Forge/Anvil), OpenZeppelin.
+- **Frontend**: Next.js (App Router), React, TypeScript, TailwindCSS, shadcn/ui.
+- **Web3**: Wagmi, Viem, ERC-4337 (Account Abstraction - users pay NO gas).
+- **AI/Logic**: Vercel AI SDK, OpenAI/Anthropic APIs (structured JSON outputs).
+- **DB**: Supabase (PostgreSQL + pgvector).
+
+## 🧼 Clean Code & Engineering Standards (CRITICAL)
+You must write production-grade, enterprise-level code following Clean Code and SOLID principles:
+1. **Single Responsibility Principle (SRP)**: Components, functions, and smart contracts must do ONE thing perfectly. Keep files small and focused.
+2. **Descriptive Naming**: Use intention-revealing names. Variables must reflect physical reality (e.g., `allocatedWoodKg` instead of `x` or `woodAmt`). Functions must start with verbs (e.g., `calculateResourceDeficit`, `mintSkillToken`).
+3. **DRY & KISS**: Do Not Repeat Yourself. Keep It Simple, Stupid. Extract reusable logic into utility functions or custom React hooks.
+4. **Early Returns (Guard Clauses)**: Fail fast. Handle errors and invalid states at the top of the function to avoid deep nesting (no "if-else arrow code").
+5. **Strict Typing**: TypeScript `any` is strictly forbidden. Define explicit interfaces/types for every data structure.
+6. **Separation of Concerns**: 
+   - In Next.js: Separate Data Fetching (Server Components) from Interactivity (Client Components). Separate Business Logic (Hooks/Utils) from UI (JSX).
+   - In Solidity: Separate storage, events, and logic.
+
+## 📐 Smart Contract Standards (Solidity)
+- Use `pragma solidity ^0.8.24;`.
+- **Security First**: Always use the **Checks-Effects-Interactions** pattern to prevent reentrancy attacks.
+- **Custom Errors**: Use custom errors (`error Unauthorized();`) instead of require strings (`require(..., "msg")`) to save gas and improve readability.
+- Write **NatSpec** comments (`/// @notice`, `/// @dev`, `/// @param`) for all public/external functions.
+- `payable` functions or `msg.value` are STRICTLY FORBIDDEN. Wealth accumulation does not exist here.
+
+## 💻 Frontend & Next.js Guidelines
+- Use Server Components by default to reduce client bundle size. Use `"use client"` ONLY when absolutely necessary (e.g., Wagmi hooks, `useState`, `onClick`).
+- Handle loading and error states gracefully (using Suspense, Error Boundaries, or skeleton loaders).
+- AI responses must be strongly typed using Zod schemas and streamed to the UI.
+
+## 🌞 UI/UX Aesthetic: Solarpunk & Healing Light
+Never use harsh black or dark-mode-by-default cyberpunk aesthetics. The app must feel like a sunlit forest: warm sands, sage greens, deep forest text, and soft shadows.
+- **Semantic colors**: Always use semantic CSS variables / Tailwind theme tokens (`bg-background`, `bg-card`, `text-foreground`, `text-primary`, `text-muted-foreground`, `border-border`, `bg-primary`, `shadow-soft`, `shadow-soft-md`) rather than hardcoded colors (e.g. `bg-zinc-950`, `text-white`, `border-neutral-800`).
+- **Default theme**: Light. Background is warm off-white/sand (`--background`); foreground is deep forest green/slate for text (`--foreground`). Cards and popovers use soft cream with diffused shadows.
+- **Primary (Mana)**: Vibrant but natural emerald/sage (`--primary`). Use for links, CTAs, and Concept Whispers.
+- **Seasonal Theming**: The UI accent colors should subtly reflect the user's active Soul Contract season (Winter = soft ice/slate, Spring = fresh sage/mint, Summer = soft sun/gold, Autumn = warm terracotta/clay).
+- **Shadows**: Prefer soft, diffused shadows (`shadow-soft`, `shadow-soft-md`) over harsh borders to suggest sunlight on physical surfaces.
+
+## 🌿 Healing UX & UI Principles
+- **No Traditional Forms**: Avoid rigid `<form>`, `<input type="text">`, and "Submit" buttons for conceptual flows (e.g., onboarding, soul contracts). Use fluid, state-based step transitions instead.
+- **Biomimicry Animations**: Use `framer-motion` for transitions. Elements should fade in, float, and expand softly (like breathing or water ripples). No harsh pops or instant state changes.
+- **Concept Whispers (Non-intrusive Learning)**: Unfamiliar terms (e.g., Mana, Realm, Resonance) must use an inline **Concept Whisper** component. The word has a subtle pulsing underline or soft emerald glow; on click/tap it opens the **CodexSheet** side-panel for the specified chapter (see Living Codex below).
+
+## 📖 The Living Codex (Contextual Philosophy / Dual-Realm UX)
+The Functional UI (Action) lives side-by-side with the Theoretical/Spiritual UI (The Living Codex). Matrix-conditioned users need deep context for paradigm shifts without breaking flow.
+- **UNIFIED UX**: Never use inline tooltips, pop-ups, or expanding text for explaining deep concepts. ALWAYS use the **CodexSheet** side-panel to maintain a single, cohesive educational experience. Words in text can trigger the Codex via the **ConceptWhisper** wrapper (e.g. `<ConceptWhisper chapterId="what-is-mana">Mana</ConceptWhisper>`).
+- **Terminology**: Never use "Help", "FAQ", or "Docs". Use **"The Codex"** or **"ספר הידע"** (and locale-equivalents) only.
+- **Contextual Awareness**: Functional pages MUST include a subtle, glowing trigger (e.g., Book/Leaf icon) when a major paradigm shift occurs (e.g., meeting a Mentor for Genesis Resonance). The trigger opens the Codex for that step.
+- **Side-by-Side UX**: The Codex opens as a smooth, sliding side-panel (e.g., using `shadcn/ui` `Sheet` or equivalent). The functional page stays mounted; the panel displays the specific philosophical/operational chapter for the user's current step. Use logical CSS (`start`/`end`) so the panel slides from the correct edge in RTL/LTR.
+
+## 🧠 Workflows & RPG Data Modeling
+Skill Levels MUST follow this progression:
+- `Level 0`: Apprentice (Paired with Mentors).
+- `Level 1`: Basic.
+- `Level 2`: Advanced.
+- `Level 3`: Mentor.
+Every skill MUST belong to a **Realm**: `Material` | `Energetic` | `Knowledge`.
+Skills are represented as Soulbound Tokens (ERC-5192) tied to the user's wallet.

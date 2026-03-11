@@ -10,6 +10,8 @@ export type ProposalStatus = "pending_resonance" | "approved" | "rejected";
 
 export type CommunityStatus = "pending_manifestation" | "manifested";
 
+export type OsFeatureProposalStatus = "pending_review" | "accepted" | "deferred";
+
 export interface ProposalResourcePlanJson {
   naturalResources: Array<{
     resourceName: string;
@@ -124,6 +126,35 @@ export interface Database {
           joined_at?: string;
         };
       };
+      os_feature_proposals: {
+        Row: {
+          id: string;
+          proposer_wallet: string;
+          title: string;
+          philosophical_alignment: string;
+          description: string;
+          status: OsFeatureProposalStatus;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          proposer_wallet: string;
+          title: string;
+          philosophical_alignment: string;
+          description: string;
+          status?: OsFeatureProposalStatus;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          proposer_wallet?: string;
+          title?: string;
+          philosophical_alignment?: string;
+          description?: string;
+          status?: OsFeatureProposalStatus;
+          created_at?: string;
+        };
+      };
     };
   };
 }
@@ -132,3 +163,4 @@ export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 export type ProposalRow = Database["public"]["Tables"]["proposals"]["Row"];
 export type CommunityRow = Database["public"]["Tables"]["communities"]["Row"];
 export type CommunityMemberRow = Database["public"]["Tables"]["community_members"]["Row"];
+export type OsFeatureProposalRow = Database["public"]["Tables"]["os_feature_proposals"]["Row"];

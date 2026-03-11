@@ -52,3 +52,19 @@ export type NaturalResourceItem = z.infer<typeof NaturalResourceItemSchema>;
 export type HumanCapitalItem = z.infer<typeof HumanCapitalItemSchema>;
 export type ProposalResourcePlan = z.infer<typeof ProposalResourcePlanSchema>;
 export type CommunitySeed = z.infer<typeof CommunitySeedSchema>;
+
+/**
+ * Architect Oracle: open-source feature proposal from a user.
+ * philosophicalAlignment describes how the feature aligns with UBA, Resonance, trauma-informed design.
+ */
+export const SubmitFeatureProposalSchema = z.object({
+  featureTitle: z.string().describe("Short title for the proposed feature"),
+  philosophicalAlignment: z
+    .string()
+    .describe(
+      "How this feature aligns with Mana OS philosophy: UBA, trauma-informed design, matrix-free, attraction-based resonance, etc."
+    ),
+  description: z.string().describe("Clear description of the feature for contributors and the roadmap"),
+});
+
+export type SubmitFeatureProposal = z.infer<typeof SubmitFeatureProposalSchema>;
