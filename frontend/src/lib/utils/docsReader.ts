@@ -1,13 +1,19 @@
 /**
- * Reads project-root documentation (README, Roadmap, Cursorrules) for a given locale
+ * Reads project-root documentation (PHILOSOPHY, README, Roadmap, Cursorrules) for a given locale
  * and concatenates them into a single context string for the Architect Oracle.
  * Used to give the AI full system philosophy and roadmap awareness.
+ * PHILOSOPHY is loaded first so the Oracle deeply understands the seven paradigms (UBA, Harmonic Time, Anti-Dopamine, Restorative Justice, Sanctuary Privacy, Fractal Economy).
  */
 
 import fs from "node:fs";
 import path from "node:path";
 
 export type DocsLocale = "en" | "he";
+
+const PHILOSOPHY_FILE: Record<DocsLocale, string> = {
+  en: "PHILOSOPHY.en.md",
+  he: "PHILOSOPHY.he.md",
+};
 
 const DOC_FILES: Record<DocsLocale, readonly [string, string, string]> = {
   en: ["README.en.md", "PROJECT_ROADMAP.en.md", "cursorrules.en.md"],
@@ -42,10 +48,21 @@ function resolveProjectRoot(): string {
  */
 export function getSystemDocsContext(locale: DocsLocale): string {
   const root = resolveProjectRoot();
-  const files = DOC_FILES[locale];
+  const philosophyFile = PHILOSOPHY_FILE[locale];
+  const docFiles = DOC_FILES[locale];
   const parts: string[] = [];
 
-  for (const file of files) {
+  // Load PHILOSOPHY first so the Oracle has canonical paradigm context (Fractal Economy, Harmonic Time, etc.)
+  const philosophyPath = path.join(root, philosophyFile);
+  try {
+    const philosophyContent = fs.readFileSync(philosophyPath, "utf-8");
+    parts.push(`## ${philosophyFile}\n\n${philosophyContent}`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    parts.push(`## ${philosophyFile}\n\n[Could not read: ${philosophyPath} — ${message}]`);
+  }
+
+  for (const file of docFiles) {
     const filePath = path.join(root, file);
     try {
       const content = fs.readFileSync(filePath, "utf-8");
@@ -57,7 +74,7 @@ export function getSystemDocsContext(locale: DocsLocale): string {
   }
 
   if (parts.length === 0) {
-    return "[No system documentation could be loaded. Check that README.en.md, PROJECT_ROADMAP.en.md, and cursorrules.en.md exist at the project root.]";
+    return "[No system documentation could be loaded. Check that PHILOSOPHY.en.md, README.en.md, PROJECT_ROADMAP.en.md, and cursorrules.en.md exist at the project root.]";
   }
 
   return parts.join(SEPARATOR);

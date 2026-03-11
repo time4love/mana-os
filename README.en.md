@@ -65,6 +65,15 @@ Because money doesn't exist here, users cannot pay "Gas Fees" in crypto. We util
 ### 5. Global First (i18n & Native RTL)
 This movement isn't localized. Mana OS is built from Day 1 to support any natural language, with flawless logical-property styling (Tailwind) to support Right-to-Left (RTL) languages like Hebrew and Arabic natively.
 
+### 6. The Anti-Dopamine Attention Economy
+Mana OS rejects the matrix's attention economy. Instead of real-time push notifications and stressful red dots, the system uses **Sunset Whispers**—a calm daily digest delivered as a ritual (e.g., at sunset or sunrise). Visual cues are soft glows (like a hearth) that pull rather than push. If a user's Soul Contract is set to **Winter** (Rest/Healing), the system fully shields them from project updates and action-requests.
+
+### 7. Restorative Justice & Nonviolent Communication
+Mana OS rejects punitive tech features like banning, user reporting, and social credit scores. We utilize Restorative Justice. Unfulfilled commitments trigger a gentle "Spiritual Recalibration" from the Oracle, offering the user a transition to a "Winter" rest phase. Interpersonal conflicts are resolved not by algorithms, but by triggering a **Call for Harmony**, which summons community Mentors from the Energetic Realm to facilitate human mediation.
+
+### 8. Sanctuary Privacy & Anonymous Resonance
+Transparency is for resources; privacy is for souls. Mana OS abolishes surveillance features like "last seen" statuses or public voting records. Resonance is fully anonymous (utilizing Zero-Knowledge proofs). Community connection thrives not on public likes, but on Collaborative Discourse—where AI-generated proposals serve as a baseline for human discussion and refinement. Additionally, users in a resting phase are wrapped in a **Winter Cloak**, shielding them from interactions and metrics.
+
 ---
 
 ## 🛠 Tech Stack

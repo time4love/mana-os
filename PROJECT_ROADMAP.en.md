@@ -59,21 +59,25 @@ This flow ensures that every component—Socratic Oracle, DAO, Callings Board, a
 - [ ] Create `ProposalsDAO.sol`: A smart contract to accept the AI-generated `ProposalResourcePlan` (hashed/stored on-chain).
 - [ ] Build the "Community Feed" UI: Users can view pending proposals and vote on them directly using their connected wallets.
 - [ ] Implement Status Tracking: Proposals should move from `Pending Vote` -> `Approved`/`Rejected`.
+- [ ] **Anonymous Resonance (ZKP) & Refinement Circle:** Implement Anonymous Resonance mechanism (ZKP concepts) so who resonated is not exposed; add **The Refinement Circle** (discussion/comments thread) for collaborative proposal upgrading.
 
 ### ⏳ Phase 6: Calling Resonance (Attraction-Based Matchmaking)
 - [ ] Create the **Mana Callings Board** UI for `Approved` proposals (no "Task Board" or task language).
 - [ ] **Resonance Matchmaking**: The UI reads the user's `ManaSkills.sol` SBTs and Realms and surfaces **Callings** that resonate (e.g., matching an "Agriculture Level 2" calling to a user holding that SBT and Realm). Work is claimed by attraction, never assigned.
 - [ ] **Calling Resonance flow**: Users claim callings based on energetic resonance. No quotas or commitments. Status moves from `Open` -> `In Resonance` -> `Completed`.
+- [ ] **Sunset Whisper Cron Job & Seasonal Muting Logic**: Implement batched daily digest (Sunset Whisper) instead of real-time notifications; respect Soul Contract season (e.g., Winter = full mute of project/action updates).
 
 ### 🚧 Phase 7: Community Onboarding & Verification (Rite of Passage)
 - [x] Create the "Join Community" onboarding flow (Breath → Soul Contract/Seasons → Realm → Genesis Anchor) with fluid step transitions and Concept Whispers.
 - [ ] Initial Skill Minting: Allow a trusted local mentor (Level 3) to approve and mint the first Level 0 (Apprentice) or Level 1 SBT for new members.
+- [ ] **Restorative Justice Protocol:** Implement **Call for Harmony** (בקשת גישור)—route conflict to Level 3 Mentors in the Energetic/Healing Realm for human mediation (NVC/healing framing, not moderation or admin enforcement).
 
 ### ⏳ Phase 8: Testnet Deployment & Open Source Launch
 - [ ] Deploy all contracts to **Base Sepolia** testnet.
 - [ ] Update Frontend environment variables to point to the live testnet.
 - [ ] Deploy Next.js app to **Vercel**.
 - [ ] Publicly launch the GitHub repo.
+- [ ] **The Mycelium Network: Fractal Economy & Surplus Overflow routing** — Inter-community surplus flow: communities in surplus resonate overflow to the network; others take what they need. No barter, trade, or debt. Macro-projects (bridges between communities) require Macro-Resonance pooled from multiple hubs.
 
 ---
 
