@@ -12,6 +12,8 @@ export type CommunityStatus = "pending_manifestation" | "manifested";
 
 export type OsFeatureProposalStatus = "pending_review" | "accepted" | "deferred";
 
+export type ProposalUpgradeStatus = "pending" | "merged";
+
 export interface ProposalResourcePlanJson {
   naturalResources: Array<{
     resourceName: string;
@@ -155,6 +157,35 @@ export interface Database {
           created_at?: string;
         };
       };
+      proposal_upgrades: {
+        Row: {
+          id: string;
+          proposal_id: string;
+          author_wallet: string;
+          suggested_upgrade: string;
+          resonance_count: number;
+          status: ProposalUpgradeStatus;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          proposal_id: string;
+          author_wallet: string;
+          suggested_upgrade: string;
+          resonance_count?: number;
+          status?: ProposalUpgradeStatus;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          proposal_id?: string;
+          author_wallet?: string;
+          suggested_upgrade?: string;
+          resonance_count?: number;
+          status?: ProposalUpgradeStatus;
+          created_at?: string;
+        };
+      };
     };
   };
 }
@@ -164,3 +195,4 @@ export type ProposalRow = Database["public"]["Tables"]["proposals"]["Row"];
 export type CommunityRow = Database["public"]["Tables"]["communities"]["Row"];
 export type CommunityMemberRow = Database["public"]["Tables"]["community_members"]["Row"];
 export type OsFeatureProposalRow = Database["public"]["Tables"]["os_feature_proposals"]["Row"];
+export type ProposalUpgradeRow = Database["public"]["Tables"]["proposal_upgrades"]["Row"];

@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { useLocale } from "@/lib/i18n/context";
 import { getProposalsForFeed } from "@/app/actions/proposals";
 import type { ProposalRow } from "@/lib/supabase/types";
-import { FeedProposalCard } from "@/components/proposals/FeedProposalCard";
+import { LivingProposal } from "@/components/proposals/LivingProposal";
 
 const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] };
 
@@ -99,7 +99,7 @@ export default function FeedPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05, ...transition }}
               >
-                <FeedProposalCard
+                <LivingProposal
                   proposal={proposal}
                   onResonated={loadProposals}
                 />

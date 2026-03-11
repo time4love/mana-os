@@ -88,6 +88,10 @@ export const dictionaries: Record<
       sproutedLabel: string;
       needSbtToResonate: string;
       alreadyResonated: string;
+      plantUpgradeSeedPlaceholder: string;
+      communityWisdom: string;
+      resonateWithUpgrade: string;
+      alreadyResonatedWithUpgrade: string;
     };
     communities: {
       genesisTitle: string;
@@ -252,6 +256,10 @@ export const dictionaries: Record<
       sproutedLabel: "נבט — עבר לשלב ביצוע",
       needSbtToResonate: "נדרש אסימון ManaSkills (SBT) כדי להדהד.",
       alreadyResonated: "כבר הדהדת עם החזון הזה.",
+      plantUpgradeSeedPlaceholder: "זרע שדרוג לחזון…",
+      communityWisdom: "חכמת הקהילה",
+      resonateWithUpgrade: "הדהד",
+      alreadyResonatedWithUpgrade: "כבר הדהדת עם הזרע הזה.",
     },
     communities: {
       genesisTitle: "זרע קהילה חדשה",
@@ -407,6 +415,10 @@ export const dictionaries: Record<
       sproutedLabel: "Sprouted — Ready for Action",
       needSbtToResonate: "A ManaSkills SBT is required to resonate.",
       alreadyResonated: "You have already resonated with this vision.",
+      plantUpgradeSeedPlaceholder: "Plant an Upgrade Seed…",
+      communityWisdom: "Community Wisdom",
+      resonateWithUpgrade: "Resonate",
+      alreadyResonatedWithUpgrade: "You have already resonated with this seed.",
     },
     communities: {
       genesisTitle: "Plant a Community Seed",
