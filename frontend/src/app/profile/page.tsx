@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useAccount, useConnect, useDisconnect, useReadContract } from "wagmi";
 import { anvil } from "@/lib/wagmi";
 import { MANA_SKILLS_ABI, MANA_SKILLS_ADDRESS } from "@/contracts/manaSkills";
@@ -13,6 +14,8 @@ import { useLocale } from "@/lib/i18n/context";
 import { CodexSheet } from "@/components/ui/CodexSheet";
 import { getProfileByWallet, type ProfileRow } from "@/app/actions/onboarding";
 import { Leaf } from "lucide-react";
+
+const QRCode = dynamic(() => import("react-qr-code"), { ssr: false });
 
 /** Normalize contract return: getTokenIdsOf returns uint256[] (bigint[]). */
 function getTokenIdsArray(data: unknown): bigint[] {
@@ -317,18 +320,42 @@ export default function ProfilePage() {
         )}
 
         {showWelcome && (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("welcomeTitle")}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-muted-foreground">{t("welcomeBody")}</p>
-              <Button size="lg" className="w-full sm:w-auto">
-                {t("startJourney")}
-              </Button>
-              <p className="text-sm text-muted-foreground">{t("startJourneyHint")}</p>
-            </CardContent>
-          </Card>
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("welcomeTitle")}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-muted-foreground">{t("welcomeBody")}</p>
+                <Button size="lg" className="w-full sm:w-auto">
+                  {t("startJourney")}
+                </Button>
+                <p className="text-sm text-muted-foreground">{t("startJourneyHint")}</p>
+              </CardContent>
+            </Card>
+            {address && (
+              <Card className="border-primary/20 bg-primary/5 shadow-soft">
+                <CardHeader>
+                  <CardTitle className="text-primary">
+                    {locale === "he" ? "עוגן הבראשית" : "Genesis Anchor"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center gap-4">
+                  <div className="rounded-xl border border-border/60 bg-background p-4 shadow-soft">
+                    <QRCode
+                      value={address}
+                      size={220}
+                      level="M"
+                      className="size-[220px]"
+                    />
+                  </div>
+                  <p className="text-center text-sm text-muted-foreground max-w-md">
+                    {t("genesisQrDescription")}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </>
         )}
 
         {showSkills && skillRecord != null && (

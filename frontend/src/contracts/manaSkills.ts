@@ -35,6 +35,19 @@ export const MANA_SKILLS_ABI = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "category", type: "string" },
+      { name: "level", type: "uint8" },
+      { name: "realm", type: "uint8" },
+      { name: "cycles", type: "uint256" },
+    ],
+    name: "mintSkill",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
 ] as const;
 
 export type ManaSkillsSkillRecord = readonly [string, number, number, bigint];

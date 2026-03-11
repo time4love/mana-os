@@ -186,6 +186,29 @@ export interface Database {
           created_at?: string;
         };
       };
+      seed_discourse: {
+        Row: {
+          id: string;
+          upgrade_id: string;
+          author_wallet: string;
+          wisdom: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          upgrade_id: string;
+          author_wallet: string;
+          wisdom: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          upgrade_id?: string;
+          author_wallet?: string;
+          wisdom?: string;
+          created_at?: string;
+        };
+      };
     };
   };
 }
@@ -196,3 +219,4 @@ export type CommunityRow = Database["public"]["Tables"]["communities"]["Row"];
 export type CommunityMemberRow = Database["public"]["Tables"]["community_members"]["Row"];
 export type OsFeatureProposalRow = Database["public"]["Tables"]["os_feature_proposals"]["Row"];
 export type ProposalUpgradeRow = Database["public"]["Tables"]["proposal_upgrades"]["Row"];
+export type SeedDiscourseRow = Database["public"]["Tables"]["seed_discourse"]["Row"];

@@ -9,6 +9,7 @@ import {
   PROPOSALS_DAO_ABI,
   PROPOSALS_DAO_ADDRESS,
 } from "@/contracts/proposalsDao";
+import { MANA_SKILLS_ABI, MANA_SKILLS_ADDRESS } from "@/contracts/manaSkills";
 import type { ProposalRow, ProposalUpgradeRow } from "@/lib/supabase/types";
 import type { ProposalResourcePlanJson } from "@/lib/supabase/types";
 import { syncProposalStatusToApproved } from "@/app/actions/proposals";
@@ -18,7 +19,8 @@ import {
   plantUpgradeSeed,
   resonateWithUpgrade,
 } from "@/app/actions/upgrades";
-import { Leaf, Sparkles, Radio } from "lucide-react";
+import { UpgradeSeedCard } from "@/components/proposals/UpgradeSeedCard";
+import { Leaf, Sparkles } from "lucide-react";
 
 const RESONANCE_THRESHOLD = 3;
 const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] };
@@ -122,6 +124,16 @@ export function LivingProposal({ proposal, onResonated }: LivingProposalProps) {
     functionName: "hasResonated",
     args: address ? [proposal.id, address] : undefined,
   });
+
+  const { data: sbtBalanceRaw } = useReadContract({
+    address: MANA_SKILLS_ADDRESS,
+    abi: MANA_SKILLS_ABI,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+  });
+  const hasSbt = typeof sbtBalanceRaw === "bigint" && sbtBalanceRaw > 0n;
+  const daoConfigured = PROPOSALS_DAO_ADDRESS !== "0x0000000000000000000000000000000000000000";
+  const canResonateWithSeeds = Boolean(address && hasSbt && daoConfigured);
 
   const {
     writeContract,
@@ -251,16 +263,20 @@ export function LivingProposal({ proposal, onResonated }: LivingProposalProps) {
           <div className="flex flex-wrap gap-2">
             <AnimatePresence mode="popLayout">
               {pendingUpgrades.map((upgrade, i) => (
-                <PendingSeedCard
+                <UpgradeSeedCard
                   key={upgrade.id}
                   upgrade={upgrade}
                   index={i}
                   hasResonated={resonatedUpgradeIds.has(upgrade.id)}
-                  canResonate={Boolean(address)}
+                  canResonate={canResonateWithSeeds}
                   onResonate={() => handleResonateWithUpgrade(upgrade.id)}
                   resonanceCountLabel={tProposals("resonanceCount")}
                   resonateLabel={tProposals("resonateWithUpgrade")}
                   alreadyResonatedLabel={tProposals("alreadyResonatedWithUpgrade")}
+                  needSbtLabel={tProposals("needSbtToResonate")}
+                  shareWisdomPlaceholder={tProposals("shareSeedWisdomPlaceholder")}
+                  locale={locale}
+                  onDiscourseUpdated={loadUpgrades}
                 />
               ))}
             </AnimatePresence>
@@ -383,55 +399,3 @@ export function LivingProposal({ proposal, onResonated }: LivingProposalProps) {
   );
 }
 
-function PendingSeedCard({
-  upgrade,
-  index,
-  hasResonated,
-  canResonate,
-  onResonate,
-  resonanceCountLabel,
-  resonateLabel,
-  alreadyResonatedLabel,
-}: {
-  upgrade: ProposalUpgradeRow;
-  index: number;
-  hasResonated: boolean;
-  canResonate: boolean;
-  onResonate: () => void;
-  resonanceCountLabel: string;
-  resonateLabel: string;
-  alreadyResonatedLabel: string;
-}) {
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.96 }}
-      transition={{ delay: index * 0.05, ...transition }}
-      className="rounded-xl border border-amber-200/50 bg-amber-50/80 px-4 py-3 shadow-soft dark:border-amber-800/30 dark:bg-amber-950/25"
-    >
-      <p className="text-sm text-foreground">{upgrade.suggested_upgrade}</p>
-      <div className="mt-3 flex min-h-[44px] flex-wrap items-center justify-between gap-2">
-        <span className="text-xs text-muted-foreground">
-          {upgrade.resonance_count} {resonanceCountLabel}
-        </span>
-        {hasResonated ? (
-          <span className="text-xs italic text-muted-foreground">
-            {alreadyResonatedLabel}
-          </span>
-        ) : canResonate ? (
-          <button
-            type="button"
-            onClick={onResonate}
-            className="inline-flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary/80 transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-primary"
-            aria-label={resonateLabel}
-          >
-            <Radio className="size-3.5 shrink-0" aria-hidden />
-            <span>{resonateLabel}</span>
-          </button>
-        ) : null}
-      </div>
-    </motion.div>
-  );
-}

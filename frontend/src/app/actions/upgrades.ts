@@ -1,7 +1,7 @@
 "use server";
 
 import { createServerSupabase } from "@/lib/supabase/server";
-import type { ProposalUpgradeRow } from "@/lib/supabase/types";
+import type { ProposalUpgradeRow, SeedDiscourseRow } from "@/lib/supabase/types";
 
 const MERGE_RESONANCE_THRESHOLD = 2;
 
@@ -161,6 +161,67 @@ export async function getUpgradeResonanceByWallet(
     return { success: true, resonatedUpgradeIds };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to load resonance status";
+    return { success: false, error: message };
+  }
+}
+
+export type ShareSeedWisdomResult =
+  | { success: true }
+  | { success: false; error: string };
+
+/**
+ * Adds a wisdom message to the seed's micro-circle (flat discourse). No nesting.
+ */
+export async function shareSeedWisdom(
+  upgradeId: string,
+  authorWallet: string,
+  wisdom: string
+): Promise<ShareSeedWisdomResult> {
+  const trimmed = wisdom?.trim();
+  if (!trimmed) return { success: false, error: "Wisdom text is required" };
+  if (!upgradeId || !authorWallet || !/^0x[a-fA-F0-9]{40}$/.test(authorWallet)) {
+    return { success: false, error: "Invalid upgrade or wallet" };
+  }
+
+  try {
+    const supabase = createServerSupabase();
+    const { error } = await supabase.from("seed_discourse").insert({
+      upgrade_id: upgradeId,
+      author_wallet: authorWallet.toLowerCase(),
+      wisdom: trimmed,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to share wisdom";
+    return { success: false, error: message };
+  }
+}
+
+export type GetSeedDiscourseResult =
+  | { success: true; discourse: SeedDiscourseRow[] }
+  | { success: false; error: string };
+
+/**
+ * Fetches the flat micro-circle discourse for an upgrade seed, chronologically.
+ */
+export async function getSeedDiscourse(
+  upgradeId: string
+): Promise<GetSeedDiscourseResult> {
+  if (!upgradeId) return { success: false, error: "Invalid upgrade id" };
+
+  try {
+    const supabase = createServerSupabase();
+    const { data, error } = await supabase
+      .from("seed_discourse")
+      .select("*")
+      .eq("upgrade_id", upgradeId)
+      .order("created_at", { ascending: true });
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, discourse: (data ?? []) as SeedDiscourseRow[] };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to load discourse";
     return { success: false, error: message };
   }
 }

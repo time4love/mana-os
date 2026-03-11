@@ -43,6 +43,7 @@ export const dictionaries: Record<
       soulContractTitle: string;
       currentSeasonLabel: string;
       resonatingRealmsLabel: string;
+      genesisQrDescription: string;
     };
     proficiency: {
       apprentice: string;
@@ -92,6 +93,7 @@ export const dictionaries: Record<
       communityWisdom: string;
       resonateWithUpgrade: string;
       alreadyResonatedWithUpgrade: string;
+      shareSeedWisdomPlaceholder: string;
     };
     communities: {
       genesisTitle: string;
@@ -128,6 +130,16 @@ export const dictionaries: Record<
       youLabel: string;
       successTitle: string;
       successMessage: string;
+    };
+    mentor: {
+      accessDeniedTitle: string;
+      accessDeniedMessage: string;
+      grantGenesisResonance: string;
+      confirmGrantPrompt: string;
+      scanOrPastePlaceholder: string;
+      openCamera: string;
+      grantedTitle: string;
+      grantedMessage: string;
     };
     onboarding: {
       welcomeHome: string;
@@ -210,6 +222,8 @@ export const dictionaries: Record<
       soulContractTitle: "חוזה הנשמה הדינמי",
       currentSeasonLabel: "עונה נוכחית",
       resonatingRealmsLabel: "תדרים מהדהדים",
+      genesisQrDescription:
+        "הראה קוד זה למנטור בקהילה כדי לקבל את חותם המאנה הראשון שלך (עוגן הבראשית).",
     },
     proficiency: {
       apprentice: "שוליה",
@@ -260,6 +274,7 @@ export const dictionaries: Record<
       communityWisdom: "חכמת הקהילה",
       resonateWithUpgrade: "הדהד",
       alreadyResonatedWithUpgrade: "כבר הדהדת עם הזרע הזה.",
+      shareSeedWisdomPlaceholder: "שתף חוכמה על זרע זה…",
     },
     communities: {
       genesisTitle: "זרע קהילה חדשה",
@@ -285,6 +300,17 @@ export const dictionaries: Record<
       youLabel: "את/ה",
       successTitle: "החזון נחקק",
       successMessage: "הרעיון שלך נרשם ביומן הקוד הפתוח. הקהילה תשקול אותו.",
+    },
+    mentor: {
+      accessDeniedTitle: "גישה מוגבלת — למנחים בלבד",
+      accessDeniedMessage:
+        "רק מחזיקי אסימון ManaSkills ברמת מנחה (Level 3) יכולים להעניק עוגן הבראשית. המשך את דרכך והגע לרמת מנחה כדי לפתוח את סורק הבראשית.",
+      grantGenesisResonance: "הענק הדהוד חניכה",
+      confirmGrantPrompt: "להעניק עוגן הבראשית ל־{address}?",
+      scanOrPastePlaceholder: "סרוק QR או הדבק כתובת ארנק…",
+      openCamera: "פתח מצלמה",
+      grantedTitle: "הדהוד חניכה הוענק",
+      grantedMessage: "המשתתף קיבל את אסימון השוליה (Level 0). הם יכולים כעת להדהד עם הצעות ולצבור מעגלי מאנה.",
     },
     onboarding: {
       welcomeHome:
@@ -369,6 +395,8 @@ export const dictionaries: Record<
       soulContractTitle: "Dynamic Soul Contract",
       currentSeasonLabel: "Current Season",
       resonatingRealmsLabel: "Resonating Realms",
+      genesisQrDescription:
+        "Show this QR to a community Mentor to receive your Genesis Anchor (SBT).",
     },
     proficiency: {
       apprentice: "Apprentice",
@@ -419,6 +447,7 @@ export const dictionaries: Record<
       communityWisdom: "Community Wisdom",
       resonateWithUpgrade: "Resonate",
       alreadyResonatedWithUpgrade: "You have already resonated with this seed.",
+      shareSeedWisdomPlaceholder: "Share wisdom on this seed…",
     },
     communities: {
       genesisTitle: "Plant a Community Seed",
@@ -444,6 +473,17 @@ export const dictionaries: Record<
       youLabel: "You",
       successTitle: "Vision etched",
       successMessage: "Your vision has been etched into the Open Source log. The community will consider it.",
+    },
+    mentor: {
+      accessDeniedTitle: "Access Denied — Mentors Only",
+      accessDeniedMessage:
+        "Only holders of a Level 3 (Mentor) ManaSkills SBT can grant the Genesis Anchor. Continue your path to Mentor level to unlock the Genesis Scanner.",
+      grantGenesisResonance: "Grant Genesis Resonance",
+      confirmGrantPrompt: "Grant Genesis Anchor to {address}?",
+      scanOrPastePlaceholder: "Scan QR or paste wallet address…",
+      openCamera: "Open camera",
+      grantedTitle: "Genesis Resonance granted",
+      grantedMessage: "The participant received their Apprentice (Level 0) token. They can now resonate with proposals and grow mana cycles.",
     },
     onboarding: {
       welcomeHome:
