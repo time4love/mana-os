@@ -30,6 +30,8 @@ interface LivingProposalProps {
   onResonated?: () => void;
   /** When set, shows a "Consult the Oracle" control that opens the Codex with this proposal as context. */
   onConsultOracle?: (proposal: ProposalRow) => void;
+  /** When this value changes (e.g. after closing the Codex), refetch upgrade seeds so Oracle-planted seeds appear without a full page refresh. */
+  upgradeRefreshTrigger?: number;
 }
 
 function ResourcePlanSection({
@@ -82,7 +84,7 @@ function ResourcePlanSection({
   );
 }
 
-export function LivingProposal({ proposal, onResonated, onConsultOracle }: LivingProposalProps) {
+export function LivingProposal({ proposal, onResonated, onConsultOracle, upgradeRefreshTrigger }: LivingProposalProps) {
   const { locale, tProposals } = useLocale();
   const { address } = useAccount();
   const [upgrades, setUpgrades] = useState<ProposalUpgradeRow[]>([]);
@@ -103,6 +105,10 @@ export function LivingProposal({ proposal, onResonated, onConsultOracle }: Livin
   useEffect(() => {
     loadUpgrades();
   }, [loadUpgrades]);
+
+  useEffect(() => {
+    if (upgradeRefreshTrigger != null) loadUpgrades();
+  }, [upgradeRefreshTrigger, loadUpgrades]);
 
   useEffect(() => {
     if (!address || pendingUpgrades.length === 0) return;
@@ -294,6 +300,7 @@ export function LivingProposal({ proposal, onResonated, onConsultOracle }: Livin
                   alreadyResonatedLabel={tProposals("alreadyResonatedWithUpgrade")}
                   needSbtLabel={tProposals("needSbtToResonate")}
                   shareWisdomPlaceholder={tProposals("shareSeedWisdomPlaceholder")}
+                  oracleSeedAuthorLabel={tProposals("oracleSeedAuthorLabel")}
                   locale={locale}
                   onDiscourseUpdated={loadUpgrades}
                 />

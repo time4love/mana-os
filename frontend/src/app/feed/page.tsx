@@ -17,17 +17,23 @@ export default function FeedPage() {
   const [error, setError] = useState<string | null>(null);
   const [codexOpen, setCodexOpen] = useState(false);
   const [codexProposal, setCodexProposal] = useState<ProposalRow | null>(null);
+  /** When Codex closes, trigger the proposal that was open to refetch upgrades (e.g. after Oracle plants a seed). */
+  const [upgradeRefreshTrigger, setUpgradeRefreshTrigger] = useState<{ proposalId: string; at: number } | null>(null);
   const isRtl = locale === "he";
 
   const handleConsultOracle = useCallback((proposal: ProposalRow) => {
     setCodexProposal(proposal);
     setCodexOpen(true);
+    setUpgradeRefreshTrigger(null);
   }, []);
 
   const handleCodexOpenChange = useCallback((open: boolean) => {
+    if (!open && codexProposal) {
+      setUpgradeRefreshTrigger({ proposalId: codexProposal.id, at: Date.now() });
+    }
     setCodexOpen(open);
     if (!open) setCodexProposal(null);
-  }, []);
+  }, [codexProposal]);
 
   const loadProposals = useCallback(() => {
     getProposalsForFeed().then((result) => {
@@ -116,6 +122,9 @@ export default function FeedPage() {
                   proposal={proposal}
                   onResonated={loadProposals}
                   onConsultOracle={handleConsultOracle}
+                  upgradeRefreshTrigger={
+                    upgradeRefreshTrigger?.proposalId === proposal.id ? upgradeRefreshTrigger.at : undefined
+                  }
                 />
               </motion.div>
             ))}

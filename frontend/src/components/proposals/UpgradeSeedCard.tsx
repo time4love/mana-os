@@ -5,6 +5,7 @@ import { useAccount } from "wagmi";
 import { motion, AnimatePresence } from "framer-motion";
 import { getRelativeHarmonicTime } from "@/lib/utils/harmonicTime";
 import { getSeedDiscourse, shareSeedWisdom } from "@/app/actions/upgrades";
+import { ORACLE_SEED_AUTHOR } from "@/lib/oracle/constants";
 import type { ProposalUpgradeRow, SeedDiscourseRow } from "@/lib/supabase/types";
 import { ChevronDown, ChevronUp, Radio } from "lucide-react";
 
@@ -21,6 +22,8 @@ export interface UpgradeSeedCardProps {
   alreadyResonatedLabel: string;
   needSbtLabel?: string;
   shareWisdomPlaceholder: string;
+  /** When the seed is from the Village Elder (ORACLE), show this label instead of a wallet. E.g. "🌱 Oracle Insight" / "🌱 חוכמת זקן הכפר" */
+  oracleSeedAuthorLabel?: string;
   locale: "he" | "en";
   onDiscourseUpdated?: () => void;
 }
@@ -36,10 +39,18 @@ export function UpgradeSeedCard({
   alreadyResonatedLabel,
   needSbtLabel,
   shareWisdomPlaceholder,
+  oracleSeedAuthorLabel,
   locale,
   onDiscourseUpdated,
 }: UpgradeSeedCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const isOracleSeed = upgrade.author_wallet === ORACLE_SEED_AUTHOR;
+  const cardClassName = isOracleSeed
+    ? "overflow-hidden rounded-xl border border-emerald-500/30 bg-emerald-500/10 shadow-soft dark:border-emerald-400/25 dark:bg-emerald-950/30"
+    : "overflow-hidden rounded-xl border border-amber-200/50 bg-amber-50/80 shadow-soft dark:border-amber-800/30 dark:bg-amber-950/25";
+  const borderExpandClassName = isOracleSeed
+    ? "border-t border-emerald-500/30 bg-muted/30 dark:border-emerald-400/25 dark:bg-muted/20"
+    : "border-t border-amber-200/50 bg-muted/30 dark:border-amber-800/30 dark:bg-muted/20";
   const [discourse, setDiscourse] = useState<SeedDiscourseRow[]>([]);
   const [wisdomInput, setWisdomInput] = useState("");
   const [sharing, setSharing] = useState(false);
@@ -78,10 +89,15 @@ export function UpgradeSeedCard({
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ delay: index * 0.05, ...transition }}
-      className="overflow-hidden rounded-xl border border-amber-200/50 bg-amber-50/80 shadow-soft dark:border-amber-800/30 dark:bg-amber-950/25"
+      className={cardClassName}
     >
       {/* Top level: suggestion (clickable to expand) + resonance + Resonate button + expand trigger */}
       <div className="px-4 py-3">
+        {isOracleSeed && oracleSeedAuthorLabel && (
+          <p className="mb-1.5 text-xs font-medium text-emerald-700/90 dark:text-emerald-300/90" aria-label="Author">
+            {oracleSeedAuthorLabel}
+          </p>
+        )}
         <button
           type="button"
           onClick={() => setIsExpanded((prev) => !prev)}
@@ -146,7 +162,7 @@ export function UpgradeSeedCard({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={transition}
-            className="border-t border-amber-200/50 bg-muted/30 dark:border-amber-800/30 dark:bg-muted/20"
+            className={borderExpandClassName}
           >
             <div className="px-4 py-3">
               {discourse.length > 0 && (

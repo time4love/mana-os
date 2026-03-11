@@ -85,3 +85,15 @@ export const OracleSynthesisOutputSchema = z.object({
 });
 
 export type OracleSynthesisOutput = z.infer<typeof OracleSynthesisOutputSchema>;
+
+/**
+ * Proposal Oracle (Village Elder): plants the AI's insight as a pending upgrade seed for the community to resonate with.
+ */
+export const PlantOracleSeedSchema = z.object({
+  proposalId: z.string().describe("The proposal ID (UUID) to attach this upgrade seed to"),
+  suggestedUpgrade: z
+    .string()
+    .describe("The synthesized ecological or philosophical suggestion to add as a pending upgrade seed; write it clearly for the community"),
+});
+
+export type PlantOracleSeed = z.infer<typeof PlantOracleSeedSchema>;

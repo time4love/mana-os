@@ -98,6 +98,7 @@ export const dictionaries: Record<
       synthesisLoading: string;
       oracleInsightLabel: string;
       consultOracleLabel: string;
+      oracleSeedAuthorLabel: string;
     };
     communities: {
       genesisTitle: string;
@@ -285,6 +286,7 @@ export const dictionaries: Record<
       synthesisLoading: "האורקל טווה…",
       oracleInsightLabel: "תבוננות האורקל",
       consultOracleLabel: "היוועץ באורקל",
+      oracleSeedAuthorLabel: "🌱 חוכמת זקן הכפר",
     },
     communities: {
       genesisTitle: "זרע קהילה חדשה",
@@ -464,6 +466,7 @@ export const dictionaries: Record<
       synthesisLoading: "The Oracle is weaving…",
       oracleInsightLabel: "Oracle's Insight",
       consultOracleLabel: "Consult the Oracle",
+      oracleSeedAuthorLabel: "🌱 Oracle Insight",
     },
     communities: {
       genesisTitle: "Plant a Community Seed",

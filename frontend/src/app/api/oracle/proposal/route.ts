@@ -3,6 +3,9 @@ import type { UIMessage } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { NextResponse } from "next/server";
 import { getSystemDocsContext, type DocsLocale } from "@/lib/utils/docsReader";
+import { plantUpgradeSeed } from "@/app/actions/upgrades";
+import { ORACLE_SEED_AUTHOR } from "@/lib/oracle/constants";
+import { PlantOracleSeedSchema } from "@/lib/oracle/schema";
 
 const PROPOSAL_ORACLE_SYSTEM = `You are the Village Elder of Mana OS. You help communities refine specific physical projects. The user will provide a JSON context containing a Proposal (Title, Description, Resource Plan) and Community Upgrades (Seeds + Discourse). Your job is to read this JSON deeply, synthesize the community's exact debate (e.g., conflicts over plant types, specific resonance counts), calculate physical implications implicitly, and gently guide them. Do NOT talk about the software's source code or general philosophy unless asked. Focus on the project details provided.
 
@@ -17,7 +20,9 @@ STRICT RULES — ADDED VALUE ONLY:
 
 When the user sends a message that starts with [SYSTEM_INIT], it contains a CONTEXT JSON. DO NOT summarize the data—the user can already see it. Instead, deeply analyze the community upgrades and the micro-discourse. Provide ONE profound ecological, physical, or community-building insight about their specific debate or resources (e.g., if there is a conflict about plants, suggest permaculture synergies). Greet them warmly as the Village Elder and offer to weave this insight into the proposal.
 
-For follow-up messages, continue in the same vein: help them think through physical implications, resolve tensions in the Refinement Circle with ecological or social wisdom, or clarify resource choices. Converse in the user's language (e.g. Hebrew or English). Use Mana OS terms: Mana Cycles, Resonance, Realm, Refinement Circle. Never use banned vocabulary (hours, quota, task, deadline, etc.).`;
+For follow-up messages, continue in the same vein: help them think through physical implications, resolve tensions in the Refinement Circle with ecological or social wisdom, or clarify resource choices. Converse in the user's language (e.g. Hebrew or English). Use Mana OS terms: Mana Cycles, Resonance, Realm, Refinement Circle. Never use banned vocabulary (hours, quota, task, deadline, etc.).
+
+ORACLE'S SEED: When you offer an ecological or philosophical solution and the user agrees (e.g. "Yes, add it", "Integrate it", "Please add this"), you MUST call the \`plant_oracle_seed\` tool. Do not just say "I added it"—you must physically execute the tool so the insight appears as a pending upgrade seed for the community to resonate with. You do not alter the main proposal unilaterally; the community votes by resonating with your seed.`;
 
 const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -87,11 +92,33 @@ ${philosophyContext}
 
 ${languageHint}`;
 
+  const proposalTools = {
+    plant_oracle_seed: {
+      description:
+        "Use this tool when the user agrees to your ecological or philosophical suggestion. It plants your insight as a pending upgrade seed on the public proposal board for the community to resonate with. You do not change the main proposal—the community votes by resonating with this seed.",
+      inputSchema: PlantOracleSeedSchema,
+      execute: async ({
+        proposalId,
+        suggestedUpgrade,
+      }: {
+        proposalId: string;
+        suggestedUpgrade: string;
+      }) => {
+        const result = await plantUpgradeSeed(proposalId, ORACLE_SEED_AUTHOR, suggestedUpgrade);
+        if (result.success) {
+          return { ok: true, upgradeId: result.upgradeId, message: "The seed has been planted. The community may now resonate with it." };
+        }
+        return { ok: false, error: result.error };
+      },
+    },
+  };
+
   try {
     const result = streamText({
       model,
       system: systemPrompt,
-      messages: await convertToModelMessages(messages),
+      messages: await convertToModelMessages(messages, { tools: proposalTools }),
+      tools: proposalTools,
     });
 
     return result.toUIMessageStreamResponse({
