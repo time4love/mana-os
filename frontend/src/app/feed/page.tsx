@@ -126,6 +126,7 @@ export default function FeedPage() {
       <CodexSheet
         open={codexOpen}
         onOpenChange={handleCodexOpenChange}
+        mode="proposal"
         contextData={
           codexProposal
             ? {

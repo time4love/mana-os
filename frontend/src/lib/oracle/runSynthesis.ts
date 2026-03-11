@@ -26,7 +26,7 @@ export type RunSynthesisResult =
 
 /**
  * Runs the Oracle synthesis: fetches proposal + merged upgrades, generates updated plan and insight, updates DB.
- * Used by the synthesis API route and the requestOracleSynthesis server action.
+ * Triggered automatically when an upgrade seed reaches merge threshold in resonateWithUpgrade.
  */
 export async function runOracleSynthesis(
   proposalId: string

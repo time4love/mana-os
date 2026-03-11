@@ -12,10 +12,7 @@ import {
 import { MANA_SKILLS_ABI, MANA_SKILLS_ADDRESS } from "@/contracts/manaSkills";
 import type { ProposalRow, ProposalUpgradeRow } from "@/lib/supabase/types";
 import type { ProposalResourcePlanJson } from "@/lib/supabase/types";
-import {
-  syncProposalStatusToApproved,
-  requestOracleSynthesis,
-} from "@/app/actions/proposals";
+import { syncProposalStatusToApproved } from "@/app/actions/proposals";
 import {
   getUpgradesForProposal,
   getUpgradeResonanceByWallet,
@@ -23,7 +20,7 @@ import {
   resonateWithUpgrade,
 } from "@/app/actions/upgrades";
 import { UpgradeSeedCard } from "@/components/proposals/UpgradeSeedCard";
-import { Leaf, Sparkles, Compass, BookOpen } from "lucide-react";
+import { Leaf, Sparkles, BookOpen } from "lucide-react";
 
 const RESONANCE_THRESHOLD = 3;
 const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] };
@@ -93,8 +90,6 @@ export function LivingProposal({ proposal, onResonated, onConsultOracle }: Livin
   const [seedInput, setSeedInput] = useState("");
   const [planting, setPlanting] = useState(false);
   const [plantError, setPlantError] = useState<string | null>(null);
-  const [synthesizing, setSynthesizing] = useState(false);
-  const [synthesisError, setSynthesisError] = useState<string | null>(null);
 
   const mergedUpgrades = upgrades.filter((u) => u.status === "merged");
   const pendingUpgrades = upgrades.filter((u) => u.status === "pending");
@@ -210,17 +205,6 @@ export function LivingProposal({ proposal, onResonated, onConsultOracle }: Livin
     } else setPlantError(result.error);
   }
 
-  async function handleSeekSynthesis() {
-    if (synthesizing) return;
-    setSynthesisError(null);
-    setSynthesizing(true);
-    const result = await requestOracleSynthesis(proposal.id);
-    setSynthesizing(false);
-    if (result.success) {
-      onResonated?.();
-    } else setSynthesisError(result.error);
-  }
-
   return (
     <motion.li
       layout
@@ -248,6 +232,23 @@ export function LivingProposal({ proposal, onResonated, onConsultOracle }: Livin
           manaCyclesUnit={tProposals("manaCyclesUnit")}
         />
 
+        {/* Socratic Insight: appears after automatic synthesis when community merges seeds */}
+        {proposal.oracle_insight && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={transition}
+            className="rounded-lg border border-primary/30 bg-primary/5 p-3"
+          >
+            <p className="text-xs font-medium uppercase tracking-wider text-primary mb-1.5">
+              {tProposals("oracleInsightLabel")}
+            </p>
+            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+              {proposal.oracle_insight}
+            </p>
+          </motion.div>
+        )}
+
         {/* Community Wisdom: merged upgrades as golden text */}
         {mergedUpgrades.length > 0 && (
           <motion.section
@@ -273,57 +274,6 @@ export function LivingProposal({ proposal, onResonated, onConsultOracle }: Livin
                 </motion.p>
               ))}
             </AnimatePresence>
-            {/* Seek Oracle's Synthesis: delicate glowing action when merged seeds exist */}
-            {mergedUpgrades.length > 0 && (
-              <div className="mt-3 flex flex-col items-stretch gap-2">
-                {proposal.oracle_insight ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={transition}
-                    className="rounded-lg border border-primary/30 bg-primary/5 p-3"
-                  >
-                    <p className="text-xs font-medium uppercase tracking-wider text-primary mb-1.5">
-                      {tProposals("oracleInsightLabel")}
-                    </p>
-                    <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                      {proposal.oracle_insight}
-                    </p>
-                  </motion.div>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleSeekSynthesis}
-                      disabled={synthesizing}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300/70 bg-amber-50/80 dark:border-amber-600/50 dark:bg-amber-950/40 px-3 py-2 text-sm font-medium text-amber-800 dark:text-amber-200 shadow-[0_0_20px_rgba(245,158,11,0.15)] transition hover:bg-amber-100/80 dark:hover:bg-amber-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 disabled:opacity-60"
-                      aria-busy={synthesizing}
-                    >
-                      {synthesizing ? (
-                        <>
-                          <motion.span
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                            className="inline-block size-4 rounded-full border-2 border-amber-500/50 border-t-amber-600"
-                          />
-                          {tProposals("synthesisLoading")}
-                        </>
-                      ) : (
-                        <>
-                          <Compass className="size-4 text-amber-600 dark:text-amber-400" aria-hidden />
-                          {tProposals("seekOracleSynthesis")}
-                        </>
-                      )}
-                    </button>
-                    {synthesisError && (
-                      <p className="text-xs text-red-600 dark:text-red-400" role="alert">
-                        {synthesisError}
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
           </motion.section>
         )}
 

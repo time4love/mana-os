@@ -60,14 +60,14 @@ This flow ensures that every component—Socratic Oracle, DAO, Callings Board, a
 - [ ] Build the "Community Feed" UI: Users can view pending proposals and vote on them directly using their connected wallets.
 - [ ] Implement Status Tracking: Proposals should move from `Pending Vote` -> `Approved`/`Rejected`.
 - [ ] **Anonymous Resonance (ZKP) & Refinement Circle:** Implement Anonymous Resonance mechanism (ZKP concepts) so who resonated is not exposed; add **The Refinement Circle** (discussion/comments thread) for collaborative proposal upgrading.
-- [ ] **Oracle Synthesis Loop:** When a proposal has merged Upgrade Seeds, the Oracle can be asked to synthesize community wisdom: it produces an updated `ProposalResourcePlan` and a short Socratic Insight (תבוננות), stored on the proposal. UI: "Seek Oracle's Synthesis" / "בקש את סינתזת האורקל".
+- [ ] **Automatic Oracle Synthesis:** When an upgrade seed's resonance reaches the merge threshold (e.g. 2), the seed becomes 'merged' and the Oracle synthesis runs automatically in the backend. The proposal's `resource_plan` and `oracle_insight` (תבוננות) are updated. No manual "Seek Synthesis" button—updates are strictly triggered by community consensus.
 
 ### ⏳ Phase 6: Calling Resonance (Attraction-Based Matchmaking)
 - [ ] Create the **Mana Callings Board** UI for `Approved` proposals (no "Task Board" or task language).
 - [ ] **Resonance Matchmaking**: The UI reads the user's `ManaSkills.sol` SBTs and Realms and surfaces **Callings** that resonate (e.g., matching an "Agriculture Level 2" calling to a user holding that SBT and Realm). Work is claimed by attraction, never assigned.
 - [ ] **Calling Resonance flow**: Users claim callings based on energetic resonance. No quotas or commitments. Status moves from `Open` -> `In Resonance` -> `Completed`.
 - [ ] **Sunset Whisper Cron Job & Seasonal Muting Logic**: Implement batched daily digest (Sunset Whisper) instead of real-time notifications; respect Soul Contract season (e.g., Winter = full mute of project/action updates).
-- [ ] **Context-Aware Codex (Omnipresent Oracle):** The Codex Sheet is the single PULL-based interface for consulting the Oracle. It accepts `contextData` (e.g. current proposal, profile); the Architect Oracle receives this context and can answer deep questions about what the user is viewing without requiring them to re-explain.
+- [ ] **Context-Aware Codex (Individual Exploration):** The Codex Sheet is the single PULL-based interface for consulting the Oracle. It accepts `contextData` (e.g. current proposal, profile); the Architect Oracle receives this context and can answer deep questions (e.g. "If we approve this broccoli seed, how much more water will we need?") without altering the main proposal. Core proposal updates happen only via automatic synthesis on merge.
 
 ### 🚧 Phase 7: Community Onboarding & Verification (Rite of Passage)
 - [x] Create the "Join Community" onboarding flow (Breath → Soul Contract/Seasons → Realm → Genesis Anchor) with fluid step transitions and Concept Whispers.

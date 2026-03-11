@@ -3,9 +3,14 @@ import type { UIMessage } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { NextResponse } from "next/server";
 import { ProposalResourcePlanSchema } from "@/lib/oracle/schema";
+import { getSystemDocsContext, type DocsLocale } from "@/lib/utils/docsReader";
 
 const ORACLE_SYSTEM_PROMPT = `You are the Oracle of Mana OS: A Socratic Spiritual Architect and an Objective Physics Simulator.
 You converse with users in their native language (usually Hebrew) to help them plan community projects.
+
+KNOWLEDGE DOMAINS: You are a master of Permaculture, Biomimicry, Ecological Architecture (e.g., Rammed Earth, Earthships, Hempcrete, Passive Solar design), and Regenerative Systems. Filter all advice and resource planning through this lens.
+REJECT MATRIX SOLUTIONS: When a user proposes a project (like building a house or managing water), default to deep ecological solutions. Gently warn against highly industrialized, extractive methods (like excessive concrete or wasteful HVAC) and propose sustainable, localized alternatives—without sounding preachy.
+EDUCATE ORGANICALLY: When proposing an ecological alternative (e.g., companion planting for a garden, passive cooling for a building), briefly explain the underlying law of nature that makes it work. Be an inspiring teacher, not a lecturer.
 
 CRITICAL RULES:
 1. NO MATRIX CONCEPTS: NEVER use words like 'hours', 'money', 'budget', 'cost', 'pay', or 'time'. Human effort is ONLY measured in 'Mana Cycles' (מעגלי מאנה).
@@ -38,7 +43,7 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { messages?: UIMessage[] };
+  let body: { messages?: UIMessage[]; locale?: string };
   try {
     body = await request.json();
   } catch {
@@ -49,6 +54,26 @@ export async function POST(request: Request) {
   }
 
   const messages = Array.isArray(body.messages) ? body.messages : [];
+  const locale: DocsLocale = body.locale === "he" || body.locale === "en" ? body.locale : "en";
+
+  let philosophyContext: string;
+  try {
+    philosophyContext = getSystemDocsContext(locale);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    philosophyContext = `[System philosophy could not be loaded: ${message}. Proceed with your knowledge of Mana OS.]`;
+  }
+
+  const systemPrompt = `${ORACLE_SYSTEM_PROMPT}
+
+CRITICAL SYSTEM PHILOSOPHY:
+You must filter all your advice and calculations through the core laws of this Healing OS.
+Read the following philosophy carefully. If a user's proposal creates coercion, burnout, or violates these laws, gently guide them back to natural harmony.
+
+--- MANA OS PHILOSOPHY ---
+${philosophyContext}
+--- END PHILOSOPHY ---`;
+
   const model = getModel();
   if (!model) {
     return NextResponse.json(
@@ -69,7 +94,7 @@ export async function POST(request: Request) {
   try {
     const result = streamText({
       model,
-      system: ORACLE_SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: await convertToModelMessages(messages, { tools: oracleTools }),
       tools: oracleTools,
     });

@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     messages?: UIMessage[];
     locale?: string;
     proposerWallet?: string | null;
-    /** Context from the current page (e.g. proposal, profile); injected so the Oracle can answer in context. */
+    /** Context from the current page (e.g. profile); injected so the Oracle can answer in context. Proposal-specific context is handled by the Proposal Oracle (/api/oracle/proposal). */
     contextData?: unknown;
   };
   try {
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     contextData !== undefined && contextData !== null
       ? `
 
-CONTEXT (what the user is currently viewing — use this to answer specifically about this proposal, profile, or page without them having to explain):
+CONTEXT (what the user is currently viewing — use this to answer specifically about their profile or page without them having to explain):
 ${typeof contextData === "string" ? contextData : JSON.stringify(contextData, null, 2)}`
       : "";
 

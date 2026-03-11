@@ -3,6 +3,7 @@ import type { UIMessage } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { NextResponse } from "next/server";
 import { CommunitySeedSchema } from "@/lib/oracle/schema";
+import { getSystemDocsContext, type DocsLocale } from "@/lib/utils/docsReader";
 
 const GENESIS_ORACLE_SYSTEM_PROMPT = `You are the Genesis Oracle: a Community Architect in Mana OS. A user wants to plant a seed for a new community.
 
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { messages?: UIMessage[] };
+  let body: { messages?: UIMessage[]; locale?: string };
   try {
     body = await request.json();
   } catch {
@@ -51,6 +52,26 @@ export async function POST(request: Request) {
   }
 
   const messages = Array.isArray(body.messages) ? body.messages : [];
+  const locale: DocsLocale = body.locale === "he" || body.locale === "en" ? body.locale : "en";
+
+  let philosophyContext: string;
+  try {
+    philosophyContext = getSystemDocsContext(locale);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    philosophyContext = `[System philosophy could not be loaded: ${message}. Proceed with your knowledge of Mana OS.]`;
+  }
+
+  const systemPrompt = `${GENESIS_ORACLE_SYSTEM_PROMPT}
+
+CRITICAL SYSTEM PHILOSOPHY:
+You must filter all your advice and calculations through the core laws of this Healing OS.
+Read the following philosophy carefully. If a user's proposal creates coercion, burnout, or violates these laws, gently guide them back to natural harmony.
+
+--- MANA OS PHILOSOPHY ---
+${philosophyContext}
+--- END PHILOSOPHY ---`;
+
   const model = getModel();
   if (!model) {
     return NextResponse.json(
@@ -72,7 +93,7 @@ export async function POST(request: Request) {
   try {
     const result = streamText({
       model,
-      system: GENESIS_ORACLE_SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: await convertToModelMessages(messages, { tools: genesisTools }),
       tools: genesisTools,
     });

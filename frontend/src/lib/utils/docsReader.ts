@@ -1,8 +1,9 @@
 /**
- * Reads project-root documentation (PHILOSOPHY, README, Roadmap, Cursorrules) for a given locale
- * and concatenates them into a single context string for the Architect Oracle.
- * Used to give the AI full system philosophy and roadmap awareness.
- * PHILOSOPHY is loaded first so the Oracle deeply understands the seven paradigms (UBA, Harmonic Time, Anti-Dopamine, Restorative Justice, Sanctuary Privacy, Fractal Economy).
+ * Reads project-root documentation for a given locale and concatenates it into a single context string
+ * for all Oracles (Architect, Initial Planner, Village Elder, Genesis). Philosophy is paramount:
+ * PHILOSOPHY.[locale].md is always read first and is the canonical source for the 12 Pillars and core
+ * laws (UBA, Attraction-Based Resonance, Dynamic Soul Contracts, Restorative Justice, etc.).
+ * README and PROJECT_ROADMAP are then appended when present to give full system awareness.
  */
 
 import fs from "node:fs";
@@ -41,10 +42,11 @@ function resolveProjectRoot(): string {
 }
 
 /**
- * Synchronously reads the content of the locale-specific .md docs from the project root
- * and concatenates them into one string. Used to inject full system context into the Architect Oracle.
+ * Synchronously reads PHILOSOPHY.[locale].md first (paramount), then README and PROJECT_ROADMAP
+ * from the project root, and concatenates them into one string. Used to inject full system
+ * philosophy into all Oracles so they filter advice through the Healing OS core laws.
  * @param locale - 'en' or 'he'
- * @returns Concatenated doc content, or a fallback message if files are missing
+ * @returns Concatenated doc content (philosophy first), or a fallback message if files are missing
  */
 export function getSystemDocsContext(locale: DocsLocale): string {
   const root = resolveProjectRoot();

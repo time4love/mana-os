@@ -131,9 +131,11 @@ export const dictionaries: Record<
       chatPlaceholder: string;
       chatSend: string;
       oracleLabel: string;
+      proposalOracleLabel: string;
       youLabel: string;
       successTitle: string;
       successMessage: string;
+      oracleContemplating: string;
     };
     mentor: {
       accessDeniedTitle: string;
@@ -305,9 +307,11 @@ export const dictionaries: Record<
       chatPlaceholder: "הקלד הודעה...",
       chatSend: "שלח",
       oracleLabel: "אורקל הארכיטקט",
+      proposalOracleLabel: "זקן הכפר",
       youLabel: "את/ה",
       successTitle: "החזון נחקק",
       successMessage: "הרעיון שלך נרשם ביומן הקוד הפתוח. הקהילה תשקול אותו.",
+      oracleContemplating: "האורקל מתבונן בחזון…",
     },
     mentor: {
       accessDeniedTitle: "גישה מוגבלת — למנחים בלבד",
@@ -482,9 +486,11 @@ export const dictionaries: Record<
       chatPlaceholder: "Type a message...",
       chatSend: "Send",
       oracleLabel: "Architect Oracle",
+      proposalOracleLabel: "Village Elder",
       youLabel: "You",
       successTitle: "Vision etched",
       successMessage: "Your vision has been etched into the Open Source log. The community will consider it.",
+      oracleContemplating: "The Oracle is contemplating the vision…",
     },
     mentor: {
       accessDeniedTitle: "Access Denied — Mentors Only",

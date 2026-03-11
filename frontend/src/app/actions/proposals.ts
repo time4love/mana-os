@@ -101,25 +101,6 @@ export type SyncProposalStatusResult =
  * If on-chain resonance for the proposal is >= threshold, updates Supabase status to approved.
  * Call when the feed displays a proposal that has reached resonance (e.g. after refetch).
  */
-export type RequestOracleSynthesisResult =
-  | { success: true }
-  | { success: false; error: string };
-
-/**
- * Requests the Oracle to synthesize community wisdom: merges upgrade seeds into an updated
- * resource plan and stores the Socratic insight (תבוננות) on the proposal.
- * Call when the proposal has merged Upgrade Seeds; the feed should refetch after success.
- */
-export async function requestOracleSynthesis(
-  proposalId: string
-): Promise<RequestOracleSynthesisResult> {
-  if (!proposalId?.trim()) {
-    return { success: false, error: "Proposal id is required" };
-  }
-  const { runOracleSynthesis } = await import("@/lib/oracle/runSynthesis");
-  return runOracleSynthesis(proposalId.trim());
-}
-
 export async function syncProposalStatusToApproved(
   proposalId: string
 ): Promise<SyncProposalStatusResult> {

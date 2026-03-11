@@ -1,7 +1,12 @@
 "use server";
 
 import { createServerSupabase } from "@/lib/supabase/server";
-import type { ProposalUpgradeRow, SeedDiscourseRow } from "@/lib/supabase/types";
+import type {
+  ProposalRow,
+  ProposalUpgradeRow,
+  SeedDiscourseRow,
+} from "@/lib/supabase/types";
+import { runOracleSynthesis } from "@/lib/oracle/runSynthesis";
 
 const MERGE_RESONANCE_THRESHOLD = 2;
 
@@ -98,6 +103,21 @@ export async function resonateWithUpgrade(
       .eq("id", upgradeId);
 
     if (updateError) return { success: false, error: updateError.message };
+
+    if (shouldMerge) {
+      const { data: upgradeRow } = await supabase
+        .from("proposal_upgrades")
+        .select("proposal_id")
+        .eq("id", upgradeId)
+        .single();
+      if (upgradeRow?.proposal_id) {
+        const synthesisResult = await runOracleSynthesis(upgradeRow.proposal_id);
+        if (!synthesisResult.success) {
+          console.error("[resonateWithUpgrade] Oracle synthesis after merge:", synthesisResult.error);
+        }
+      }
+    }
+
     return { success: true, merged: shouldMerge };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to resonate with upgrade";
@@ -201,6 +221,96 @@ export async function shareSeedWisdom(
 export type GetSeedDiscourseResult =
   | { success: true; discourse: SeedDiscourseRow[] }
   | { success: false; error: string };
+
+/** Rich proposal context for the Codex: proposal + upgrades + micro-circle discourse per seed. */
+export interface ProposalContextForCodex {
+  proposal: {
+    id: string;
+    title: string;
+    description: string;
+    resource_plan: ProposalRow["resource_plan"];
+    oracle_insight: string | null;
+  };
+  upgrades: Array<{
+    id: string;
+    suggested_upgrade: string;
+    resonance_count: number;
+    status: ProposalUpgradeRow["status"];
+    discourse: SeedDiscourseRow[];
+  }>;
+}
+
+export type GetProposalContextForCodexResult =
+  | { success: true; context: ProposalContextForCodex }
+  | { success: false; error: string };
+
+/**
+ * Fetches full proposal context for the Codex: proposal, all upgrade seeds (pending + merged),
+ * and micro-circle discourse for each seed. One round-trip for the "Present Oracle" greeting.
+ */
+export async function getProposalContextForCodex(
+  proposalId: string
+): Promise<GetProposalContextForCodexResult> {
+  if (!proposalId) return { success: false, error: "Invalid proposal id" };
+
+  try {
+    const supabase = createServerSupabase();
+
+    const { data: proposal, error: proposalError } = await supabase
+      .from("proposals")
+      .select("id, title, description, resource_plan, oracle_insight")
+      .eq("id", proposalId)
+      .single();
+
+    if (proposalError || !proposal) {
+      return { success: false, error: "Proposal not found" };
+    }
+
+    const { data: upgrades, error: upgradesError } = await supabase
+      .from("proposal_upgrades")
+      .select("id, suggested_upgrade, resonance_count, status")
+      .eq("proposal_id", proposalId)
+      .order("created_at", { ascending: true });
+
+    if (upgradesError) {
+      return { success: false, error: upgradesError.message };
+    }
+
+    const upgradeList = (upgrades ?? []) as ProposalUpgradeRow[];
+    const discourseByUpgradeId: Record<string, SeedDiscourseRow[]> = {};
+
+    for (const u of upgradeList) {
+      const { data: discourse } = await supabase
+        .from("seed_discourse")
+        .select("*")
+        .eq("upgrade_id", u.id)
+        .order("created_at", { ascending: true });
+      discourseByUpgradeId[u.id] = (discourse ?? []) as SeedDiscourseRow[];
+    }
+
+    const context: ProposalContextForCodex = {
+      proposal: {
+        id: proposal.id,
+        title: proposal.title,
+        description: proposal.description,
+        resource_plan: proposal.resource_plan,
+        oracle_insight: proposal.oracle_insight,
+      },
+      upgrades: upgradeList.map((u) => ({
+        id: u.id,
+        suggested_upgrade: u.suggested_upgrade,
+        resonance_count: u.resonance_count,
+        status: u.status,
+        discourse: discourseByUpgradeId[u.id] ?? [],
+      })),
+    };
+
+    return { success: true, context };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to load proposal context";
+    return { success: false, error: message };
+  }
+}
 
 /**
  * Fetches the flat micro-circle discourse for an upgrade seed, chronologically.
