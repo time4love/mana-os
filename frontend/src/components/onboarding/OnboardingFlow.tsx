@@ -13,7 +13,7 @@ import { CodexSheet } from "@/components/ui/CodexSheet";
 import type { CodexChapterId } from "@/lib/codex";
 import { anchorSoulContract } from "@/app/actions/onboarding";
 
-type Season = "winter" | "spring" | "summer";
+type Season = "spring" | "summer" | "autumn" | "winter";
 type RealmChoice = "material" | "energetic" | "knowledge";
 
 const STEP_BREATH = 1;
@@ -47,7 +47,7 @@ export function OnboardingFlow() {
   const runAnchor = useCallback(() => {
     if (!isConnected || !address || anchorInProgressRef.current) return;
     anchorInProgressRef.current = true;
-    const season = selectedSeason ?? "winter";
+    const season = selectedSeason ?? "spring";
     const realms = selectedRealm ? [selectedRealm] : [];
     setAnchorError(null);
     setIsAnchoring(true);
@@ -84,7 +84,7 @@ export function OnboardingFlow() {
       return;
     }
     if (step === STEP_SEASON && selectedSeason) {
-      if (selectedSeason === "winter") setStep(STEP_GENESIS);
+      if (selectedSeason === "winter" || selectedSeason === "autumn") setStep(STEP_GENESIS);
       else setStep(STEP_REALM);
       return;
     }
@@ -182,9 +182,10 @@ export function OnboardingFlow() {
               <div className="flex w-full flex-col gap-4">
                 {(
                   [
-                    ["winter", tOnboarding("seasonWinter")],
                     ["spring", tOnboarding("seasonSpring")],
                     ["summer", tOnboarding("seasonSummer")],
+                    ["autumn", tOnboarding("seasonAutumn")],
+                    ["winter", tOnboarding("seasonWinter")],
                   ] as const
                 ).map(([value, label]) => (
                   <motion.button
@@ -192,7 +193,7 @@ export function OnboardingFlow() {
                     type="button"
                     onClick={() => {
                       setSelectedSeason(value);
-                      if (value === "winter") setStep(STEP_GENESIS);
+                      if (value === "winter" || value === "autumn") setStep(STEP_GENESIS);
                       else setStep(STEP_REALM);
                     }}
                     whileHover={{ scale: 1.02 }}

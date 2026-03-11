@@ -48,10 +48,11 @@ function getSkillRecordFields(
   };
 }
 
-const SEASON_KEYS: Record<string, "seasonWinter" | "seasonSpring" | "seasonSummer"> = {
+const SEASON_KEYS: Record<string, "seasonWinter" | "seasonSpring" | "seasonSummer" | "seasonAutumn"> = {
   winter: "seasonWinter",
   spring: "seasonSpring",
   summer: "seasonSummer",
+  autumn: "seasonAutumn",
 };
 const REALM_PROFILE_KEYS: Record<string, "realmMaterial" | "realmEnergetic" | "realmKnowledge"> = {
   material: "realmMaterial",
@@ -61,7 +62,7 @@ const REALM_PROFILE_KEYS: Record<string, "realmMaterial" | "realmEnergetic" | "r
 
 function getSeasonDisplay(
   season: string,
-  tOnboarding: (k: "seasonWinter" | "seasonSpring" | "seasonSummer") => string
+  tOnboarding: (k: "seasonWinter" | "seasonSpring" | "seasonSummer" | "seasonAutumn") => string
 ): string {
   const key = SEASON_KEYS[season.toLowerCase()];
   return key ? tOnboarding(key) : season;

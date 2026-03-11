@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { ProfileRow as SupabaseProfileRow } from "@/lib/supabase/types";
 
-const SeasonSchema = z.enum(["winter", "spring", "summer"]);
+const SeasonSchema = z.enum(["winter", "spring", "summer", "autumn"]);
 const RealmSchema = z.enum(["material", "energetic", "knowledge"]);
 const WalletAddressSchema = z
   .string()

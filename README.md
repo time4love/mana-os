@@ -1,5 +1,9 @@
 # Mana OS: The Post-Money, Post-Time Operating System
 
+<p align="center">
+  <img src="frontend/public/logo.png" alt="Mana OS logo" width="200" />
+</p>
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
 [![Foundry](https://img.shields.io/badge/Foundry-Smart_Contracts-blue)](https://book.getfoundry.sh/)

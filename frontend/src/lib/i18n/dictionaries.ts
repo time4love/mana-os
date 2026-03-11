@@ -83,6 +83,7 @@ export const dictionaries: Record<
       seasonWinter: string;
       seasonSpring: string;
       seasonSummer: string;
+      seasonAutumn: string;
       realmQuestion: string;
       realmQuestionPrefix: string;
       realmQuestionSuffix: string;
@@ -187,6 +188,7 @@ export const dictionaries: Record<
       seasonWinter: "חורף (מנוחה וריפוי)",
       seasonSpring: "אביב (למידה וצמיחה)",
       seasonSummer: "קיץ (יצירה והדהוד)",
+      seasonAutumn: "סתיו (אסיף והשלה)",
       realmQuestion: "לאן המאנה שלך רוצה לזרום העונה?",
       realmQuestionPrefix: "לאן ",
       realmQuestionSuffix: " שלך רוצה לזרום העונה?",
@@ -292,6 +294,7 @@ export const dictionaries: Record<
       seasonWinter: "Winter (Rest & Healing)",
       seasonSpring: "Spring (Learning & Growing)",
       seasonSummer: "Summer (Creating & Resonating)",
+      seasonAutumn: "Autumn (Harvesting & Shedding)",
       realmQuestion: "Where does your Mana wish to flow this season?",
       realmQuestionPrefix: "Where does your ",
       realmQuestionSuffix: " wish to flow this season?",
