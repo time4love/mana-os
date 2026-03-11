@@ -94,6 +94,10 @@ export const dictionaries: Record<
       resonateWithUpgrade: string;
       alreadyResonatedWithUpgrade: string;
       shareSeedWisdomPlaceholder: string;
+      seekOracleSynthesis: string;
+      synthesisLoading: string;
+      oracleInsightLabel: string;
+      consultOracleLabel: string;
     };
     communities: {
       genesisTitle: string;
@@ -275,6 +279,10 @@ export const dictionaries: Record<
       resonateWithUpgrade: "הדהד",
       alreadyResonatedWithUpgrade: "כבר הדהדת עם הזרע הזה.",
       shareSeedWisdomPlaceholder: "שתף חוכמה על זרע זה…",
+      seekOracleSynthesis: "בקש את סינתזת האורקל",
+      synthesisLoading: "האורקל טווה…",
+      oracleInsightLabel: "תבוננות האורקל",
+      consultOracleLabel: "היוועץ באורקל",
     },
     communities: {
       genesisTitle: "זרע קהילה חדשה",
@@ -306,7 +314,7 @@ export const dictionaries: Record<
       accessDeniedMessage:
         "רק מחזיקי אסימון ManaSkills ברמת מנחה (Level 3) יכולים להעניק עוגן הבראשית. המשך את דרכך והגע לרמת מנחה כדי לפתוח את סורק הבראשית.",
       grantGenesisResonance: "הענק הדהוד חניכה",
-      confirmGrantPrompt: "להעניק עוגן הבראשית ל־{address}?",
+      confirmGrantPrompt: "להעניק עוגן הבראשית ל-{address}?",
       scanOrPastePlaceholder: "סרוק QR או הדבק כתובת ארנק…",
       openCamera: "פתח מצלמה",
       grantedTitle: "הדהוד חניכה הוענק",
@@ -448,6 +456,10 @@ export const dictionaries: Record<
       resonateWithUpgrade: "Resonate",
       alreadyResonatedWithUpgrade: "You have already resonated with this seed.",
       shareSeedWisdomPlaceholder: "Share wisdom on this seed…",
+      seekOracleSynthesis: "Seek Oracle's Synthesis",
+      synthesisLoading: "The Oracle is weaving…",
+      oracleInsightLabel: "Oracle's Insight",
+      consultOracleLabel: "Consult the Oracle",
     },
     communities: {
       genesisTitle: "Plant a Community Seed",

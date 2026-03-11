@@ -68,3 +68,20 @@ export const SubmitFeatureProposalSchema = z.object({
 });
 
 export type SubmitFeatureProposal = z.infer<typeof SubmitFeatureProposalSchema>;
+
+/**
+ * Oracle Synthesis: output when the Oracle weaves community upgrade seeds into an updated plan.
+ * socraticInsight = תבוננות — short reflection on how the community organically evolved the idea.
+ */
+export const OracleSynthesisOutputSchema = z.object({
+  updatedPlan: ProposalResourcePlanSchema.describe(
+    "Updated ProposalResourcePlan recalculating Mana Cycles and Natural Resources to include all merged community upgrades"
+  ),
+  socraticInsight: z
+    .string()
+    .describe(
+      "Short Socratic insight (תבוננות) reflecting on the beauty of how the community organically evolved the idea; 1–3 sentences"
+    ),
+});
+
+export type OracleSynthesisOutput = z.infer<typeof OracleSynthesisOutputSchema>;

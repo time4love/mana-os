@@ -15,7 +15,13 @@ import { CodexSheet } from "@/components/ui/CodexSheet";
 import { getProfileByWallet, type ProfileRow } from "@/app/actions/onboarding";
 import { Leaf } from "lucide-react";
 
-const QRCode = dynamic(() => import("react-qr-code"), { ssr: false });
+const QRCode = dynamic(
+  () =>
+    import("react-qr-code")
+      .then((m) => m?.default ?? (m as { QRCode?: unknown }).QRCode)
+      .catch(() => null),
+  { ssr: false }
+);
 
 /** Normalize contract return: getTokenIdsOf returns uint256[] (bigint[]). */
 function getTokenIdsArray(data: unknown): bigint[] {
@@ -341,13 +347,17 @@ export default function ProfilePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center gap-4">
-                  <div className="rounded-xl border border-border/60 bg-background p-4 shadow-soft">
-                    <QRCode
-                      value={address}
-                      size={220}
-                      level="M"
-                      className="size-[220px]"
-                    />
+                  <div className="rounded-xl border border-border/60 bg-background p-4 shadow-soft flex items-center justify-center min-h-[220px]">
+                    {QRCode ? (
+                      <QRCode
+                        value={address}
+                        size={220}
+                        level="M"
+                        className="size-[220px]"
+                      />
+                    ) : (
+                      <p className="font-mono text-xs text-muted-foreground break-all px-2 text-center" dir="ltr">{address}</p>
+                    )}
                   </div>
                   <p className="text-center text-sm text-muted-foreground max-w-md">
                     {t("genesisQrDescription")}

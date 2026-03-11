@@ -62,6 +62,7 @@ export interface Database {
           resource_plan: ProposalResourcePlanJson;
           status: ProposalStatus;
           created_at: string;
+          oracle_insight: string | null;
         };
         Insert: {
           id?: string;
@@ -71,6 +72,7 @@ export interface Database {
           resource_plan: ProposalResourcePlanJson;
           status?: ProposalStatus;
           created_at?: string;
+          oracle_insight?: string | null;
         };
         Update: {
           id?: string;
@@ -80,6 +82,7 @@ export interface Database {
           resource_plan?: ProposalResourcePlanJson;
           status?: ProposalStatus;
           created_at?: string;
+          oracle_insight?: string | null;
         };
       };
       communities: {

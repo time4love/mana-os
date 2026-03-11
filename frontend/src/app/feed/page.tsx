@@ -6,6 +6,7 @@ import { useLocale } from "@/lib/i18n/context";
 import { getProposalsForFeed } from "@/app/actions/proposals";
 import type { ProposalRow } from "@/lib/supabase/types";
 import { LivingProposal } from "@/components/proposals/LivingProposal";
+import { CodexSheet } from "@/components/ui/CodexSheet";
 
 const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] };
 
@@ -14,7 +15,19 @@ export default function FeedPage() {
   const [proposals, setProposals] = useState<ProposalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [codexOpen, setCodexOpen] = useState(false);
+  const [codexProposal, setCodexProposal] = useState<ProposalRow | null>(null);
   const isRtl = locale === "he";
+
+  const handleConsultOracle = useCallback((proposal: ProposalRow) => {
+    setCodexProposal(proposal);
+    setCodexOpen(true);
+  }, []);
+
+  const handleCodexOpenChange = useCallback((open: boolean) => {
+    setCodexOpen(open);
+    if (!open) setCodexProposal(null);
+  }, []);
 
   const loadProposals = useCallback(() => {
     getProposalsForFeed().then((result) => {
@@ -102,12 +115,31 @@ export default function FeedPage() {
                 <LivingProposal
                   proposal={proposal}
                   onResonated={loadProposals}
+                  onConsultOracle={handleConsultOracle}
                 />
               </motion.div>
             ))}
           </ul>
         )}
       </div>
+
+      <CodexSheet
+        open={codexOpen}
+        onOpenChange={handleCodexOpenChange}
+        contextData={
+          codexProposal
+            ? {
+                proposal: {
+                  id: codexProposal.id,
+                  title: codexProposal.title,
+                  description: codexProposal.description,
+                  resource_plan: codexProposal.resource_plan,
+                  oracle_insight: codexProposal.oracle_insight ?? undefined,
+                },
+              }
+            : undefined
+        }
+      />
     </main>
   );
 }

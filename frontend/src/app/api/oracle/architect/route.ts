@@ -39,6 +39,8 @@ export async function POST(request: Request) {
     messages?: UIMessage[];
     locale?: string;
     proposerWallet?: string | null;
+    /** Context from the current page (e.g. proposal, profile); injected so the Oracle can answer in context. */
+    contextData?: unknown;
   };
   try {
     body = await request.json();
@@ -56,6 +58,7 @@ export async function POST(request: Request) {
     typeof body.proposerWallet === "string" && body.proposerWallet.trim()
       ? body.proposerWallet.trim()
       : "anonymous";
+  const contextData = body.contextData;
 
   const model = getModel();
   if (!model) {
@@ -73,11 +76,19 @@ export async function POST(request: Request) {
     docsContext = `[System docs could not be loaded: ${message}. Proceed with your knowledge of Mana OS.]`;
   }
 
+  const contextBlock =
+    contextData !== undefined && contextData !== null
+      ? `
+
+CONTEXT (what the user is currently viewing — use this to answer specifically about this proposal, profile, or page without them having to explain):
+${typeof contextData === "string" ? contextData : JSON.stringify(contextData, null, 2)}`
+      : "";
+
   const systemPrompt = `${ARCHITECT_INTRO}
 
 Below is the full system documentation (README, Roadmap, Cursorrules) for Mana OS. Use it to answer questions and to evaluate whether a feature proposal aligns with our philosophy.
 
-${docsContext}`;
+${docsContext}${contextBlock}`;
 
   const architectTools = {
     submit_feature_proposal: {
