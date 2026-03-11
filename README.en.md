@@ -17,6 +17,10 @@ We are building an open-source, decentralized **Healing Operating System** for c
 
 **⚠️ CRITICAL RULE FOR CONTRIBUTORS:** Money and Time-Tracking do not exist in this codebase. If you submit a PR containing variables like `price`, `budget`, `payment_gateway`, or `hoursContributed`, it will be rejected. We do not trade in the Matrix's illusions. We trade in energetic reality.
 
+## 📖 The Core Manifesto
+Mana OS is not just a codebase; it is a paradigm shift. Before exploring the architecture or contributing code, you must understand the rules of the new world. 
+👉 **[Read the 12 Pillars of the Healing OS (The Mana Philosophy)](PHILOSOPHY.en.md)**
+
 ---
 
 ## 🛑 The Problem: The Matrix of Scarcity and Time
