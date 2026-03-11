@@ -26,8 +26,9 @@ We have removed the Gregorian calendar from all user interfaces (no display of m
 8. **Attention Economy and Solarpunk Design (Anti-Dopamine & Solarpunk UX):**
 We refuse to hijack the nervous system. No push notifications, no red indicators, no anxiety-inducing counters. Updates are delivered in a daily ritual called the **Sunset Whisper**. The visual design abolishes dark neon screens in favour of light, sand, sage green, and the aesthetics of nature.
 
-9. **Restorative Justice & Nonviolent Communication:**
-The system utterly rejects punishment, bans, or user rating. Unfulfilled commitment triggers a gentle “Spiritual Recalibration” with the Oracle. Conflicts are handled through a **Call for Harmony**, which summons human Mentors from the Energetic Realm to heal the dialogue.
+9. **Restorative Justice & The Immune System:**
+The system rejects vindictive punishment, fines, or social credit scores. Unfulfilled commitments trigger a gentle 'Spiritual Recalibration'. Conflicts are handled via a 'Call for Harmony' and human mediation. However, in extreme cases of severe harm or fundamental violation of the sanctity of life, the community activates its 'Immune System': **Severance and Exile**. 
+This does not violate Unconditional Basic Abundance; the community never uses food as leverage for compliance. However, an individual endangering the whole loses the right to remain in the communal space. Their energetic anchor (SBT) is severed from that specific Mycelium network, and they are exiled from its digital and physical boundaries. This is not educational punishment; it is the absolute drawing of physical boundaries to protect the community organism.
 
 10. **Sanctuary Privacy & Anonymous Resonance:**
 Transparency is for resources; privacy is for souls. There is no “last seen”. A user in “Winter” wears the **Winter Cloak**, which shields them from social surveillance. Votes on proposals are fully anonymous (ZKP) to prevent ego competition, and the community is connected through shared discourse circles.
