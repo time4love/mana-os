@@ -9,13 +9,13 @@ export function HomeNav() {
     <nav className="flex flex-wrap items-center gap-4">
       <Link
         href="/profile"
-        className="text-emerald-400 underline underline-offset-2"
+        className="text-primary underline underline-offset-2"
       >
         {t("title")}
       </Link>
       <Link
         href="/proposals/new"
-        className="text-emerald-400 underline underline-offset-2"
+        className="text-primary underline underline-offset-2"
       >
         {tProposals("navNewProposal")}
       </Link>

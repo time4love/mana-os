@@ -15,10 +15,10 @@ export function Progress({ value, max = 100, className = "" }: ProgressProps) {
       aria-valuenow={value}
       aria-valuemin={0}
       aria-valuemax={max}
-      className={`h-2 w-full overflow-hidden rounded-full bg-neutral-700 ${className}`}
+      className={`h-2 w-full overflow-hidden rounded-full bg-muted ${className}`}
     >
       <div
-        className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+        className="h-full rounded-full bg-primary transition-all duration-300"
         style={{ inlineSize: `${percentage}%` }}
       />
     </div>

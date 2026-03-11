@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useAccount, useConnect, useDisconnect, useReadContract } from "wagmi";
 import { anvil } from "@/lib/wagmi";
@@ -11,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useLocale } from "@/lib/i18n/context";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { CodexSheet } from "@/components/ui/CodexSheet";
+import { getProfileByWallet, type ProfileRow } from "@/app/actions/onboarding";
+import { Leaf } from "lucide-react";
 
 /** Normalize contract return: getTokenIdsOf returns uint256[] (bigint[]). */
 function getTokenIdsArray(data: unknown): bigint[] {
@@ -45,14 +48,58 @@ function getSkillRecordFields(
   };
 }
 
+const SEASON_KEYS: Record<string, "seasonWinter" | "seasonSpring" | "seasonSummer"> = {
+  winter: "seasonWinter",
+  spring: "seasonSpring",
+  summer: "seasonSummer",
+};
+const REALM_PROFILE_KEYS: Record<string, "realmMaterial" | "realmEnergetic" | "realmKnowledge"> = {
+  material: "realmMaterial",
+  energetic: "realmEnergetic",
+  knowledge: "realmKnowledge",
+};
+
+function getSeasonDisplay(
+  season: string,
+  tOnboarding: (k: "seasonWinter" | "seasonSpring" | "seasonSummer") => string
+): string {
+  const key = SEASON_KEYS[season.toLowerCase()];
+  return key ? tOnboarding(key) : season;
+}
+
+function getRealmLabel(
+  realm: string,
+  t: (k: "realmMaterial" | "realmEnergetic" | "realmKnowledge") => string
+): string {
+  const key = REALM_PROFILE_KEYS[realm.toLowerCase()];
+  return key ? t(key) : realm;
+}
+
 export default function ProfilePage() {
   const [mounted, setMounted] = useState(false);
-  const { locale, t, tProposals, getLevelDisplay, getRealmDisplay, replace } = useLocale();
+  const [soulContract, setSoulContract] = useState<ProfileRow | null | undefined>(undefined);
+  const [codexOpen, setCodexOpen] = useState(false);
+  const { locale, t, tOnboarding, tProposals, getLevelDisplay, getRealmDisplay, replace } =
+    useLocale();
   const { address, isConnected, chainId: connectedChainId } = useAccount();
   const { connect, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
 
   useEffect(() => setMounted(true), []);
+
+  const fetchSoulContract = useCallback(async (walletAddress: string) => {
+    const result = await getProfileByWallet(walletAddress);
+    if (result.success) setSoulContract(result.profile);
+    else setSoulContract(null);
+  }, []);
+
+  useEffect(() => {
+    if (!address) {
+      setSoulContract(undefined);
+      return;
+    }
+    fetchSoulContract(address);
+  }, [address, fetchSoulContract]);
 
   const {
     data: tokenIdsRaw,
@@ -122,26 +169,26 @@ export default function ProfilePage() {
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/"
-                className="text-emerald-400 underline underline-offset-2"
+                className="text-primary underline underline-offset-2"
               >
                 {t("navHome")}
               </Link>
-              <span className="text-neutral-500">|</span>
+              <span className="text-muted-foreground">|</span>
               <Link
                 href="/proposals/new"
-                className="text-emerald-400 underline underline-offset-2"
+                className="text-primary underline underline-offset-2"
               >
                 {tProposals("navNewProposal")}
               </Link>
             </div>
             <LanguageSwitcher />
           </nav>
-          <h1 className="text-2xl font-bold text-neutral-100 text-start">
+          <h1 className="text-2xl font-bold text-foreground text-start">
             {t("title")}
           </h1>
           <Card>
             <CardContent className="p-6">
-              <p className="text-neutral-400">{t("loadingSkills")}</p>
+              <p className="text-muted-foreground">{t("loadingSkills")}</p>
             </CardContent>
           </Card>
         </div>
@@ -159,31 +206,77 @@ export default function ProfilePage() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/"
-              className="text-emerald-400 underline underline-offset-2"
+              className="text-primary underline underline-offset-2"
             >
               {t("navHome")}
             </Link>
-            <span className="text-neutral-500">|</span>
+            <span className="text-muted-foreground">|</span>
             <Link
               href="/proposals/new"
-              className="text-emerald-400 underline underline-offset-2"
+              className="text-primary underline underline-offset-2"
             >
               {tProposals("navNewProposal")}
             </Link>
           </div>
           <LanguageSwitcher />
         </nav>
-        <h1 className="text-2xl font-bold text-neutral-100 text-start">
+        <h1 className="text-2xl font-bold text-foreground text-start">
           {t("title")}
         </h1>
 
+        {isConnected && soulContract && (
+          <Card className="border-primary/20 bg-primary/5 shadow-soft">
+            <CardHeader>
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-primary">
+                  {t("soulContractTitle")}
+                </CardTitle>
+                <button
+                  type="button"
+                  onClick={() => setCodexOpen(true)}
+                  className="inline-flex shrink-0 rounded p-1 text-primary/70 outline-none transition hover:text-primary hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={tOnboarding("codexSoulContractTriggerLabel")}
+                >
+                  <span
+                    className="relative inline-flex rounded opacity-90 transition-opacity"
+                    style={{
+                      boxShadow: "0 0 10px 2px rgba(52, 211, 153, 0.2)",
+                      animation: "concept-whisper-pulse 2.5s ease-in-out infinite",
+                    }}
+                  >
+                    <Leaf className="h-5 w-5" aria-hidden />
+                  </span>
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-foreground">
+                <span className="text-muted-foreground">{t("currentSeasonLabel")}: </span>
+                <span className="font-medium text-primary">
+                  {getSeasonDisplay(soulContract.season, tOnboarding)}
+                </span>
+              </p>
+              {soulContract.realms.length > 0 && (
+                <p className="text-foreground">
+                  <span className="text-muted-foreground">{t("resonatingRealmsLabel")}: </span>
+                  <span className="font-medium text-primary">
+                    {soulContract.realms
+                      .map((r) => getRealmLabel(r, t))
+                      .join(" · ")}
+                  </span>
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {isConnected && (
-          <p className="text-sm text-neutral-500 font-mono">
+          <p className="text-sm text-muted-foreground font-mono">
             {address}
             <button
               type="button"
               onClick={() => disconnect()}
-              className="ms-2 text-emerald-400 hover:underline"
+              className="ms-2 text-primary hover:underline"
             >
               {t("disconnect")}
             </button>
@@ -193,7 +286,7 @@ export default function ProfilePage() {
         {!isConnected && (
           <Card>
             <CardContent className="space-y-4 p-6">
-              <p className="text-neutral-400">{t("connectPrompt")}</p>
+              <p className="text-muted-foreground">{t("connectPrompt")}</p>
               {connectors.map((connector) => (
                 <Button
                   key={connector.uid}
@@ -212,7 +305,7 @@ export default function ProfilePage() {
         {showSkillsLoading && (
           <Card>
             <CardContent className="p-6">
-              <p className="text-neutral-400">{t("loadingSkills")}</p>
+              <p className="text-muted-foreground">{t("loadingSkills")}</p>
             </CardContent>
           </Card>
         )}
@@ -220,7 +313,7 @@ export default function ProfilePage() {
         {showSkillsError && (
           <Card>
             <CardContent className="p-6">
-              <p className="text-neutral-400">{t("errorLoadSkills")}</p>
+              <p className="text-muted-foreground">{t("errorLoadSkills")}</p>
             </CardContent>
           </Card>
         )}
@@ -231,11 +324,11 @@ export default function ProfilePage() {
               <CardTitle>{t("welcomeTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-neutral-300">{t("welcomeBody")}</p>
+              <p className="text-muted-foreground">{t("welcomeBody")}</p>
               <Button size="lg" className="w-full sm:w-auto">
                 {t("startJourney")}
               </Button>
-              <p className="text-sm text-neutral-500">{t("startJourneyHint")}</p>
+              <p className="text-sm text-muted-foreground">{t("startJourneyHint")}</p>
             </CardContent>
           </Card>
         )}
@@ -256,9 +349,9 @@ export default function ProfilePage() {
                     {t("realmLabel")}: {getRealmDisplay(skillFields.realm)}
                   </Badge>
                 </div>
-                <p className="text-sm text-neutral-400">
+                <p className="text-sm text-muted-foreground">
                   {t("proficiencyLabel")}:{" "}
-                  <span className="font-medium text-neutral-200">
+                  <span className="font-medium text-foreground">
                     {getLevelDisplay(skillFields.level)}
                   </span>
                 </p>
@@ -270,7 +363,7 @@ export default function ProfilePage() {
                 <CardTitle>{t("manaCycles")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-3xl font-semibold text-emerald-400">
+                <p className="text-3xl font-semibold text-primary">
                   {skillFields.manaCycles}
                 </p>
                 <Progress
@@ -285,7 +378,7 @@ export default function ProfilePage() {
         {showSkillRecordLoading && (
           <Card>
             <CardContent className="p-6">
-              <p className="text-neutral-400">{t("loadingRecord")}</p>
+              <p className="text-muted-foreground">{t("loadingRecord")}</p>
             </CardContent>
           </Card>
         )}
@@ -293,10 +386,10 @@ export default function ProfilePage() {
         {isWrongChain && (
           <Card>
             <CardContent className="p-6">
-              <p className="text-neutral-300">
+              <p className="text-foreground">
                 {replace(t("wrongChain"), { chainId: String(anvil.id) })}
               </p>
-              <p className="mt-2 text-sm text-neutral-500">
+              <p className="mt-2 text-sm text-muted-foreground">
                 {t("wrongChainRpc")}
               </p>
             </CardContent>
@@ -306,21 +399,21 @@ export default function ProfilePage() {
         {showConnectedFallback && !isWrongChain && (
           <Card>
             <CardContent className="p-6">
-              <p className="text-neutral-400">{t("loadingSkills")}</p>
-              <p className="mt-2 text-sm text-neutral-500">
+              <p className="text-muted-foreground">{t("loadingSkills")}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
                 {t("fallbackHint")}
               </p>
             </CardContent>
           </Card>
         )}
 
-        <Card className="border-neutral-600 bg-neutral-900/80">
+        <Card className="border-border bg-muted/50">
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-neutral-400">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               {t("debugTitle")}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1 font-mono text-xs text-neutral-500">
+          <CardContent className="space-y-1 font-mono text-xs text-muted-foreground">
             <p>
               {t("debugConnected")}: {isConnected ? t("yes") : t("no")}
             </p>
@@ -345,6 +438,12 @@ export default function ProfilePage() {
             </p>
           </CardContent>
         </Card>
+
+        <CodexSheet
+          open={codexOpen}
+          onOpenChange={setCodexOpen}
+          chapterId="soul-contract-seasons"
+        />
       </div>
     </main>
   );

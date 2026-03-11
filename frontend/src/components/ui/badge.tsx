@@ -7,9 +7,9 @@ interface BadgeProps {
 }
 
 const variantStyles = {
-  default: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  secondary: "bg-neutral-600/30 text-neutral-300 border-neutral-500/30",
-  outline: "border border-neutral-500 text-neutral-300",
+  default: "bg-primary/15 text-primary border-primary/30",
+  secondary: "bg-muted text-muted-foreground border-border",
+  outline: "border border-border text-muted-foreground",
 };
 
 export function Badge({ children, variant = "default", className = "" }: BadgeProps) {

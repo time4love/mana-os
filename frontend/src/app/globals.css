@@ -2,14 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Solarpunk & Healing Light — Nature-first palette. Default theme: light. */
 :root {
-  --background: #0a0a0a;
-  --foreground: #fafafa;
+  --background: #fdfbf7;
+  --foreground: #1a2e25;
+  --card: #faf8f4;
+  --card-foreground: #1a2e25;
+  --popover: #faf8f4;
+  --popover-foreground: #1a2e25;
+  --primary: #059669;
+  --primary-foreground: #fdfbf7;
+  --secondary: #e8f0eb;
+  --secondary-foreground: #1a2e25;
+  --muted: #e8ede9;
+  --muted-foreground: #4a5d52;
+  --accent: #d4e5da;
+  --accent-foreground: #1a2e25;
+  --border: #d1ddd4;
+  --input: #d1ddd4;
+  --ring: #059669;
+  --radius: 0.75rem;
+  --overlay: rgba(26, 46, 37, 0.35);
+}
+
+/* Optional: "Midnight Forest" for users who prefer dark — warm dark, not pure black */
+.dark {
+  --background: #0f1814;
+  --foreground: #e8f0eb;
+  --card: #162019;
+  --card-foreground: #e8f0eb;
+  --popover: #162019;
+  --popover-foreground: #e8f0eb;
+  --primary: #34d399;
+  --primary-foreground: #0f1814;
+  --secondary: #1e2e26;
+  --secondary-foreground: #e8f0eb;
+  --muted: #243328;
+  --muted-foreground: #9caa9f;
+  --accent: #2d4236;
+  --accent-foreground: #e8f0eb;
+  --border: #2d4236;
+  --input: #2d4236;
+  --ring: #34d399;
+  --overlay: rgba(0, 0, 0, 0.5);
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
+}
+
+/* Sheet overlay uses semantic overlay (warm in light, dark in .dark) */
+.bg-overlay {
+  background: var(--overlay);
 }
 
 @keyframes concept-whisper-pulse {
@@ -19,5 +64,73 @@ body {
   }
   50% {
     opacity: 0.5;
+  }
+}
+
+/* Living Codex — Sheet slide animations (logical: end = right in LTR, left in RTL) */
+.sheet-overlay[data-state="open"] {
+  animation: sheet-fade-in 0.3s ease-out;
+}
+.sheet-overlay[data-state="closed"] {
+  animation: sheet-fade-out 0.25s ease-in;
+}
+.sheet-content[data-state="open"] {
+  animation: sheet-slide-in 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.sheet-content[data-state="closed"] {
+  animation: sheet-slide-out 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.sheet-content[data-side="start"][data-state="open"] {
+  animation-name: sheet-slide-in-start;
+}
+.sheet-content[data-side="start"][data-state="closed"] {
+  animation-name: sheet-slide-out-start;
+}
+@keyframes sheet-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sheet-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes sheet-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes sheet-slide-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes sheet-slide-in-start {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes sheet-slide-out-start {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
   }
 }

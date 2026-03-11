@@ -59,10 +59,24 @@ You must write production-grade, enterprise-level code following Clean Code and 
 - Handle loading and error states gracefully (using Suspense, Error Boundaries, or skeleton loaders).
 - AI responses must be strongly typed using Zod schemas and streamed to the UI.
 
+## 🌞 UI/UX Aesthetic: Solarpunk & Healing Light
+Never use harsh black or dark-mode-by-default cyberpunk aesthetics. The app must feel like a sunlit forest: warm sands, sage greens, deep forest text, and soft shadows.
+- **Semantic colors**: Always use semantic CSS variables / Tailwind theme tokens (`bg-background`, `bg-card`, `text-foreground`, `text-primary`, `text-muted-foreground`, `border-border`, `bg-primary`, `shadow-soft`, `shadow-soft-md`) rather than hardcoded colors (e.g. `bg-zinc-950`, `text-white`, `border-neutral-800`).
+- **Default theme**: Light. Background is warm off-white/sand (`--background`); foreground is deep forest green/slate for text (`--foreground`). Cards and popovers use soft cream with diffused shadows.
+- **Primary (Mana)**: Vibrant but natural emerald/sage (`--primary`). Use for links, CTAs, and Concept Whispers.
+- **Shadows**: Prefer soft, diffused shadows (`shadow-soft`, `shadow-soft-md`) over harsh borders to suggest sunlight on physical surfaces.
+
 ## 🌿 Healing UX & UI Principles
 - **No Traditional Forms**: Avoid rigid `<form>`, `<input type="text">`, and "Submit" buttons for conceptual flows (e.g., onboarding, soul contracts). Use fluid, state-based step transitions instead.
 - **Biomimicry Animations**: Use `framer-motion` for transitions. Elements should fade in, float, and expand softly (like breathing or water ripples). No harsh pops or instant state changes.
-- **Concept Whispers (Non-intrusive Learning)**: Unfamiliar terms (e.g., Mana, Realm, Resonance) must use an inline **Concept Whisper** component. The word has a subtle pulsing underline or soft emerald glow; on click/tap it smoothly expands inline to reveal a short definition without modals or breaking flow.
+- **Concept Whispers (Non-intrusive Learning)**: Unfamiliar terms (e.g., Mana, Realm, Resonance) must use an inline **Concept Whisper** component. The word has a subtle pulsing underline or soft emerald glow; on click/tap it opens the **CodexSheet** side-panel for the specified chapter (see Living Codex below).
+
+## 📖 The Living Codex (Contextual Philosophy / Dual-Realm UX)
+The Functional UI (Action) lives side-by-side with the Theoretical/Spiritual UI (The Living Codex). Matrix-conditioned users need deep context for paradigm shifts without breaking flow.
+- **UNIFIED UX**: Never use inline tooltips, pop-ups, or expanding text for explaining deep concepts. ALWAYS use the **CodexSheet** side-panel to maintain a single, cohesive educational experience. Words in text can trigger the Codex via the **ConceptWhisper** wrapper (e.g. `<ConceptWhisper chapterId="what-is-mana">Mana</ConceptWhisper>`).
+- **Terminology**: Never use "Help", "FAQ", or "Docs". Use **"The Codex"** or **"ספר הידע"** (and locale-equivalents) only.
+- **Contextual Awareness**: Functional pages MUST include a subtle, glowing trigger (e.g., Book/Leaf icon) when a major paradigm shift occurs (e.g., meeting a Mentor for Genesis Resonance). The trigger opens the Codex for that step.
+- **Side-by-Side UX**: The Codex opens as a smooth, sliding side-panel (e.g., using `shadcn/ui` `Sheet` or equivalent). The functional page stays mounted; the panel displays the specific philosophical/operational chapter for the user's current step. Use logical CSS (`start`/`end`) so the panel slides from the correct edge in RTL/LTR.
 
 ## 🧠 Workflows & RPG Data Modeling
 Skill Levels MUST follow this progression:

@@ -40,14 +40,14 @@ export default function NewProposalPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/"
-              className="text-emerald-400 underline underline-offset-2"
+              className="text-primary underline underline-offset-2"
             >
               {tProposals("navHome")}
             </Link>
-            <span className="text-neutral-500">|</span>
+            <span className="text-muted-foreground">|</span>
             <Link
               href="/profile"
-              className="text-emerald-400 underline underline-offset-2"
+              className="text-primary underline underline-offset-2"
             >
               {tProposals("navProfile")}
             </Link>
@@ -55,14 +55,14 @@ export default function NewProposalPage() {
           <LanguageSwitcher />
         </nav>
 
-        <h1 className="text-2xl font-bold text-neutral-100 text-start mb-6">
+        <h1 className="text-2xl font-bold text-foreground text-start mb-6">
           {tProposals("title")}
         </h1>
 
-        <div className="flex-1 flex flex-col min-h-0 rounded-lg border border-neutral-700 bg-neutral-900/60 overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 rounded-lg border border-border bg-card overflow-hidden shadow-soft">
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 && (
-              <p className="text-neutral-500 text-sm text-center py-8">
+              <p className="text-muted-foreground text-sm text-center py-8">
                 {tProposals("placeholder")}
               </p>
             )}
@@ -74,11 +74,11 @@ export default function NewProposalPage() {
                 <div
                   className={`max-w-[85%] rounded-2xl px-4 py-3 ${
                     message.role === "user"
-                      ? "bg-emerald-900/40 border border-emerald-800/50 text-neutral-100"
-                      : "bg-neutral-800/80 border border-neutral-700 text-neutral-200"
+                      ? "bg-primary/15 border border-primary/40 text-foreground"
+                      : "bg-muted border border-border text-foreground"
                   }`}
                 >
-                  <p className="text-xs font-medium text-neutral-400 mb-1.5">
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5">
                     {message.role === "user"
                       ? tProposals("youLabel")
                       : tProposals("oracleLabel")}
@@ -128,7 +128,7 @@ export default function NewProposalPage() {
                         return (
                           <p
                             key={partIndex}
-                            className="text-neutral-500 italic"
+                            className="text-muted-foreground italic"
                           >
                             {tProposals("loading")}
                           </p>
@@ -144,7 +144,7 @@ export default function NewProposalPage() {
 
           <form
             onSubmit={handleSubmit}
-            className="p-4 border-t border-neutral-700 bg-neutral-950/50"
+            className="p-4 border-t border-border bg-muted/30"
           >
             <div className="flex gap-2">
               <input
@@ -152,7 +152,7 @@ export default function NewProposalPage() {
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={tProposals("chatPlaceholder")}
                 disabled={isLoading}
-                className="flex-1 rounded-lg border border-neutral-600 bg-neutral-800/80 px-4 py-3 text-neutral-100 placeholder:text-neutral-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="flex-1 rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
                 aria-label={tProposals("chatPlaceholder")}
               />
               <Button type="submit" disabled={isLoading || !input.trim()}>

@@ -40,6 +40,9 @@ export const dictionaries: Record<
       debugShowing: string;
       yes: string;
       no: string;
+      soulContractTitle: string;
+      currentSeasonLabel: string;
+      resonatingRealmsLabel: string;
     };
     proficiency: {
       apprentice: string;
@@ -90,7 +93,14 @@ export const dictionaries: Record<
       manaWhisperDefinition: string;
       genesisText: string;
       readyLabel: string;
+      genesisAnchorButton: string;
+      genesisAnchoring: string;
+      genesisConnectWallet: string;
       navHome: string;
+      codexTriggerLabel: string;
+      codexSoulContractTriggerLabel: string;
+      noWalletHint: string;
+      noWalletError: string;
     };
   }
 > = {
@@ -132,6 +142,9 @@ export const dictionaries: Record<
       debugShowing: "מציג",
       yes: "כן",
       no: "לא",
+      soulContractTitle: "חוזה הנשמה הדינמי",
+      currentSeasonLabel: "עונה נוכחית",
+      resonatingRealmsLabel: "תדרים מהדהדים",
     },
     proficiency: {
       apprentice: "שוליה",
@@ -186,7 +199,14 @@ export const dictionaries: Record<
       genesisText:
         "חתימת האנרגיה שלך מוכנה. כדי להעיר אותה, פגש/י מנחה קהילתי מקומי פנים אל פנים. הם ימסרו לך את התהודה הראשונה שלך.",
       readyLabel: "מוכן",
+      genesisAnchorButton: "עגן את החוזה הנשמתי",
+      genesisAnchoring: "מהדהד…",
+      genesisConnectWallet: "התחבר עם הארנק כדי להעגן",
       navHome: "← ראשי",
+      codexTriggerLabel: "למה פגישה פיזית? (ספר הידע)",
+      codexSoulContractTriggerLabel: "חוזה הנשמה והעונות (ספר הידע)",
+      noWalletHint: "התקן הרחבת ארנק (למשל MetaMask) כדי להמשיך.",
+      noWalletError: "לא נמצא ארנק. התקן הרחבת ארנק (למשל MetaMask) וחבר את האתר.",
     },
   },
   en: {
@@ -227,6 +247,9 @@ export const dictionaries: Record<
       debugShowing: "Showing",
       yes: "Yes",
       no: "No",
+      soulContractTitle: "Dynamic Soul Contract",
+      currentSeasonLabel: "Current Season",
+      resonatingRealmsLabel: "Resonating Realms",
     },
     proficiency: {
       apprentice: "Apprentice",
@@ -281,7 +304,14 @@ export const dictionaries: Record<
       genesisText:
         "Your energetic signature is ready. To awaken it, meet a local community mentor eye-to-eye. They will grant your first resonance.",
       readyLabel: "Ready",
+      genesisAnchorButton: "Anchor Soul Contract",
+      genesisAnchoring: "Resonating…",
+      genesisConnectWallet: "Connect wallet to anchor",
       navHome: "← Home",
+      codexTriggerLabel: "Why a physical meeting? (The Codex)",
+      codexSoulContractTriggerLabel: "Soul Contract & Seasons (The Codex)",
+      noWalletHint: "Install a wallet extension (e.g. MetaMask) to continue.",
+      noWalletError: "No wallet found. Install a wallet extension (e.g. MetaMask) and connect this site.",
     },
   },
 };

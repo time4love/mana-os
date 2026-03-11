@@ -31,13 +31,13 @@ export default function ProfileError({ error, reset }: ProfileErrorProps) {
         <nav className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
           <Link
             href="/"
-            className="text-emerald-400 underline underline-offset-2"
+            className="text-primary underline underline-offset-2"
           >
             {t("navHome")}
           </Link>
           <LanguageSwitcher />
         </nav>
-        <h1 className="text-2xl font-bold text-neutral-100 text-start">
+        <h1 className="text-2xl font-bold text-foreground text-start">
           {t("title")}
         </h1>
 
@@ -46,15 +46,15 @@ export default function ProfileError({ error, reset }: ProfileErrorProps) {
             <CardTitle className="text-red-400">{tError("title")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-neutral-300">{tError("message")}</p>
-            <p className="break-all font-mono text-xs text-neutral-500">
+            <p className="text-sm text-foreground">{tError("message")}</p>
+            <p className="break-all font-mono text-xs text-muted-foreground">
               {error.message}
             </p>
             <div className="flex gap-2">
               <Button onClick={reset}>{tError("tryAgain")}</Button>
               <Link
                 href="/"
-                className="inline-flex items-center justify-center rounded-md border border-neutral-600 px-4 py-2 text-sm font-medium text-neutral-300 hover:bg-neutral-800"
+                className="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
               >
                 {tError("goHome")}
               </Link>
