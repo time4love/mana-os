@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useAccount, useReadContract, useWriteContract } from "wagmi";
 import { motion } from "framer-motion";
 import { useLocale } from "@/lib/i18n/context";
+import { getRelativeHarmonicTime } from "@/lib/utils/harmonicTime";
 import {
   PROPOSALS_DAO_ABI,
   PROPOSALS_DAO_ADDRESS,
@@ -225,9 +226,9 @@ export function FeedProposalCard({ proposal, onResonated }: FeedProposalCardProp
         )}
 
         <p className="text-xs text-muted-foreground">
-          {new Date(proposal.created_at).toLocaleDateString(
-            locale === "he" ? "he-IL" : "en-US",
-            { dateStyle: "medium" }
+          {getRelativeHarmonicTime(
+            new Date(proposal.created_at),
+            locale
           )}
         </p>
       </div>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAccount } from "wagmi";
 import { motion } from "framer-motion";
 import { useLocale } from "@/lib/i18n/context";
+import { getRelativeHarmonicTime } from "@/lib/utils/harmonicTime";
 import {
   getSeedsForNursery,
   joinCommunity,
@@ -243,10 +244,7 @@ function SeedCard({
         )}
 
         <p className="text-xs text-muted-foreground">
-          {new Date(seed.created_at).toLocaleDateString(
-            locale === "he" ? "he-IL" : "en-US",
-            { dateStyle: "medium" }
-          )}
+          {getRelativeHarmonicTime(new Date(seed.created_at), locale)}
         </p>
       </div>
     </li>
