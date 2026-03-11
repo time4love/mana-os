@@ -99,6 +99,8 @@ export const dictionaries: Record<
       oracleInsightLabel: string;
       consultOracleLabel: string;
       oracleSeedAuthorLabel: string;
+      physicsForecastLabel: string;
+      computingPhysicsForecast: string;
     };
     communities: {
       genesisTitle: string;
@@ -137,6 +139,8 @@ export const dictionaries: Record<
       successTitle: string;
       successMessage: string;
       oracleContemplating: string;
+      draftSeedApprovePlant: string;
+      draftSeedPlantedSuccess: string;
     };
     mentor: {
       accessDeniedTitle: string;
@@ -287,6 +291,8 @@ export const dictionaries: Record<
       oracleInsightLabel: "תבוננות האורקל",
       consultOracleLabel: "היוועץ באורקל",
       oracleSeedAuthorLabel: "🌱 חוכמת זקן הכפר",
+      physicsForecastLabel: "תחזית פיזיקלית",
+      computingPhysicsForecast: "מחשב תחזית פיזיקלית…",
     },
     communities: {
       genesisTitle: "זרע קהילה חדשה",
@@ -314,6 +320,8 @@ export const dictionaries: Record<
       successTitle: "החזון נחקק",
       successMessage: "הרעיון שלך נרשם ביומן הקוד הפתוח. הקהילה תשקול אותו.",
       oracleContemplating: "האורקל מתבונן בחזון…",
+      draftSeedApprovePlant: "אשר ושתול במדורה",
+      draftSeedPlantedSuccess: "הזרע נטמן בהצלחה 🌱",
     },
     mentor: {
       accessDeniedTitle: "גישה מוגבלת — למנחים בלבד",
@@ -467,6 +475,8 @@ export const dictionaries: Record<
       oracleInsightLabel: "Oracle's Insight",
       consultOracleLabel: "Consult the Oracle",
       oracleSeedAuthorLabel: "🌱 Oracle Insight",
+      physicsForecastLabel: "Physics Forecast",
+      computingPhysicsForecast: "Computing physics forecast…",
     },
     communities: {
       genesisTitle: "Plant a Community Seed",
@@ -494,6 +504,8 @@ export const dictionaries: Record<
       successTitle: "Vision etched",
       successMessage: "Your vision has been etched into the Open Source log. The community will consider it.",
       oracleContemplating: "The Oracle is contemplating the vision…",
+      draftSeedApprovePlant: "Approve & Plant in the Hearth",
+      draftSeedPlantedSuccess: "Seed planted successfully 🌱",
     },
     mentor: {
       accessDeniedTitle: "Access Denied — Mentors Only",

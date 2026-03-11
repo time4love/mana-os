@@ -1,14 +1,69 @@
 "use server";
 
+import { generateObject } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
+import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type {
   ProposalRow,
   ProposalUpgradeRow,
   SeedDiscourseRow,
 } from "@/lib/supabase/types";
+import type { PhysicsForecastDeltaJson } from "@/lib/supabase/types";
 import { runOracleSynthesis } from "@/lib/oracle/runSynthesis";
 
 const MERGE_RESONANCE_THRESHOLD = 2;
+
+const PhysicsForecastSchema = z.object({
+  deltas: z.array(
+    z.object({
+      category: z.string(),
+      name: z.string(),
+      change: z.string(),
+    })
+  ),
+});
+
+const PHYSICS_FORECAST_SYSTEM = `You are the Oracle of Mana OS. Calculate the physical delta (added or reduced resources and Mana Cycles) required to implement a specific upgrade seed into an existing proposal. Return ONLY the differences—no explanation. Use category "Natural" for physical resources (water, wood, compost, kWh, etc.) and "Human" for Mana Cycles (e.g. "Agriculture Cycle", "Construction Cycle"). Use change strings like "+50 liters", "-20 kg", "+1", "+2 Mana Cycles". No money, prices, or time.`;
+
+function getForecastModel() {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return null;
+  const modelId = process.env.OPENAI_ORACLE_MODEL ?? "gpt-4o-mini";
+  return createOpenAI({ apiKey: key })(modelId);
+}
+
+/**
+ * Generates the Physics Forecast (deltas) for an upgrade seed using the proposal context.
+ * Returns null if AI is unavailable or generation fails (caller may still insert without forecast).
+ */
+async function generatePhysicsForecast(
+  proposalContext: { title: string; description: string; resource_plan: ProposalRow["resource_plan"] },
+  suggestedUpgrade: string
+): Promise<PhysicsForecastDeltaJson[] | null> {
+  const model = getForecastModel();
+  if (!model) return null;
+
+  const prompt = `Proposal: Title: ${proposalContext.title}. Description: ${proposalContext.description}. Current resource plan: ${JSON.stringify(proposalContext.resource_plan ?? {}, null, 2)}.
+
+Upgrade seed to implement: "${suggestedUpgrade}"
+
+Calculate the physical delta (added or reduced resources and Mana Cycles) required to implement this specific upgrade seed. Return ONLY the differences.`;
+
+  try {
+    const { object } = await generateObject({
+      model,
+      schema: PhysicsForecastSchema,
+      schemaName: "PhysicsForecast",
+      schemaDescription: "Physical deltas for an upgrade seed",
+      prompt,
+      system: PHYSICS_FORECAST_SYSTEM,
+    });
+    return object.deltas.length > 0 ? object.deltas : null;
+  } catch {
+    return null;
+  }
+}
 
 export type PlantUpgradeSeedResult =
   | { success: true; upgradeId: string }
@@ -16,12 +71,14 @@ export type PlantUpgradeSeedResult =
 
 /**
  * Plants an Upgrade Seed (community suggestion) on a proposal.
+ * When physicsForecast is not provided, computes it via AI before insert.
  * The seed appears as pending until enough members resonate with it.
  */
 export async function plantUpgradeSeed(
   proposalId: string,
   authorWallet: string,
-  suggestedUpgrade: string
+  suggestedUpgrade: string,
+  physicsForecast?: PhysicsForecastDeltaJson[] | null
 ): Promise<PlantUpgradeSeedResult> {
   const trimmed = suggestedUpgrade?.trim();
   if (!trimmed) {
@@ -33,6 +90,28 @@ export async function plantUpgradeSeed(
 
   try {
     const supabase = createServerSupabase();
+
+    let forecast: PhysicsForecastDeltaJson[] | null =
+      physicsForecast != null ? (physicsForecast.length > 0 ? physicsForecast : null) : null;
+
+    if (forecast === undefined) {
+      const { data: proposal } = await supabase
+        .from("proposals")
+        .select("id, title, description, resource_plan")
+        .eq("id", proposalId)
+        .single();
+      if (proposal) {
+        forecast = await generatePhysicsForecast(
+          {
+            title: proposal.title,
+            description: proposal.description,
+            resource_plan: proposal.resource_plan,
+          },
+          trimmed
+        );
+      }
+    }
+
     const { data, error } = await supabase
       .from("proposal_upgrades")
       .insert({
@@ -41,6 +120,7 @@ export async function plantUpgradeSeed(
         suggested_upgrade: trimmed,
         resonance_count: 0,
         status: "pending",
+        physics_forecast: forecast,
       })
       .select("id")
       .single();
@@ -236,6 +316,7 @@ export interface ProposalContextForCodex {
     suggested_upgrade: string;
     resonance_count: number;
     status: ProposalUpgradeRow["status"];
+    author_wallet: string;
     discourse: SeedDiscourseRow[];
   }>;
 }
@@ -268,7 +349,7 @@ export async function getProposalContextForCodex(
 
     const { data: upgrades, error: upgradesError } = await supabase
       .from("proposal_upgrades")
-      .select("id, suggested_upgrade, resonance_count, status")
+      .select("id, suggested_upgrade, resonance_count, status, author_wallet")
       .eq("proposal_id", proposalId)
       .order("created_at", { ascending: true });
 
@@ -301,6 +382,7 @@ export async function getProposalContextForCodex(
         suggested_upgrade: u.suggested_upgrade,
         resonance_count: u.resonance_count,
         status: u.status,
+        author_wallet: u.author_wallet,
         discourse: discourseByUpgradeId[u.id] ?? [],
       })),
     };

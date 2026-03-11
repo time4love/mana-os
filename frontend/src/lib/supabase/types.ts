@@ -14,6 +14,13 @@ export type OsFeatureProposalStatus = "pending_review" | "accepted" | "deferred"
 
 export type ProposalUpgradeStatus = "pending" | "merged";
 
+/** Single delta in the Physics Forecast: added or reduced resource / Mana Cycle for an upgrade seed. */
+export interface PhysicsForecastDeltaJson {
+  category: string;
+  name: string;
+  change: string;
+}
+
 export interface ProposalResourcePlanJson {
   naturalResources: Array<{
     resourceName: string;
@@ -169,6 +176,7 @@ export interface Database {
           resonance_count: number;
           status: ProposalUpgradeStatus;
           created_at: string;
+          physics_forecast: PhysicsForecastDeltaJson[] | null;
         };
         Insert: {
           id?: string;
@@ -178,6 +186,7 @@ export interface Database {
           resonance_count?: number;
           status?: ProposalUpgradeStatus;
           created_at?: string;
+          physics_forecast?: PhysicsForecastDeltaJson[] | null;
         };
         Update: {
           id?: string;
@@ -187,6 +196,7 @@ export interface Database {
           resonance_count?: number;
           status?: ProposalUpgradeStatus;
           created_at?: string;
+          physics_forecast?: PhysicsForecastDeltaJson[] | null;
         };
       };
       seed_discourse: {

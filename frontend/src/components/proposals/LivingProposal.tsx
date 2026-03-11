@@ -301,6 +301,7 @@ export function LivingProposal({ proposal, onResonated, onConsultOracle, upgrade
                   needSbtLabel={tProposals("needSbtToResonate")}
                   shareWisdomPlaceholder={tProposals("shareSeedWisdomPlaceholder")}
                   oracleSeedAuthorLabel={tProposals("oracleSeedAuthorLabel")}
+                  physicsForecastLabel={tProposals("physicsForecastLabel")}
                   locale={locale}
                   onDiscourseUpdated={loadUpgrades}
                 />
@@ -406,7 +407,7 @@ export function LivingProposal({ proposal, onResonated, onConsultOracle, upgrade
                 disabled={!seedInput.trim() || planting}
                 className="rounded-xl border border-primary/60 bg-transparent px-4 py-2.5 text-sm font-medium text-primary transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
               >
-                {planting ? (locale === "he" ? "נוטע…" : "Planting…") : (locale === "he" ? "נטע" : "Plant")}
+                {planting ? tProposals("computingPhysicsForecast") : (locale === "he" ? "נטע" : "Plant")}
               </button>
             </div>
             {plantError && (

@@ -81,6 +81,13 @@ This flow ensures that every component—Socratic Oracle, DAO, Callings Board, a
 - [ ] Publicly launch the GitHub repo.
 - [ ] **The Mycelium Network: Fractal Economy & Surplus Overflow routing** — Inter-community surplus flow: communities in surplus resonate overflow to the network; others take what they need. No barter, trade, or debt. Macro-projects (bridges between communities) require Macro-Resonance pooled from multiple hubs.
 
+### 🔮 Phase 9: The Council of Elders (Multi-Agent Swarm & Co-Governance)
+- [ ] **Multi-Agent Architecture:** Upgrading the Oracle from a single LLM to an Agentic Workflow where specialized AI entities debate backend before responding.
+- [ ] **Agent 1: The Earth Architect:** Master of the Material Realm (Biomimicry, Permaculture, ecological physics). Calculates raw resource needs.
+- [ ] **Agent 2: The Spirit Weaver:** Master of the Energetic Realm. Monitors human capacity, Soul Contracts (seasons), and prevents community burnout by pacing projects organically.
+- [ ] **Agent 3: The Knowledge Keeper:** Master of the Knowledge Realm. Guardian of the Manifesto, ensuring Matrix constructs (competition, fiat logic) do not infect proposals.
+- [ ] **The Village Elder (Orchestrator):** The user-facing synthesizer. Gathers council insights and weaves them into a singular, poetic, and actionable response for the community.
+
 ---
 
 ## 🤖 Instructions for Cursor AI

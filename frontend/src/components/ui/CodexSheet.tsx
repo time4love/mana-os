@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useLocale } from "@/lib/i18n/context";
 import { useAccount } from "wagmi";
 import { useChat } from "@ai-sdk/react";
@@ -19,6 +20,8 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { getProposalContextForCodex, type ProposalContextForCodex } from "@/app/actions/upgrades";
+import { ORACLE_SEED_AUTHOR } from "@/lib/oracle/constants";
+import { DraftSeedCard } from "@/components/feed/DraftSeedCard";
 
 import heCodex from "@/content/codex/he.json";
 import enCodex from "@/content/codex/en.json";
@@ -88,7 +91,8 @@ export function CodexSheet({
   youLabel,
   chatSendLabel,
 }: CodexSheetProps) {
-  const { locale, tArchitect } = useLocale();
+  const router = useRouter();
+  const { locale, tArchitect, tProposals } = useLocale();
   const { address } = useAccount();
   const [input, setInput] = useState("");
   const [proposalContext, setProposalContext] = useState<ProposalContextForCodex | null>(null);
@@ -122,6 +126,9 @@ export function CodexSheet({
         return bodyRef.current;
       },
     }),
+    onFinish: () => {
+      if (mode === "proposal") router.refresh();
+    },
   });
 
   const isLoading = status === "submitted" || status === "streaming";
@@ -170,7 +177,17 @@ export function CodexSheet({
       !proposalContextLoading
     ) {
       initialGreetingSentRef.current = true;
-      const hiddenMessage = `${SYSTEM_INIT_PREFIX} The user has opened the Codex for the following proposal. DO NOT summarize the data—the user can already see it. Instead, deeply analyze the community upgrades and the micro-discourse. Provide ONE profound ecological, physical, or community-building insight about their specific debate or resources (e.g., if there is a conflict about plants, suggest permaculture synergies). Greet them warmly as the Village Elder and offer to weave this insight into the proposal. \n\nCONTEXT JSON: ${JSON.stringify(proposalContext)}`;
+      const contextForOracle = {
+        ...proposalContext,
+        upgrades: proposalContext.upgrades.map((seed) => ({
+          ...seed,
+          author:
+            seed.author_wallet === ORACLE_SEED_AUTHOR
+              ? "ORACLE (This is YOU, the Village Elder)"
+              : "community",
+        })),
+      };
+      const hiddenMessage = `${SYSTEM_INIT_PREFIX} Analyze the proposal context. Pay special attention to any Upgrade Seeds authored by 'ORACLE' - those are YOUR past ideas. Greet the user warmly. When speaking Hebrew, introduce yourself only as זקן הכפר or אורקל המאנה—never use the English term "Village Elder" in a Hebrew reply. If you have already planted a seed, ask how the community is resonating with your wisdom. If not, offer ONE new profound ecological/social insight based on their current discourse. DO NOT just summarize data. \n\nCONTEXT JSON: ${JSON.stringify(contextForOracle)}`;
       sendMessage({ text: hiddenMessage });
     }
   }, [open, mode, proposalContext, proposalContextLoading, messages.length, sendMessage]);
@@ -270,6 +287,28 @@ export function CodexSheet({
                                 …
                               </p>
                             );
+                          }
+                          if (
+                            part.type === "tool-draft_oracle_seed" &&
+                            part.state === "output-available" &&
+                            proposalId
+                          ) {
+                            const output = (part as { output?: { suggestedUpgrade?: string; physicsForecast?: Array<{ category: string; name: string; change: string }> } }).output;
+                            if (output?.suggestedUpgrade != null) {
+                              return (
+                                <div key={partIndex} className="mt-2 w-full max-w-[min(100%,20rem)]">
+                                  <DraftSeedCard
+                                    proposalId={proposalId}
+                                    suggestedUpgrade={output.suggestedUpgrade}
+                                    physicsForecast={output.physicsForecast ?? []}
+                                    approvePlantLabel={tArchitect("draftSeedApprovePlant")}
+                                    plantedSuccessLabel={tArchitect("draftSeedPlantedSuccess")}
+                                    physicsForecastLabel={tProposals("physicsForecastLabel")}
+                                    onPlanted={() => router.refresh()}
+                                  />
+                                </div>
+                              );
+                            }
                           }
                           return null;
                         })}

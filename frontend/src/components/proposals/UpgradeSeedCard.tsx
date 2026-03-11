@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getRelativeHarmonicTime } from "@/lib/utils/harmonicTime";
 import { getSeedDiscourse, shareSeedWisdom } from "@/app/actions/upgrades";
 import { ORACLE_SEED_AUTHOR } from "@/lib/oracle/constants";
-import type { ProposalUpgradeRow, SeedDiscourseRow } from "@/lib/supabase/types";
+import type { PhysicsForecastDeltaJson, ProposalUpgradeRow, SeedDiscourseRow } from "@/lib/supabase/types";
 import { ChevronDown, ChevronUp, Radio } from "lucide-react";
 
 const transition = { duration: 0.3, ease: [0.32, 0.72, 0, 1] };
@@ -24,6 +24,8 @@ export interface UpgradeSeedCardProps {
   shareWisdomPlaceholder: string;
   /** When the seed is from the Village Elder (ORACLE), show this label instead of a wallet. E.g. "🌱 Oracle Insight" / "🌱 חוכמת זקן הכפר" */
   oracleSeedAuthorLabel?: string;
+  /** Label for the Physics Forecast (תחזית פיזיקלית) section */
+  physicsForecastLabel?: string;
   locale: "he" | "en";
   onDiscourseUpdated?: () => void;
 }
@@ -40,6 +42,7 @@ export function UpgradeSeedCard({
   needSbtLabel,
   shareWisdomPlaceholder,
   oracleSeedAuthorLabel,
+  physicsForecastLabel,
   locale,
   onDiscourseUpdated,
 }: UpgradeSeedCardProps) {
@@ -107,6 +110,21 @@ export function UpgradeSeedCard({
         >
           {upgrade.suggested_upgrade}
         </button>
+        {/* Physics Forecast (תחזית פיזיקלית): deltas shown below seed text, above Resonate */}
+        {upgrade.physics_forecast?.length && physicsForecastLabel ? (
+          <div className="mt-2.5 rounded-lg border border-border/50 bg-muted/40 px-3 py-2" role="region" aria-label={physicsForecastLabel}>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
+              {physicsForecastLabel}:
+            </p>
+            <ul className="list-none space-y-0.5 text-xs text-foreground/90">
+              {(upgrade.physics_forecast as PhysicsForecastDeltaJson[]).map((delta, i) => (
+                <li key={i}>
+                  {delta.change} {delta.name}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <div className="mt-3 flex min-h-[44px] flex-wrap items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">
             {upgrade.resonance_count} {resonanceCountLabel}
