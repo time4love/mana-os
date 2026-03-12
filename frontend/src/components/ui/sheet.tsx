@@ -100,7 +100,7 @@ function SheetContent({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
-      className="fixed inset-0 z-50 bg-overlay"
+      className="fixed inset-0 z-[1200] bg-overlay"
       onClick={() => onOpenChange(false)}
     />
   );
@@ -122,7 +122,7 @@ function SheetContent({
           : { y: side === "bottom" ? "100%" : "-100%" }
       }
       transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
-      className={`fixed z-50 flex flex-col gap-4 bg-card text-card-foreground shadow-soft-md border border-border ${positionClass} ${sizeClass} ${className}`}
+      className={`fixed z-[1200] flex flex-col gap-4 bg-card text-card-foreground shadow-soft-md border border-border ${positionClass} ${sizeClass} ${className}`}
       onClick={(e) => e.stopPropagation()}
     >
       {children}

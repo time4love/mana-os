@@ -44,6 +44,7 @@ export default function MapPage() {
   const [lng, setLng] = useState<number | null>(null);
   const [placing, setPlacing] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [focusedLocation, setFocusedLocation] = useState<[number, number] | null>(null);
   const { address } = useAccount();
 
   const loadPins = useCallback(async () => {
@@ -116,6 +117,7 @@ export default function MapPage() {
     setPlacing(false);
 
     if (result.success) {
+      setFocusedLocation([lat, lng]);
       setMessage({ type: "success", text: tMap("successMessage") });
       await loadPins();
       setTimeout(() => {
@@ -129,7 +131,7 @@ export default function MapPage() {
 
   return (
     <main
-      className="flex flex-col h-[calc(100dvh-3.5rem)] w-full bg-background"
+      className="relative flex flex-col h-[calc(100dvh-3.5rem)] w-full bg-background overflow-hidden"
       dir={isRtl ? "rtl" : "ltr"}
     >
       <div className="flex-1 relative min-h-0 w-full">
@@ -144,12 +146,17 @@ export default function MapPage() {
             </motion.div>
           </div>
         ) : (
-          <AwakeningMap pins={pins} locale={locale} />
+          <AwakeningMap
+            pins={pins}
+            locale={locale}
+            focusedLocation={focusedLocation}
+            onFocusComplete={() => setFocusedLocation(null)}
+          />
         )}
       </div>
 
       <motion.div
-        className="absolute bottom-6 start-1/2 -translate-x-1/2 z-[1000]"
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1100] pointer-events-auto"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}

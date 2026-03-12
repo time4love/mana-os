@@ -35,14 +35,17 @@ const DEFAULT_ZOOM = 11;
 /** Zoom level at which Overpass POIs are fetched; below this, only user pins show. */
 const MIN_ZOOM_FOR_OVERPASS = 15;
 
-/** Overpass query: amenities and shops in bbox so transmuted + fallback POIs render. */
+/** Overpass query: amenity, shop, leisure, tourism, natural in bbox for rich map layers. Optimized limit + timeout. */
 function buildOverpassQuery(south: number, west: number, north: number, east: number): string {
-  return `[out:json][timeout:12];
+  return `[out:json][timeout:14];
 (
   node["amenity"](${south},${west},${north},${east});
   node["shop"](${south},${west},${north},${east});
+  node["leisure"](${south},${west},${north},${east});
+  node["tourism"](${south},${west},${north},${east});
+  node["natural"](${south},${west},${north},${east});
 );
-out body 500;`;
+out body 600;`;
 }
 
 interface OverpassElement {
@@ -222,6 +225,10 @@ export interface AwakeningMapProps {
   zoom?: number;
   /** Locale for transmuted POI labels (he/en). */
   locale?: TransmuterLocale;
+  /** When set, the map flies to this [lat, lng] (e.g. after dropping a new pin). */
+  focusedLocation?: [number, number] | null;
+  /** Called when the fly-to focusedLocation animation completes. */
+  onFocusComplete?: () => void;
 }
 
 function MapClickHandler({
@@ -254,6 +261,30 @@ function FlyToController({
     map.flyTo([target.lat, target.lon], 16, { duration: 1.2 });
     onFlown();
   }, [map, target, onFlown]);
+  return null;
+}
+
+/** Flies the map to a focused location (e.g. newly dropped pin) and notifies when done. */
+function MapFocusController({
+  focusedLocation,
+  onFocusComplete,
+}: {
+  focusedLocation: [number, number] | null;
+  onFocusComplete?: () => void;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    if (!focusedLocation) return;
+    const [lat, lng] = focusedLocation;
+    map.flyTo([lat, lng], 17, { animate: true, duration: 1.5 });
+    const onMoveEnd = () => {
+      onFocusComplete?.();
+    };
+    map.once("moveend", onMoveEnd);
+    return () => {
+      map.off("moveend", onMoveEnd);
+    };
+  }, [map, focusedLocation, onFocusComplete]);
   return null;
 }
 
@@ -491,6 +522,8 @@ export function AwakeningMap({
   center = DEFAULT_CENTER,
   zoom = DEFAULT_ZOOM,
   locale = "en",
+  focusedLocation = null,
+  onFocusComplete,
 }: AwakeningMapProps) {
   const [transmutedPOIs, setTransmutedPOIs] = useState<TransmutedPOIWithCoords[]>([]);
   const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lon: number } | null>(null);
@@ -622,6 +655,12 @@ export function AwakeningMap({
           />
         )}
         <MapClickHandler pickerMode={pickerMode} onMapClick={onMapClick} />
+        {!pickerMode && focusedLocation && (
+          <MapFocusController
+            focusedLocation={focusedLocation}
+            onFocusComplete={onFocusComplete}
+          />
+        )}
         {!pickerMode && (
           <ZoomReporter onZoomChange={handleZoomChange} />
         )}
