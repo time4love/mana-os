@@ -21,7 +21,8 @@ The lifecycle of a proposal in Mana OS (The Healing OS) connects all phases into
 2. **Governance** (Phase 5) — The proposal (or its hash) is recorded on-chain to **ProposalsDAO.sol**. The Community Feed UI lets members view pending proposals and vote with their wallets. Status moves from **Pending Vote** → **Approved** or **Rejected**.
 3. **Resource Allocation** (Phase 6) — **Attraction-Based Resonance**: Approved proposals appear on the **Mana Callings Board**. The UI reads each user's **ManaSkills.sol** SBTs and Realms (e.g. "Agriculture Level 2" task ↔ user holding that SBT). Users claim Callings by resonance; no forced commitment. Status moves **Open** → **In Resonance** → **Completed**.
 4. **Onboarding** (Phase 7) — **Dynamic Soul Contracts**: New members join via a "Join Community" rite of passage; they declare their current **seasonal capacity** (Rest, Build, Learn) without obligation. A trusted local **Mentor** (Level 3) approves and mints the first **Level 0 (Apprentice)** or **Level 1** SBT, bootstrapping their presence in the system.
-5. **Deployment & Launch** (Phase 8) — Contracts and frontend go to testnet and production; the repo is opened for contributors.
+5. **The Awakening Map** (Phase 8) — Simulation mode: map overlay transmutes matrix infrastructure; users drop Vision Seeds, Abundance pins, and Resource Pledges.
+6. **Deployment & Launch** (Phase 9) — Contracts and frontend go to testnet and production; the repo is opened for contributors.
 
 This flow ensures that every component—Socratic Oracle, DAO, Callings Board, and Skills—connects logically from idea to execution.
 
@@ -74,14 +75,21 @@ This flow ensures that every component—Socratic Oracle, DAO, Callings Board, a
 - [ ] Initial Skill Minting: Allow a trusted local mentor (Level 3) to approve and mint the first Level 0 (Apprentice) or Level 1 SBT for new members.
 - [ ] **Restorative Justice Protocol:** Implement **Call for Harmony** (בקשת גישור)—route conflict to Level 3 Mentors in the Energetic/Healing Realm for human mediation (NVC/healing framing, not moderation or admin enforcement).
 
-### ⏳ Phase 8: Testnet Deployment & Open Source Launch
+### ⏳ Phase 8: The Awakening Map (Simulation Mode & Abundance Radar)
+- [ ] **Matrix Transmutation (Map Overlay):** Integrate OpenStreetMap but transmute existing matrix infrastructure into Mana OS entities (e.g., Banks display as "Museums of the Old World", Supermarkets as "Abundance Hubs"). Use a glowing, Solarpunk custom map style.
+- [ ] **Crowdsourcing Abundance (Pins):** Build a UI allowing users to drop 3 types of pins on the map:
+  1. *Vision Seeds:* Location-based project proposals ("A food forest should grow here").
+  2. *Anchoring Existing Abundance:* Tagging public fruit trees, street libraries, and water sources.
+  3. *Resource Pledging:* Citizens opening their private spaces for community use (e.g., sharing a roof for solar panels).
+
+### ⏳ Phase 9: Testnet Deployment & Open Source Launch
 - [ ] Deploy all contracts to **Base Sepolia** testnet.
 - [ ] Update Frontend environment variables to point to the live testnet.
 - [ ] Deploy Next.js app to **Vercel**.
 - [ ] Publicly launch the GitHub repo.
-- [ ] **The Mycelium Network: Fractal Economy & Surplus Overflow routing** — Inter-community surplus flow: communities in surplus resonate overflow to the network; others take what they need. No barter, trade, or debt. Macro-projects (bridges between communities) require Macro-Resonance pooled from multiple hubs.
+- [ ] **The Weave: Fractal Economy & Surplus Overflow routing** — Inter-community surplus flow: communities in surplus resonate overflow to the network; others take what they need. No barter, trade, or debt. Macro-projects (bridges between communities) require Macro-Resonance pooled from multiple hubs.
 
-### 🔮 Phase 9: The Council of Elders (Multi-Agent Swarm & Co-Governance)
+### 🔮 Phase 10: The Council of Elders (Multi-Agent Swarm & Co-Governance)
 - [ ] **Multi-Agent Architecture:** Upgrading the Oracle from a single LLM to an Agentic Workflow where specialized AI entities debate backend before responding.
 - [ ] **Agent 1: The Earth Architect:** Master of the Material Realm (Biomimicry, Permaculture, ecological physics). Calculates raw resource needs.
 - [ ] **Agent 2: The Spirit Weaver:** Master of the Energetic Realm. Monitors human capacity, Soul Contracts (seasons), and prevents community burnout by pacing projects organically.

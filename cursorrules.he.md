@@ -14,7 +14,7 @@
 
 ## 🚫 אוצר מילים אסור ומונחה
 - **אסור** (לעולם לא בקוד, בטקסט או בסכמה): `hours`, `timeTrack`, `quota`, `penalty`, `submit`, `deadline`, `task`, `job`. **אסור בהתראות/קשב**: Push Notifications, Red Badges/Dots, Unread Counters, Real-time alerts, Urgency. **אסור בסכסוך/מודרציה**: ban, report user, strike, social credit, rating/reviews (for humans), punishment, violation. **אסור במעקב/פרטיות**: online status, last seen, read receipts, leaderboards, public voting records. **אסור בכלכלה/בין-קהילות**: barter, trade, debt, exchange rate, import/export (במובן תחשבנותי).
-- **חובה** (במוצר ובמסמכים): Overflow, Macro-Resonance, Mycelium Network (רשת התפטיר) – לזרימת עודף בין-קהילתית וכלכלה פרקטלית.
+- **חובה** (במוצר ובמסמכים): Overflow, Macro-Resonance, The Weave (המארג) – לזרימת עודף בין-קהילתית וכלכלה פרקטלית.
 - **שמירת זיכרון:** לפני תכנון כל תכונה, סכמת DB או רכיב UI, חובה לקרוא את `PHILOSOPHY.en.md` (או `PHILOSOPHY.he.md` בהקשר עברי). אם תכונה סותרת את הפילוסופיה (למשל מכניסה חוב, מכסות, התראות פוש, סחר חליפין או רשומות הצבעה ציבוריות), יש לסרב לבנותה ולהציע אלטרנטיבה טבעית התואמת לשבעת Paradigm-ים.
 - **חובה** (במוצר ובמסמכים): מעגלי מאנה, הדהוד, תדר פעולה, קריאה.
 

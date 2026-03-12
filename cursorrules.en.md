@@ -14,7 +14,7 @@ Mana consists of:
 
 ## 🚫 Banned & Enforced Vocabulary
 - **BAN** (never use in code, copy, or schema): `hours`, `timeTrack`, `quota`, `penalty`, `submit`, `deadline`, `task`, `job`. **BAN in notifications/attention**: `Push Notifications`, `Red Badges/Dots`, `Unread Counters`, `Real-time alerts`, `Urgency`. **BAN in conflict/moderation**: `ban`, `report user`, `strike`, `social credit`, `rating/reviews (for humans)`, `punishment`, `violation`. **BAN in surveillance/privacy**: `online status`, `last seen`, `read receipts`, `leaderboards`, `public voting records`. **BAN in economy/inter-community**: `barter`, `trade`, `debt`, `exchange rate`, `import/export` (transactional sense).
-- **ENFORCE** (product and docs): `Overflow`, `Macro-Resonance`, `Mycelium Network` (for inter-community surplus flow and fractal economy).
+- **ENFORCE** (product and docs): `Overflow`, `Macro-Resonance`, `The Weave` / `המארג` (for inter-community surplus flow and fractal economy).
 - **MEMORY RETENTION:** Before designing any new feature, database schema, or UI component, YOU MUST READ `PHILOSOPHY.en.md` (or `PHILOSOPHY.he.md` for Hebrew context). If a feature violates the Philosophy (e.g., introduces debt, quotas, push notifications, bartering, or public voting records), you must refuse to build it and propose a natural alternative aligned with the seven paradigms.
 - **ENFORCE** (use in product and docs): `Mana Cycles` (מעגלי מאנה), `Resonance` (הדהוד), `Realm` (תדר פעולה), `Calling` (קריאה).
 
