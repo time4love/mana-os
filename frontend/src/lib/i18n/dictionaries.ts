@@ -155,6 +155,29 @@ export const dictionaries: Record<
       grantedTitle: string;
       grantedMessage: string;
     };
+    map: {
+      navMap: string;
+      pageTitle: string;
+      fabAnchorAbundance: string;
+      step1Title: string;
+      pinTypeVisionSeed: string;
+      pinTypeAbundanceAnchor: string;
+      pinTypeResourcePledge: string;
+      step2Title: string;
+      titleLabel: string;
+      titlePlaceholder: string;
+      descriptionLabel: string;
+      descriptionPlaceholder: string;
+      step3Title: string;
+      useMyLocation: string;
+      clickMapToSet: string;
+      placePin: string;
+      nextToLocation: string;
+      placing: string;
+      successMessage: string;
+      errorGeneric: string;
+      connectWalletToPin: string;
+    };
     onboarding: {
       welcomeHome: string;
       tapToContinue: string;
@@ -339,6 +362,29 @@ export const dictionaries: Record<
       openCamera: "פתח מצלמה",
       grantedTitle: "הדהוד חניכה הוענק",
       grantedMessage: "המשתתף קיבל את אסימון השוליה (Level 0). הם יכולים כעת להדהד עם הצעות ולצבור מעגלי מאנה.",
+    },
+    map: {
+      navMap: "מפת ההתעוררות",
+      pageTitle: "מפת ההתעוררות",
+      fabAnchorAbundance: "נעץ שפע במרחב",
+      step1Title: "סוג הסיכה",
+      pinTypeVisionSeed: "זרע חזון",
+      pinTypeAbundanceAnchor: "עוגן שפע",
+      pinTypeResourcePledge: "התחייבות משאב",
+      step2Title: "כותרת ותיאור",
+      titleLabel: "כותרת",
+      titlePlaceholder: "שם קצר למקום או לרעיון",
+      descriptionLabel: "תיאור",
+      descriptionPlaceholder: "ספר/י בקצרה…",
+      step3Title: "מיקום",
+      useMyLocation: "השתמש במיקומי",
+      clickMapToSet: "גע במפה כדי לבחור מיקום",
+      placePin: "שָׂם סיכה",
+      nextToLocation: "בחירת מיקום",
+      placing: "מעגן…",
+      successMessage: "הסיכה הונחה במרחב.",
+      errorGeneric: "משהו השתבש. נסה שוב.",
+      connectWalletToPin: "חבר ארנק כדי לשים סיכה.",
     },
     onboarding: {
       welcomeHome:
@@ -526,6 +572,29 @@ export const dictionaries: Record<
       openCamera: "Open camera",
       grantedTitle: "Genesis Resonance granted",
       grantedMessage: "The participant received their Apprentice (Level 0) token. They can now resonate with proposals and grow mana cycles.",
+    },
+    map: {
+      navMap: "The Awakening Map",
+      pageTitle: "The Awakening Map",
+      fabAnchorAbundance: "Anchor Abundance",
+      step1Title: "Pin type",
+      pinTypeVisionSeed: "Vision Seed",
+      pinTypeAbundanceAnchor: "Abundance Anchor",
+      pinTypeResourcePledge: "Resource Pledge",
+      step2Title: "Title & description",
+      titleLabel: "Title",
+      titlePlaceholder: "A short name for the place or idea",
+      descriptionLabel: "Description",
+      descriptionPlaceholder: "Share a little…",
+      step3Title: "Location",
+      useMyLocation: "Use my location",
+      clickMapToSet: "Tap the map to choose a spot",
+      placePin: "Place pin",
+      nextToLocation: "Choose location",
+      placing: "Anchoring…",
+      successMessage: "The pin is now on the map.",
+      errorGeneric: "Something went wrong. Try again.",
+      connectWalletToPin: "Connect your wallet to place a pin.",
     },
     onboarding: {
       welcomeHome:

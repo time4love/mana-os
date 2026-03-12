@@ -14,6 +14,8 @@ export type OsFeatureProposalStatus = "pending_review" | "accepted" | "deferred"
 
 export type ProposalUpgradeStatus = "pending" | "merged";
 
+export type MapPinType = "vision_seed" | "abundance_anchor" | "resource_pledge";
+
 /** Single delta in the Physics Forecast: added or reduced resource / Mana Cycle for an upgrade seed. */
 export interface PhysicsForecastDeltaJson {
   category: string;
@@ -222,6 +224,38 @@ export interface Database {
           created_at?: string;
         };
       };
+      map_pins: {
+        Row: {
+          id: string;
+          creator_wallet: string;
+          pin_type: MapPinType;
+          lat: number;
+          lng: number;
+          title: string;
+          description: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          creator_wallet: string;
+          pin_type: MapPinType;
+          lat: number;
+          lng: number;
+          title: string;
+          description: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          creator_wallet?: string;
+          pin_type?: MapPinType;
+          lat?: number;
+          lng?: number;
+          title?: string;
+          description?: string;
+          created_at?: string;
+        };
+      };
     };
   };
 }
@@ -233,3 +267,4 @@ export type CommunityMemberRow = Database["public"]["Tables"]["community_members
 export type OsFeatureProposalRow = Database["public"]["Tables"]["os_feature_proposals"]["Row"];
 export type ProposalUpgradeRow = Database["public"]["Tables"]["proposal_upgrades"]["Row"];
 export type SeedDiscourseRow = Database["public"]["Tables"]["seed_discourse"]["Row"];
+export type MapPinRow = Database["public"]["Tables"]["map_pins"]["Row"];

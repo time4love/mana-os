@@ -17,7 +17,7 @@ import { useLocale } from "@/lib/i18n/context";
 
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { locale, tProposals, tCommunities, tOracle } = useLocale();
+  const { locale, tProposals, tCommunities, tOracle, tMap } = useLocale();
   const isRtl = locale === "he";
 
   return (
@@ -108,6 +108,14 @@ export function Navbar() {
                 className="block rounded-xl px-4 py-4 text-base font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground"
               >
                 {tCommunities("navSeeds")}
+              </Link>
+            </SheetClose>
+            <SheetClose asChild>
+              <Link
+                href="/map"
+                className="block rounded-xl px-4 py-4 text-base font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground"
+              >
+                {tMap("navMap")}
               </Link>
             </SheetClose>
             <SheetClose asChild>

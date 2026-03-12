@@ -43,6 +43,7 @@ type LocaleContextValue = {
   tArchitect: (key: keyof (typeof dictionaries.he)["architect"]) => string;
   tOracle: (key: keyof (typeof dictionaries.he)["oracle"]) => string;
   tMentor: (key: keyof (typeof dictionaries.he)["mentor"]) => string;
+  tMap: (key: keyof (typeof dictionaries.he)["map"]) => string;
   getProficiencyLabel: (level: number) => string;
   getLevelDisplay: (level: number) => string;
   getRealmDisplay: (realmIndex: number) => string;
@@ -120,6 +121,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     [dict]
   );
 
+  const tMap = useCallback(
+    (key: keyof (typeof dictionaries.he)["map"]) => dict.map[key],
+    [dict]
+  );
+
   const getProficiencyLabel = useCallback(
     (level: number) => getProficiencyLabelI18n(locale, level),
     [locale]
@@ -159,6 +165,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       tArchitect,
       tOracle,
       tMentor,
+      tMap,
       getProficiencyLabel,
       getLevelDisplay,
       getRealmDisplay,
@@ -176,6 +183,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       tArchitect,
       tOracle,
       tMentor,
+      tMap,
       getProficiencyLabel,
       getLevelDisplay,
       getRealmDisplay,
