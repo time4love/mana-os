@@ -41,6 +41,7 @@ type LocaleContextValue = {
   tOnboarding: (key: keyof (typeof dictionaries.he)["onboarding"]) => string;
   tHome: (key: keyof (typeof dictionaries.he)["home"]) => string;
   tArchitect: (key: keyof (typeof dictionaries.he)["architect"]) => string;
+  tOracle: (key: keyof (typeof dictionaries.he)["oracle"]) => string;
   tMentor: (key: keyof (typeof dictionaries.he)["mentor"]) => string;
   getProficiencyLabel: (level: number) => string;
   getLevelDisplay: (level: number) => string;
@@ -109,6 +110,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     [dict]
   );
 
+  const tOracle = useCallback(
+    (key: keyof (typeof dictionaries.he)["oracle"]) => dict.oracle[key],
+    [dict]
+  );
+
   const tMentor = useCallback(
     (key: keyof (typeof dictionaries.he)["mentor"]) => dict.mentor[key],
     [dict]
@@ -151,6 +157,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       tOnboarding,
       tHome,
       tArchitect,
+      tOracle,
       tMentor,
       getProficiencyLabel,
       getLevelDisplay,
@@ -167,6 +174,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       tOnboarding,
       tHome,
       tArchitect,
+      tOracle,
       tMentor,
       getProficiencyLabel,
       getLevelDisplay,

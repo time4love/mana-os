@@ -129,3 +129,12 @@ export const DraftOracleSeedSchema = z.object({
 });
 
 export type DraftOracleSeed = z.infer<typeof DraftOracleSeedSchema>;
+
+/**
+ * Gatekeeper Oracle: routing only. Reason is optional context for the target Oracle.
+ */
+export const GatekeeperRouteSchema = z.object({
+  reason: z.string().optional().describe("Brief reason for this route (e.g. user wants new community)"),
+});
+
+export type GatekeeperRoute = z.infer<typeof GatekeeperRouteSchema>;

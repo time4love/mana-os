@@ -17,7 +17,7 @@ import { useLocale } from "@/lib/i18n/context";
 
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { locale, tProposals, tCommunities, tArchitect } = useLocale();
+  const { locale, tProposals, tCommunities, tOracle } = useLocale();
   const isRtl = locale === "he";
 
   return (
@@ -88,10 +88,10 @@ export function Navbar() {
             </SheetClose>
             <SheetClose asChild>
               <Link
-                href="/proposals/new"
+                href="/oracle"
                 className="block rounded-xl px-4 py-4 text-base font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground"
               >
-                {tProposals("navNewProposal")}
+                {tOracle("navTent")}
               </Link>
             </SheetClose>
             <SheetClose asChild>
@@ -108,22 +108,6 @@ export function Navbar() {
                 className="block rounded-xl px-4 py-4 text-base font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground"
               >
                 {tCommunities("navSeeds")}
-              </Link>
-            </SheetClose>
-            <SheetClose asChild>
-              <Link
-                href="/communities/genesis"
-                className="block rounded-xl px-4 py-4 text-base font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground"
-              >
-                {tCommunities("navGenesis")}
-              </Link>
-            </SheetClose>
-            <SheetClose asChild>
-              <Link
-                href="/architect"
-                className="block rounded-xl px-4 py-4 text-base font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground"
-              >
-                {tArchitect("navArchitect")}
               </Link>
             </SheetClose>
             <SheetClose asChild>

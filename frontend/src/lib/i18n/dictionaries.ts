@@ -126,6 +126,9 @@ export const dictionaries: Record<
       seasonLabel: string;
       manaCyclesLabel: string;
     };
+    oracle: {
+      navTent: string;
+    };
     architect: {
       navArchitect: string;
       title: string;
@@ -192,6 +195,9 @@ export const dictionaries: Record<
       consultOracle: "היוועץ באורקל",
       seasonLabel: "עונה נוכחית",
       manaCyclesLabel: "מעגלי מאנה",
+    },
+    oracle: {
+      navTent: "אוהל האורקל",
     },
     profile: {
       title: "פרופיל המאנה שלי",
@@ -376,6 +382,9 @@ export const dictionaries: Record<
       consultOracle: "Consult the Oracle",
       seasonLabel: "Current Season",
       manaCyclesLabel: "Mana Cycles",
+    },
+    oracle: {
+      navTent: "The Oracle's Tent",
     },
     profile: {
       title: "My Mana Profile",

@@ -157,7 +157,7 @@ export default function HomePage() {
           transition={{ delay: 0.1, ...transition }}
         >
           <Link
-            href="/proposals/new"
+            href="/oracle"
             className="block rounded-2xl border border-primary/30 bg-card p-6 text-foreground shadow-soft transition hover:border-primary/50 hover:shadow-soft-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             style={{
               boxShadow: "0 0 24px 2px rgba(52, 211, 153, 0.12)",
