@@ -66,6 +66,7 @@ export const dictionaries: Record<
       navProfile: string;
       navNewProposal: string;
       navFeed: string;
+      navTruth: string;
       placeholder: string;
       visionTitleLabel: string;
       visionTitlePlaceholder: string;
@@ -287,6 +288,7 @@ export const dictionaries: Record<
       navProfile: "פרופיל",
       navNewProposal: "הצעה חדשה",
       navFeed: "המדורה",
+      navTruth: "מנוע האמת",
       placeholder: "תאר את ההצעה או הפרויקט הקהילתי שלך (טקסט חופשי)...",
       visionTitleLabel: "שם החזון",
       visionTitlePlaceholder: "כותרת קצרה לחזון",
@@ -497,6 +499,7 @@ export const dictionaries: Record<
       navProfile: "Profile",
       navNewProposal: "New proposal",
       navFeed: "The Hearth",
+      navTruth: "Truth Engine",
       placeholder: "Describe your community proposal or project (free text)...",
       visionTitleLabel: "Vision Title",
       visionTitlePlaceholder: "A short title for your vision",

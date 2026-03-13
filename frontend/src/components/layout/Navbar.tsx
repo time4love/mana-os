@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { Menu, Network } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -116,6 +116,15 @@ export function Navbar() {
                 className="block rounded-xl px-4 py-4 text-base font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground"
               >
                 {tMap("navMap")}
+              </Link>
+            </SheetClose>
+            <SheetClose asChild>
+              <Link
+                href="/truth"
+                className="flex items-center gap-3 rounded-xl px-4 py-4 text-base font-medium text-foreground transition hover:bg-accent hover:text-accent-foreground"
+              >
+                <Network className="size-5 shrink-0 text-primary/80" aria-hidden />
+                {tProposals("navTruth")}
               </Link>
             </SheetClose>
             <SheetClose asChild>

@@ -127,4 +127,14 @@ cp .env.example .env.local   # set NEXT_PUBLIC_MANA_SKILLS_ADDRESS, etc.
 pnpm dev
 ```
 
+### 4. Truth Engine & Epistemic Prism (Gemini)
+The **Fractal Truth Engine** and **Epistemic Prism** (document deconstruction, anti–appeal-to-authority analysis) use **Google Gemini 1.5 Pro** for large-context, logically detached reasoning. To enable them:
+
+1. Open **[Google AI Studio](https://aistudio.google.com/apikey)** and create or copy an API key.
+2. Add to `frontend/.env.local`:
+   ```bash
+   GOOGLE_GENERATIVE_AI_API_KEY=your-key-here
+   ```
+3. Restart the frontend dev server. Document upload and “Analyze as document” will then use Gemini for whole-book–scale ingestion without manual chunking.
+
 For full development phases, deployment, and mint scripts, see **[PROJECT_ROADMAP.en.md](PROJECT_ROADMAP.en.md)**.

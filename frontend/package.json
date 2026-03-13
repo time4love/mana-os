@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.33",
     "@ai-sdk/openai": "^3.0.31",
     "@ai-sdk/react": "^3.0.0",
     "@supabase/supabase-js": "^2.47.0",
@@ -19,6 +20,7 @@
     "leaflet.markercluster": "^1.5.3",
     "lucide-react": "^0.575.0",
     "next": "15.0.3",
+    "pdf-parse": "^1.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-leaflet": "^4.2.1",

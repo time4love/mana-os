@@ -94,4 +94,6 @@ pnpm install
 
 חוזים: `cd contracts && forge build`. פרונט: `cd frontend && cp .env.example .env.local && pnpm dev`.
 
+**מנוע האמת (גמיני):** לניתוח מסמכים ופריזמה אפיסטמית הוסף ל־`.env.local`: `GOOGLE_GENERATIVE_AI_API_KEY` — מפתח מ־[Google AI Studio](https://aistudio.google.com/apikey).
+
 לשלבי פיתוח מלאים ולפריסה, ראו **[PROJECT_ROADMAP.he.md](PROJECT_ROADMAP.he.md)**.

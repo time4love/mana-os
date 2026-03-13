@@ -256,6 +256,62 @@ export interface Database {
           created_at?: string;
         };
       };
+      truth_nodes: {
+        Row: {
+          id: string;
+          author_wallet: string | null;
+          content: string;
+          embedding: number[] | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          author_wallet?: string | null;
+          content: string;
+          embedding?: number[] | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          author_wallet?: string | null;
+          content?: string;
+          embedding?: number[] | null;
+          created_at?: string;
+        };
+      };
+      truth_edges: {
+        Row: {
+          id: string;
+          source_id: string;
+          target_id: string;
+          relationship: "supports" | "challenges" | "ai_analysis";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          source_id: string;
+          target_id: string;
+          relationship: "supports" | "challenges" | "ai_analysis";
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          source_id?: string;
+          target_id?: string;
+          relationship?: "supports" | "challenges" | "ai_analysis";
+          created_at?: string;
+        };
+      };
+    };
+    Functions: {
+      match_truth_nodes: {
+        Args: {
+          query_embedding: number[];
+          match_threshold: number;
+          match_count: number;
+        };
+        Returns: Array<{ id: string; content: string; similarity: number }>;
+      };
     };
   };
 }
@@ -268,3 +324,5 @@ export type OsFeatureProposalRow = Database["public"]["Tables"]["os_feature_prop
 export type ProposalUpgradeRow = Database["public"]["Tables"]["proposal_upgrades"]["Row"];
 export type SeedDiscourseRow = Database["public"]["Tables"]["seed_discourse"]["Row"];
 export type MapPinRow = Database["public"]["Tables"]["map_pins"]["Row"];
+export type TruthNodeRow = Database["public"]["Tables"]["truth_nodes"]["Row"];
+export type TruthEdgeRow = Database["public"]["Tables"]["truth_edges"]["Row"];

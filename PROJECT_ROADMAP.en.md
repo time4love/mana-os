@@ -90,11 +90,14 @@ This flow ensures that every component—Socratic Oracle, DAO, Callings Board, a
 - [ ] **The Weave: Fractal Economy & Surplus Overflow routing** — Inter-community surplus flow: communities in surplus resonate overflow to the network; others take what they need. No barter, trade, or debt. Macro-projects (bridges between communities) require Macro-Resonance pooled from multiple hubs.
 
 ### 🔮 Phase 10: The Fractal Truth Engine
-- [ ] **DAG Database Structure:** Map nested assertions as canonical standalone entities rather than tied parents, using Supabase UUID foreign keys.
-- [ ] **Semantic Weaver (AI):** Implement `pgvector` search prior to saving a node to propose merging duplicates into the Semantic Graph.
-- [ ] **Endless Dive UX:** Discard deep-nested margins. Use a column/stacking sliding UI, treating each node as a flat context before sliding horizontally deeper into a child node.
-- [ ] **Logician AI Tooling:** Integrate the non-aligned "Neutral Sieve" Oracle designed solely for exposing fallacies and assumptions.
-- [ ] **Community Verification Mechanics:** Replace standard likes with logic validation tags backed by ManaSkills SBT logic.
+- [x] **Step 1: The DAG Architecture & Database Schema:** Create `truth_nodes` and `truth_edges` in Supabase to allow concepts to have multiple parents, including `pgvector` integration.
+- [ ] **Step 2: The Semantic Weaver (Anti-Duplication):** Integrate OpenAI Embeddings. Intercept users adding nodes to run cosine-similarity checks, forcing them to merge duplicates into canonical nodes.
+- [ ] **Step 3: The "Pure Logician" AI Oracle:** An API endpoint trained exclusively on formal logic and fallacies, acting as an unbiased structural mapper.
+- [ ] **Step 4: The Endless Dive UX:** Implement a sliding, horizontal column layout that isolates singular logic junctions, preventing visual collapse and infinite nesting scroll-fatigue.
+- [ ] **Step 5: Epistemic Resonance (SBT Immunity):** Implement anti-troll voting (`Verify Logic` / `Flag Fallacy`). Only users holding Genesis Anchor SBTs can affect the structural weight of a node.
+- [ ] **Localized Epistemic Windows:** Develop isolated context payloads preventing cross-pollution into main nodes until `Context Bubbling` commits resolved propositions.
+- [ ] **Background Memory Consolidation Worker:** Architect an async CRON workflow instructing the Gemini 1.5 core via tree-traversal API to condense noise into `Refined Thought Trajectory` records stored via pgvector, not needing active response generation overhead on chat execution logic, serving to reset stale tokens.
+- [ ] **LLM-As-A-Judge Sync Verification:** Tool testing condensed graph structures post consolidation checking unparsed logic/debunk loss before applying strictly.
 
 ### 🔮 Phase 11: The Council of Elders (Multi-Agent Swarm & Co-Governance)
 - [ ] **Multi-Agent Architecture:** Upgrading the Oracle from a single LLM to an Agentic Workflow where specialized AI entities debate backend before responding.
