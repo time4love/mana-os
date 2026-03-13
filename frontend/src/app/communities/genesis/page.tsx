@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { manifestCommunitySeed } from "@/app/actions/communities";
 import type { CommunitySeed } from "@/lib/oracle/schema";
 
-const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] };
+const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] as const };
 
 export default function GenesisPage() {
   const router = useRouter();
@@ -51,15 +51,18 @@ export default function GenesisPage() {
     for (let i = messages.length - 1; i >= 0; i--) {
       const parts = messages[i].parts ?? [];
       for (const part of parts) {
+        const p = part as { type?: string; state?: string; input?: unknown };
+        const input = p.input;
         if (
-          part.type === "tool-manifest_community_seed" &&
-          (part.state === "input-available" || part.state === "output-available") &&
-          part.input &&
-          "name" in part.input &&
-          "vision" in part.input &&
-          "requiredCriticalMass" in part.input
+          p.type === "tool-manifest_community_seed" &&
+          (p.state === "input-available" || p.state === "output-available") &&
+          typeof input === "object" &&
+          input !== null &&
+          "name" in input &&
+          "vision" in input &&
+          "requiredCriticalMass" in input
         ) {
-          return part.input as CommunitySeed;
+          return input as CommunitySeed;
         }
       }
     }
@@ -120,7 +123,7 @@ export default function GenesisPage() {
                 key={message.id}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.03, ...transition }}
+                transition={{ delay: idx * 0.03, duration: 0.35, ease: [0.32, 0.72, 0, 1] as const }}
                 className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
@@ -176,7 +179,7 @@ export default function GenesisPage() {
               onManifest={handleManifest}
               address={address}
               locale={locale}
-              tCommunities={tCommunities}
+              tCommunities={tCommunities as (key: string) => string}
             />
           )}
 

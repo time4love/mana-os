@@ -23,7 +23,7 @@ import { UpgradeSeedCard } from "@/components/proposals/UpgradeSeedCard";
 import { Leaf, Sparkles, BookOpen } from "lucide-react";
 
 const RESONANCE_THRESHOLD = 3;
-const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] };
+const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] as const };
 
 interface LivingProposalProps {
   proposal: ProposalRow;
@@ -368,7 +368,7 @@ export function LivingProposal({ proposal, onResonated, onConsultOracle, upgrade
               className="h-full rounded-full bg-primary/80 shadow-[0_0_12px_rgba(34,197,94,0.5)]"
               initial={false}
               animate={{ width: `${progress * 100}%` }}
-              transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+              transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] as const }}
             />
           </div>
         </div>

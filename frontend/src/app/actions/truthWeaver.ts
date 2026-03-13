@@ -57,7 +57,8 @@ export async function proposeTruthNode(
   });
 
   if (!parsed.success) {
-    const msg = parsed.error.errors.map((e) => e.message).join("; ");
+    const issues = "issues" in parsed.error ? parsed.error.issues : (parsed.error as { errors?: { message: string }[] }).errors ?? [];
+    const msg = (issues as { message: string }[]).map((e) => e.message).join("; ");
     return { status: "error", error: msg };
   }
 
@@ -86,14 +87,16 @@ export async function proposeTruthNode(
   const supabase = createServerSupabase();
 
   if (!bypass) {
-    const { data: matches, error: rpcError } = await supabase.rpc("match_truth_nodes", {
+    const rpcArgs = {
       query_embedding: embedding,
       match_threshold: MATCH_THRESHOLD,
       match_count: MATCH_COUNT,
-    });
+    };
+    const { data: matches, error: rpcError } = await supabase.rpc("match_truth_nodes", rpcArgs as never);
+    const matchList = matches as { id: string; content: string; similarity: number }[] | null;
 
-    if (!rpcError && Array.isArray(matches) && matches.length > 0) {
-      const typed: MatchTruthNodeResult[] = matches.map((m: { id: string; content: string; similarity: number }) => ({
+    if (!rpcError && Array.isArray(matchList) && matchList.length > 0) {
+      const typed: MatchTruthNodeResult[] = matchList.map((m) => ({
         id: m.id,
         content: m.content,
         similarity: Number(m.similarity),
@@ -102,17 +105,19 @@ export async function proposeTruthNode(
     }
   }
 
-  const { data: newNode, error: insertNodeError } = await supabase
+  const nodePayload = {
+    author_wallet: wallet.toLowerCase(),
+    content: trimmedContent,
+    embedding,
+    is_macro_root: !parent,
+  };
+  const { data: newNodeData, error: insertNodeError } = await supabase
     .from("truth_nodes")
-    .insert({
-      author_wallet: wallet.toLowerCase(),
-      content: trimmedContent,
-      embedding,
-      is_macro_root: !parent,
-    })
+    .insert(nodePayload as never)
     .select("id")
     .single();
 
+  const newNode = newNodeData as { id: string } | null;
   if (insertNodeError || !newNode?.id) {
     return {
       status: "error",
@@ -123,9 +128,9 @@ export async function proposeTruthNode(
   if (parent && rel) {
     const { error: edgeError } = await supabase.from("truth_edges").insert({
       source_id: parent,
-      target_id: newNode.id,
+      target_id: newNode!.id,
       relationship: rel,
-    });
+    } as never);
     if (edgeError) {
       return {
         status: "error",
@@ -173,7 +178,7 @@ export async function attachTruthEdge(
     if (!parsed.success) {
       return {
         success: false,
-        error: parsed.error.errors.map((e) => e.message).join("; "),
+        error: (("issues" in parsed.error ? parsed.error.issues : []) as { message: string }[]).map((e) => e.message).join("; "),
       };
     }
 
@@ -194,17 +199,19 @@ export async function attachTruthEdge(
 
     const supabase = createServerSupabase();
 
-    const { data: newNode, error: insertNodeError } = await supabase
+    const nodePayload = {
+      author_wallet: parsed.data.authorWallet.toLowerCase(),
+      content: parsed.data.targetContent,
+      embedding,
+      is_macro_root: false,
+    };
+    const { data: newNodeData, error: insertNodeError } = await supabase
       .from("truth_nodes")
-      .insert({
-        author_wallet: parsed.data.authorWallet.toLowerCase(),
-        content: parsed.data.targetContent,
-        embedding,
-        is_macro_root: false,
-      })
+      .insert(nodePayload as never)
       .select("id")
       .single();
 
+    const newNode = newNodeData as { id: string } | null;
     if (insertNodeError || !newNode?.id) {
       return {
         success: false,
@@ -212,16 +219,18 @@ export async function attachTruthEdge(
       };
     }
 
-    const { data: newEdge, error: edgeError } = await supabase
+    const edgePayload = {
+      source_id: parsed.data.sourceId,
+      target_id: newNode.id,
+      relationship: parsed.data.relationship as EdgeRelationship,
+    };
+    const { data: newEdgeData, error: edgeError } = await supabase
       .from("truth_edges")
-      .insert({
-        source_id: parsed.data.sourceId,
-        target_id: newNode.id,
-        relationship: parsed.data.relationship as EdgeRelationship,
-      })
+      .insert(edgePayload as never)
       .select("id")
       .single();
 
+    const newEdge = newEdgeData as { id: string } | null;
     if (edgeError || !newEdge?.id) {
       return {
         success: false,
@@ -229,7 +238,7 @@ export async function attachTruthEdge(
       };
     }
 
-    return { success: true, edgeId: newEdge.id };
+    return { success: true, edgeId: newEdge!.id };
   } catch (err) {
     return { success: false, error: toErrorMessage(err) || "An error occurred" };
   }
@@ -282,7 +291,7 @@ export async function anchorPrismToGraph(
     if (!parsed.success) {
       return {
         success: false,
-        error: parsed.error.errors.map((e) => e.message).join("; "),
+        error: (("issues" in parsed.error ? parsed.error.issues : []) as { message: string }[]).map((e) => e.message).join("; "),
       };
     }
 
@@ -304,17 +313,19 @@ export async function anchorPrismToGraph(
     });
     const thesisEmbedding = Array.from(thesisEmbedResult.embedding);
 
-    const { data: thesisRow, error: thesisError } = await supabase
+    const thesisPayload = {
+      author_wallet: wallet,
+      content: parsed.data.documentThesis,
+      embedding: thesisEmbedding,
+      is_macro_root: true,
+    };
+    const { data: thesisRowData, error: thesisError } = await supabase
       .from("truth_nodes")
-      .insert({
-        author_wallet: wallet,
-        content: parsed.data.documentThesis,
-        embedding: thesisEmbedding,
-        is_macro_root: true,
-      })
+      .insert(thesisPayload as never)
       .select("id")
       .single();
 
+    const thesisRow = thesisRowData as { id: string } | null;
     if (thesisError || !thesisRow?.id) {
       return {
         success: false,
@@ -333,24 +344,26 @@ export async function anchorPrismToGraph(
         });
         const claimEmbedding = Array.from(claimEmbedResult.embedding);
 
-        const { data: claimRow, error: claimError } = await supabase
+        const claimPayload = {
+          author_wallet: wallet,
+          content: claimContent,
+          embedding: claimEmbedding,
+          is_macro_root: false,
+        };
+        const { data: claimRowData, error: claimError } = await supabase
           .from("truth_nodes")
-          .insert({
-            author_wallet: wallet,
-            content: claimContent,
-            embedding: claimEmbedding,
-            is_macro_root: false,
-          })
+          .insert(claimPayload as never)
           .select("id")
           .single();
 
+        const claimRow = claimRowData as { id: string } | null;
         if (claimError || !claimRow?.id) continue;
 
         await supabase.from("truth_edges").insert({
           source_id: thesisId,
           target_id: claimRow.id,
           relationship: "ai_analysis",
-        });
+        } as never);
         claimsAnchored += 1;
       } catch {
         // Skip this claim on embed/insert failure
@@ -417,7 +430,7 @@ export async function anchorPrismDraft(
     if (!parsed.success) {
       return {
         success: false,
-        error: parsed.error.errors.map((e) => e.message).join("; "),
+        error: (("issues" in parsed.error ? parsed.error.issues : []) as { message: string }[]).map((e) => e.message).join("; "),
       };
     }
 
@@ -443,17 +456,19 @@ export async function anchorPrismDraft(
       return { success: false, error: toErrorMessage(err) || "Thesis embedding failed" };
     }
 
-    const { data: thesisRow, error: thesisError } = await supabase
+    const thesisPayload = {
+      author_wallet: wallet,
+      content: parsed.data.documentThesis,
+      embedding: thesisEmbedding,
+      is_macro_root: true,
+    };
+    const { data: thesisRowData, error: thesisError } = await supabase
       .from("truth_nodes")
-      .insert({
-        author_wallet: wallet,
-        content: parsed.data.documentThesis,
-        embedding: thesisEmbedding,
-        is_macro_root: true,
-      })
+      .insert(thesisPayload as never)
       .select("id")
       .single();
 
+    const thesisRow = thesisRowData as { id: string } | null;
     if (thesisError || !thesisRow?.id) {
       return {
         success: false,
@@ -473,17 +488,19 @@ export async function anchorPrismDraft(
         });
         const claimEmbedding = Array.from(claimEmbedResult.embedding);
 
-        const { data: claimRow, error: claimError } = await supabase
+        const claimPayload = {
+          author_wallet: wallet,
+          content,
+          embedding: claimEmbedding,
+          is_macro_root: false,
+        };
+        const { data: claimRowData, error: claimError } = await supabase
           .from("truth_nodes")
-          .insert({
-            author_wallet: wallet,
-            content,
-            embedding: claimEmbedding,
-            is_macro_root: false,
-          })
+          .insert(claimPayload as never)
           .select("id")
           .single();
 
+        const claimRow = claimRowData as { id: string } | null;
         if (claimError || !claimRow?.id) continue;
         childIds.push(claimRow.id);
       } catch {
@@ -498,7 +515,7 @@ export async function anchorPrismDraft(
         target_id,
         relationship: "supports" as const,
       }));
-      const { error: edgesError } = await supabase.from("truth_edges").insert(edges);
+      const { error: edgesError } = await supabase.from("truth_edges").insert(edges as never);
       if (edgesError) {
         return {
           success: false,
@@ -514,6 +531,93 @@ export async function anchorPrismDraft(
       thesisNodeId,
       claimsAnchored: childIds.length,
     };
+  } catch (err) {
+    return { success: false, error: toErrorMessage(err) || "An error occurred" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Epistemic Forge — single draft anchor (from Socratic chat)
+// ---------------------------------------------------------------------------
+
+const ForgeDraftSchema = z.object({
+  assertion: z.string().min(1),
+  logicalCoherenceScore: z.number().min(0).max(100),
+  reasoning: z.string(),
+  hiddenAssumptions: z.array(z.string()),
+  challengePrompt: z.string(),
+});
+
+export type AnchorForgeDraftResult =
+  | { success: true; nodeId: string }
+  | { success: false; error: string };
+
+/**
+ * Anchors a single Epistemic Forge draft to the graph: one node (formatted content),
+ * optionally linked to a parent. Used when the user approves the draft from the Forge chat.
+ */
+export async function anchorForgeDraft(
+  draft: z.infer<typeof ForgeDraftSchema>,
+  authorWallet: string,
+  parentId?: string,
+  relationship?: EdgeRelationship
+): Promise<AnchorForgeDraftResult> {
+  try {
+    const parsed = ForgeDraftSchema.safeParse(draft);
+    if (!parsed.success) {
+      const issues = "issues" in parsed.error ? parsed.error.issues : [];
+      return { success: false, error: (issues as { message: string }[]).map((e) => e.message).join("; ") };
+    }
+
+    const wallet = authorWallet?.trim().toLowerCase();
+    if (!/^0x[a-fa-f0-9]{40}$/.test(wallet)) {
+      return { success: false, error: "Invalid wallet address" };
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) return { success: false, error: "OpenAI API key not configured" };
+
+    const content = formatClaimContent(parsed.data);
+    const openai = createOpenAI({ apiKey });
+    const embeddingModel = openai.embeddingModel("text-embedding-3-small");
+
+    const embedResult = await embed({
+      model: embeddingModel,
+      value: content.slice(0, 8000),
+    });
+    const embedding = Array.from(embedResult.embedding);
+
+    const supabase = createServerSupabase();
+    const nodePayload = {
+      author_wallet: wallet,
+      content,
+      embedding,
+      is_macro_root: !parentId,
+    };
+    const { data: rowData, error: insertError } = await supabase
+      .from("truth_nodes")
+      .insert(nodePayload as never)
+      .select("id")
+      .single();
+
+    const row = rowData as { id: string } | null;
+    if (insertError || !row?.id) {
+      return { success: false, error: insertError?.message ?? "Failed to create node" };
+    }
+
+    if (parentId && relationship) {
+      const { error: edgeError } = await supabase.from("truth_edges").insert({
+        source_id: parentId,
+        target_id: row.id,
+        relationship,
+      } as never);
+      if (edgeError) {
+        return { success: false, error: `Node created but edge failed: ${edgeError.message}` };
+      }
+    }
+
+    revalidatePath("/truth");
+    return { success: true, nodeId: row.id };
   } catch (err) {
     return { success: false, error: toErrorMessage(err) || "An error occurred" };
   }

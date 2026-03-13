@@ -9,7 +9,7 @@ import type {
   ProposalUpgradeRow,
   SeedDiscourseRow,
 } from "@/lib/supabase/types";
-import type { PhysicsForecastDeltaJson } from "@/lib/supabase/types";
+import type { PhysicsForecastDeltaJson, ProposalResourcePlanJson } from "@/lib/supabase/types";
 import { runOracleSynthesis } from "@/lib/oracle/runSynthesis";
 
 const MERGE_RESONANCE_THRESHOLD = 2;
@@ -95,11 +95,12 @@ export async function plantUpgradeSeed(
       physicsForecast != null ? (physicsForecast.length > 0 ? physicsForecast : null) : null;
 
     if (forecast === undefined) {
-      const { data: proposal } = await supabase
+      const { data: proposalData } = await supabase
         .from("proposals")
         .select("id, title, description, resource_plan")
         .eq("id", proposalId)
         .single();
+      const proposal = proposalData as { title: string; description: string; resource_plan: ProposalResourcePlanJson } | null;
       if (proposal) {
         forecast = await generatePhysicsForecast(
           {
@@ -112,22 +113,24 @@ export async function plantUpgradeSeed(
       }
     }
 
-    const { data, error } = await supabase
+    const upgradePayload = {
+      proposal_id: proposalId,
+      author_wallet: authorWallet.toLowerCase(),
+      suggested_upgrade: trimmed,
+      resonance_count: 0,
+      status: "pending",
+      physics_forecast: forecast,
+    };
+    const { data: insertData, error } = await supabase
       .from("proposal_upgrades")
-      .insert({
-        proposal_id: proposalId,
-        author_wallet: authorWallet.toLowerCase(),
-        suggested_upgrade: trimmed,
-        resonance_count: 0,
-        status: "pending",
-        physics_forecast: forecast,
-      })
+      .insert(upgradePayload as never)
       .select("id")
       .single();
 
     if (error) return { success: false, error: error.message };
-    if (!data?.id) return { success: false, error: "Upgrade created but no id returned" };
-    return { success: true, upgradeId: data.id };
+    const row = insertData as { id: string } | null;
+    if (!row?.id) return { success: false, error: "Upgrade created but no id returned" };
+    return { success: true, upgradeId: row.id };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to plant upgrade seed";
     return { success: false, error: message };
@@ -156,7 +159,7 @@ export async function resonateWithUpgrade(
 
     const { error: insertError } = await supabase
       .from("proposal_upgrade_resonances")
-      .insert({ upgrade_id: upgradeId, wallet_address: normalizedWallet });
+      .insert({ upgrade_id: upgradeId, wallet_address: normalizedWallet } as never);
 
     if (insertError) {
       if (insertError.code === "23505") {
@@ -179,17 +182,18 @@ export async function resonateWithUpgrade(
       .update({
         resonance_count: newCount,
         ...(shouldMerge ? { status: "merged" } : {}),
-      })
+      } as never)
       .eq("id", upgradeId);
 
     if (updateError) return { success: false, error: updateError.message };
 
     if (shouldMerge) {
-      const { data: upgradeRow } = await supabase
+      const { data: upgradeRowData } = await supabase
         .from("proposal_upgrades")
         .select("proposal_id")
         .eq("id", upgradeId)
         .single();
+      const upgradeRow = upgradeRowData as { proposal_id: string } | null;
       if (upgradeRow?.proposal_id) {
         const synthesisResult = await runOracleSynthesis(upgradeRow.proposal_id);
         if (!synthesisResult.success) {
@@ -257,7 +261,8 @@ export async function getUpgradeResonanceByWallet(
       .in("upgrade_id", upgradeIds);
 
     if (error) return { success: false, error: error.message };
-    const resonatedUpgradeIds = (data ?? []).map((r) => r.upgrade_id);
+    const rows = (data ?? []) as { upgrade_id: string }[];
+    const resonatedUpgradeIds = rows.map((r) => r.upgrade_id);
     return { success: true, resonatedUpgradeIds };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to load resonance status";
@@ -289,7 +294,7 @@ export async function shareSeedWisdom(
       upgrade_id: upgradeId,
       author_wallet: authorWallet.toLowerCase(),
       wisdom: trimmed,
-    });
+    } as never);
     if (error) return { success: false, error: error.message };
     return { success: true };
   } catch (err) {
@@ -337,17 +342,19 @@ export async function getProposalContextForCodex(
   try {
     const supabase = createServerSupabase();
 
-    const { data: proposal, error: proposalError } = await supabase
+    const { data: proposalData, error: proposalError } = await supabase
       .from("proposals")
       .select("id, title, description, resource_plan, oracle_insight")
       .eq("id", proposalId)
       .single();
 
+    type ProposalRowShape = { id: string; title: string; description: string; resource_plan: ProposalResourcePlanJson; oracle_insight: string | null };
+    const proposal = proposalData as ProposalRowShape | null;
     if (proposalError || !proposal) {
       return { success: false, error: "Proposal not found" };
     }
 
-    const { data: upgrades, error: upgradesError } = await supabase
+    const { data: upgradesData, error: upgradesError } = await supabase
       .from("proposal_upgrades")
       .select("id, suggested_upgrade, resonance_count, status, author_wallet")
       .eq("proposal_id", proposalId)
@@ -357,7 +364,7 @@ export async function getProposalContextForCodex(
       return { success: false, error: upgradesError.message };
     }
 
-    const upgradeList = (upgrades ?? []) as ProposalUpgradeRow[];
+    const upgradeList = (upgradesData ?? []) as ProposalUpgradeRow[];
     const discourseByUpgradeId: Record<string, SeedDiscourseRow[]> = {};
 
     for (const u of upgradeList) {

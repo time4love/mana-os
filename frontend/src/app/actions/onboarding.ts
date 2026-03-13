@@ -49,15 +49,15 @@ export async function anchorSoulContract(
 
   try {
     const supabase = createServerSupabase();
-    const { error } = await supabase.from("profiles").upsert(
-      {
-        wallet_address: address.toLowerCase(),
-        season: s,
-        realms: r,
-        status: "anchored",
-      },
-      { onConflict: "wallet_address" }
-    );
+    const profilePayload = {
+      wallet_address: address.toLowerCase(),
+      season: s,
+      realms: r,
+      status: "anchored",
+    };
+    const { error } = await supabase.from("profiles").upsert(profilePayload as never, {
+      onConflict: "wallet_address",
+    });
 
     if (error) {
       return { success: false, error: error.message };

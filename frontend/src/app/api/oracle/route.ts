@@ -2,6 +2,7 @@ import { convertToModelMessages, streamText } from "ai";
 import type { UIMessage } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { ProposalResourcePlanSchema } from "@/lib/oracle/schema";
 import { getSystemDocsContext, type DocsLocale } from "@/lib/utils/docsReader";
 
@@ -93,7 +94,7 @@ ${philosophyContext}
       description:
         "Call this only when you have gathered enough scope from the user. Submits the final Mana resource plan (natural resources + human capital) for the proposal.",
       inputSchema: ProposalResourcePlanSchema,
-      execute: async (plan) => ({ ok: true, plan }),
+      execute: async (plan: z.infer<typeof ProposalResourcePlanSchema>) => ({ ok: true, plan }),
     },
   };
 

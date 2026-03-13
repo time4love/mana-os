@@ -11,7 +11,7 @@ import { useLocale } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/button";
 import { ManaResourcePlanCard } from "@/components/proposals/ManaResourcePlanCard";
 import type { ProposalResourcePlan, CommunitySeed } from "@/lib/oracle/schema";
-import { resonateProposal } from "@/app/actions/proposals";
+import { resonateProposal, type ResonateProposalResult } from "@/app/actions/proposals";
 import { manifestCommunitySeed } from "@/app/actions/communities";
 
 type OracleType = "gatekeeper" | "genesis" | "planner" | "architect";
@@ -45,7 +45,7 @@ function getFirstUserMessageText(messages: Array<{ role: string; parts?: Array<{
   return "";
 }
 
-const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] };
+const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] as const };
 
 export default function OracleTentPage() {
   const router = useRouter();
@@ -132,8 +132,8 @@ export default function OracleTentPage() {
   );
 
   const handleResonate = useCallback(
-    async (plan: ProposalResourcePlan, title: string, description: string) => {
-      if (!address) return { success: false as const, error: "Wallet not connected" };
+    async (plan: ProposalResourcePlan, title: string, description: string): Promise<ResonateProposalResult> => {
+      if (!address) return { success: false, error: "Wallet not connected" };
       const result = await resonateProposal(address, title, description, plan);
       if (result.success) router.push("/feed");
       return result;
@@ -279,9 +279,9 @@ export default function OracleTentPage() {
                         message={message}
                         activeOracle={activeOracle}
                         locale={locale}
-                        tProposals={tProposals}
-                        tCommunities={tCommunities}
-                        tArchitect={tArchitect}
+                        tProposals={tProposals as (k: string) => string}
+                        tCommunities={tCommunities as (k: string) => string}
+                        tArchitect={tArchitect as (k: string) => string}
                         address={address}
                         lastUserMessageText={lastUserMessageText}
                         onResonate={handleResonate}
@@ -387,7 +387,7 @@ function OracleMessageBubble({
   tArchitect: (k: string) => string;
   address: string | undefined;
   lastUserMessageText: string;
-  onResonate: (plan: ProposalResourcePlan, title: string, description: string) => Promise<{ success: boolean; error?: string }>;
+  onResonate: (plan: ProposalResourcePlan, title: string, description: string) => Promise<ResonateProposalResult>;
   onManifest: (seed: CommunitySeed) => Promise<{ success: boolean; error?: string }>;
 }) {
   if (message.role !== "assistant") return null;

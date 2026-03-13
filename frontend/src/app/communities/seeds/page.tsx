@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAccount } from "wagmi";
 import { motion } from "framer-motion";
 import { useLocale } from "@/lib/i18n/context";
-import { getRelativeHarmonicTime } from "@/lib/utils/harmonicTime";
+import { getRelativeHarmonicTime, type HarmonicLocale } from "@/lib/utils/harmonicTime";
 import {
   getSeedsForNursery,
   joinCommunity,
@@ -13,7 +13,7 @@ import {
 } from "@/app/actions/communities";
 import { Droplets, Leaf } from "lucide-react";
 
-const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] };
+const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] as const };
 
 export default function SeedsPage() {
   const { locale, tCommunities, tProposals } = useLocale();
@@ -128,14 +128,14 @@ export default function SeedsPage() {
                 key={seed.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05, ...transition }}
+                transition={{ delay: index * 0.05, duration: 0.35, ease: [0.32, 0.72, 0, 1] as const }}
               >
                 <SeedCard
                   seed={seed}
                   onJoined={loadSeeds}
                   walletAddress={address ?? undefined}
                   locale={locale}
-                  tCommunities={tCommunities}
+                  tCommunities={tCommunities as (key: string) => string}
                 />
               </motion.div>
             ))}
@@ -206,7 +206,7 @@ function SeedCard({
               className="h-full rounded-full bg-primary/80 shadow-[0_0_12px_rgba(34,197,94,0.4)]"
               initial={false}
               animate={{ width: `${progress * 100}%` }}
-              transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+              transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] as const }}
             />
           </div>
         </div>
@@ -244,7 +244,7 @@ function SeedCard({
         )}
 
         <p className="text-xs text-muted-foreground">
-          {getRelativeHarmonicTime(new Date(seed.created_at), locale)}
+          {getRelativeHarmonicTime(new Date(seed.created_at), locale as HarmonicLocale)}
         </p>
       </div>
     </li>

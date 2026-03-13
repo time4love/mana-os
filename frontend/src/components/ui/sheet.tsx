@@ -121,7 +121,7 @@ function SheetContent({
           ? { x: side === "end" ? "100%" : "-100%" }
           : { y: side === "bottom" ? "100%" : "-100%" }
       }
-      transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+      transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] as const }}
       className={`fixed z-[1200] flex flex-col gap-4 bg-card text-card-foreground shadow-soft-md border border-border ${positionClass} ${sizeClass} ${className}`}
       onClick={(e) => e.stopPropagation()}
     >

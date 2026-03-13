@@ -101,13 +101,14 @@ ${docsContext}${contextBlock}`;
         description: string;
       }) => {
         const supabase = createServerSupabase();
-        const { error } = await supabase.from("os_feature_proposals").insert({
+        const payload = {
           proposer_wallet: proposerWallet,
           title: args.featureTitle,
           philosophical_alignment: args.philosophicalAlignment,
           description: args.description,
           status: "pending_review",
-        });
+        };
+        const { error } = await supabase.from("os_feature_proposals").insert(payload as never);
         if (error) {
           console.error("[Architect Oracle] insert os_feature_proposals", error);
           return { ok: false, error: error.message };

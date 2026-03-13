@@ -42,17 +42,19 @@ export async function runOracleSynthesis(
 
   const supabase = createServerSupabase();
 
-  const { data: proposal, error: proposalError } = await supabase
+  const { data: proposalData, error: proposalError } = await supabase
     .from("proposals")
     .select("id, title, description, resource_plan")
     .eq("id", proposalId)
     .single();
 
+  type ProposalRow = { id: string; title: string; description: string; resource_plan: Record<string, unknown> };
+  const proposal = proposalData as ProposalRow | null;
   if (proposalError || !proposal) {
     return { success: false, error: "Proposal not found" };
   }
 
-  const { data: upgrades, error: upgradesError } = await supabase
+  const { data: upgradesData, error: upgradesError } = await supabase
     .from("proposal_upgrades")
     .select("id, suggested_upgrade, status")
     .eq("proposal_id", proposalId)
@@ -63,7 +65,8 @@ export async function runOracleSynthesis(
     return { success: false, error: "Failed to load upgrade seeds" };
   }
 
-  const mergedSeeds = (upgrades ?? []).map((u) => u.suggested_upgrade);
+  const upgradesList = (upgradesData ?? []) as { suggested_upgrade: string }[];
+  const mergedSeeds = upgradesList.map((u) => u.suggested_upgrade);
   if (mergedSeeds.length === 0) {
     return { success: false, error: "No merged upgrade seeds to synthesize" };
   }
@@ -88,12 +91,13 @@ Output the updated ProposalResourcePlan and your short Socratic Insight (תבו�
       system: SYNTHESIS_SYSTEM,
     });
 
+    const updatePayload = {
+      resource_plan: object.updatedPlan as unknown as Record<string, unknown>,
+      oracle_insight: object.socraticInsight,
+    };
     const { error: updateError } = await supabase
       .from("proposals")
-      .update({
-        resource_plan: object.updatedPlan as unknown as Record<string, unknown>,
-        oracle_insight: object.socraticInsight,
-      })
+      .update(updatePayload as never)
       .eq("id", proposalId);
 
     if (updateError) {

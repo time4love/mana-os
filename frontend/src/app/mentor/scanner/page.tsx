@@ -140,7 +140,7 @@ export default function MentorScannerPage() {
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+            transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] as const }}
           >
             <Card className="overflow-hidden border-primary/20 bg-card shadow-soft">
               <CardHeader className="border-b border-border/60 bg-muted/20">
@@ -152,7 +152,7 @@ export default function MentorScannerPage() {
               <CardContent className="p-6">
                 <p className="text-muted-foreground">{tMentor("accessDeniedMessage")}</p>
                 <Link href="/profile" className="mt-4 inline-block">
-                  <Button variant="outline" className="border-primary/50 text-primary">
+                  <Button className="border border-border bg-transparent text-primary hover:bg-primary/10">
                     {t("navHome")}
                   </Button>
                 </Link>
@@ -210,10 +210,9 @@ export default function MentorScannerPage() {
               />
               <Button
                 type="button"
-                variant="outline"
                 onClick={handlePasteSubmit}
                 disabled={!isValidAddress(pasteInput)}
-                className="border-primary/50 text-primary"
+                className="border border-border bg-transparent text-primary hover:bg-primary/10"
               >
                 {locale === "he" ? "הדבק" : "Paste"}
               </Button>
@@ -242,12 +241,12 @@ export default function MentorScannerPage() {
                   : tMentor("grantGenesisResonance")}
               </Button>
               <Button
-                variant="ghost"
                 onClick={() => {
                   setScannedAddress("");
                   setPasteInput("");
                 }}
                 disabled={isMinting}
+                className="bg-transparent text-muted-foreground hover:bg-muted/50"
               >
                 {locale === "he" ? "ביטול" : "Cancel"}
               </Button>

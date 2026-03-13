@@ -9,7 +9,7 @@ import { TruthWeaverInput } from "@/components/truth/TruthWeaverInput";
 import { parseNodeContent, truncateAssertion } from "@/lib/utils/truthParser";
 import type { MacroRootWithMeta } from "@/types/truth";
 
-const TRANSITION = { duration: 0.4, ease: [0.32, 0.72, 0, 1] };
+const TRANSITION = { duration: 0.4, ease: [0.32, 0.72, 0, 1] as const };
 const STAGGER = 0.08;
 
 const TITLE = {
@@ -101,7 +101,7 @@ export function TruthHub({ macroRoots }: TruthHubProps) {
     <motion.main
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
+      transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] as const }}
       className="min-h-[calc(100vh-3.5rem)] px-4 py-12 sm:px-8 sm:py-16 md:px-12"
       dir={isRtl ? "rtl" : "ltr"}
     >

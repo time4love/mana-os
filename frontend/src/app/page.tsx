@@ -12,7 +12,7 @@ import { getProfileByWallet, type ProfileRow } from "@/app/actions/onboarding";
 import { useReadContract } from "wagmi";
 import { MANA_SKILLS_ABI, MANA_SKILLS_ADDRESS } from "@/contracts/manaSkills";
 
-const transition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] };
+const transition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] as const };
 
 function getTokenIdsArray(data: unknown): bigint[] {
   if (Array.isArray(data)) return data as bigint[];

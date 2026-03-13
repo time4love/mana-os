@@ -109,13 +109,13 @@ export default function NewProposalPage() {
                   </p>
                   <div className="space-y-3 text-sm">
                     {message.parts?.map((part, partIndex) => {
-                      if (part.type === "text") {
+                      if (part.type === "text" && typeof part === "object" && part !== null && "text" in part) {
                         return (
                           <p
                             key={partIndex}
                             className="whitespace-pre-wrap break-words"
                           >
-                            {part.text}
+                            {(part as { text: string }).text}
                           </p>
                         );
                       }
@@ -125,7 +125,8 @@ export default function NewProposalPage() {
                           part.state === "output-available")
                       ) {
                         const plan =
-                          part.input &&
+                          typeof part.input === "object" &&
+                          part.input !== null &&
                           "naturalResources" in part.input &&
                           "humanCapital" in part.input
                             ? (part.input as ProposalResourcePlan)

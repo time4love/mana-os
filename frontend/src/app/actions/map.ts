@@ -72,22 +72,24 @@ export async function dropPin(
 
   try {
     const supabase = createServerSupabase();
+    const payload = {
+      creator_wallet: wallet.toLowerCase(),
+      pin_type: pinType,
+      lat,
+      lng,
+      title: trimmedTitle,
+      description: trimmedDesc,
+    };
     const { data, error } = await supabase
       .from("map_pins")
-      .insert({
-        creator_wallet: wallet.toLowerCase(),
-        pin_type: pinType,
-        lat,
-        lng,
-        title: trimmedTitle,
-        description: trimmedDesc,
-      })
+      .insert(payload as never)
       .select("id")
       .single();
 
     if (error) return { success: false, error: error.message };
-    if (!data?.id) return { success: false, error: "Pin created but no id returned" };
-    return { success: true, id: data.id };
+    const row = data as { id: string } | null;
+    if (!row?.id) return { success: false, error: "Pin created but no id returned" };
+    return { success: true, id: row.id };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Failed to drop pin";

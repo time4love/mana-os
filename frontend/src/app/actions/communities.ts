@@ -2,6 +2,7 @@
 
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { CommunityRow } from "@/lib/supabase/types";
+import type { CommunitiesInsert, CommunitiesUpdate, CommunityMembersInsert } from "@/lib/supabase/db";
 import type { CommunitySeed } from "@/lib/oracle/schema";
 
 export type ManifestSeedResult =
@@ -29,21 +30,23 @@ export async function manifestCommunitySeed(
   const mass = Math.max(1, Math.floor(Number(seed.requiredCriticalMass) || 1));
   try {
     const supabase = createServerSupabase();
+    const payload: CommunitiesInsert = {
+      founder_wallet: founderWallet.toLowerCase(),
+      name,
+      vision,
+      required_critical_mass: mass,
+      status: "pending_manifestation",
+    };
     const { data, error } = await supabase
       .from("communities")
-      .insert({
-        founder_wallet: founderWallet.toLowerCase(),
-        name,
-        vision,
-        required_critical_mass: mass,
-        status: "pending_manifestation",
-      })
+      .insert(payload as never)
       .select("id")
       .single();
 
     if (error) return { success: false, error: error.message };
-    if (!data?.id) return { success: false, error: "Community created but no id returned" };
-    return { success: true, id: data.id };
+    const row = data as { id: string } | null;
+    if (!row?.id) return { success: false, error: "Community created but no id returned" };
+    return { success: true, id: row.id };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Failed to manifest community seed";
@@ -69,17 +72,18 @@ export async function getSeedsForNursery(
 ): Promise<GetSeedsResult> {
   try {
     const supabase = createServerSupabase();
-    const { data: communities, error: commError } = await supabase
+    const { data: communitiesData, error: commError } = await supabase
       .from("communities")
       .select("*")
       .eq("status", "pending_manifestation")
       .order("created_at", { ascending: false });
 
     if (commError) return { success: false, error: commError.message };
+    const communities = (communitiesData ?? []) as CommunityRow[];
 
     const seeds: SeedWithMemberCount[] = [];
     const normalizedWallet = wallet?.toLowerCase();
-    for (const c of communities ?? []) {
+    for (const c of communities) {
       const { count, error: countError } = await supabase
         .from("community_members")
         .select("*", { count: "exact", head: true })
@@ -127,10 +131,11 @@ export async function joinCommunity(
   }
   try {
     const supabase = createServerSupabase();
-    const { error: insertError } = await supabase.from("community_members").insert({
+    const memberPayload: CommunityMembersInsert = {
       community_id: communityId,
       wallet_address: walletAddress.toLowerCase(),
-    });
+    };
+    const { error: insertError } = await supabase.from("community_members").insert(memberPayload as never);
 
     if (insertError) {
       if (insertError.code === "23505") {
@@ -139,22 +144,21 @@ export async function joinCommunity(
       return { success: false, error: insertError.message };
     }
 
-    const { data: community } = await supabase
+    const { data: communityData } = await supabase
       .from("communities")
       .select("required_critical_mass")
       .eq("id", communityId)
       .single();
 
+    const community = communityData as { required_critical_mass: number | null } | null;
     if (community) {
       const { count } = await supabase
         .from("community_members")
         .select("*", { count: "exact", head: true })
         .eq("community_id", communityId);
       if (count !== null && count >= (community.required_critical_mass ?? 0)) {
-        await supabase
-          .from("communities")
-          .update({ status: "manifested" })
-          .eq("id", communityId);
+        const updatePayload: CommunitiesUpdate = { status: "manifested" };
+        await supabase.from("communities").update(updatePayload as never).eq("id", communityId);
       }
     }
     return { success: true };

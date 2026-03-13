@@ -49,29 +49,32 @@ export async function fetchTruthNodeWithRelations(nodeId: string): Promise<Fetch
       return { success: false, error: nodeError?.message ?? "Node not found" };
     }
 
-    const node = rowToNode(nodeRow);
+    type NodeRow = { id: string; author_wallet: string | null; content: string; created_at: string; is_macro_root: boolean };
+    const node = rowToNode(nodeRow as NodeRow);
 
     // Children: edges where this node is the source (source_id = nodeId); target_id = child
-    const { data: childEdges, error: childEdgesError } = await supabase
+    const { data: childEdgesData, error: childEdgesError } = await supabase
       .from("truth_edges")
       .select("target_id, relationship")
       .eq("source_id", nodeId);
 
+    const childEdges = (childEdgesData ?? []) as { target_id: string; relationship: string }[];
     const childrenByRelationship: ChildrenByRelationship = {
       supports: [],
       challenges: [],
       ai_analysis: [],
     };
 
-    if (!childEdgesError && childEdges?.length) {
+    if (!childEdgesError && childEdges.length) {
       const targetIds = [...new Set(childEdges.map((e) => e.target_id))];
-      const { data: childRows } = await supabase
+      const { data: childRowsData } = await supabase
         .from("truth_nodes")
         .select("id, author_wallet, content, created_at, is_macro_root")
         .in("id", targetIds);
 
+      const childRows = (childRowsData ?? []) as NodeRow[];
       const childMap = new Map<string | null, TruthNode>();
-      childRows?.forEach((row) => childMap.set(row.id, rowToNode(row)));
+      childRows.forEach((row) => childMap.set(row.id, rowToNode(row)));
 
       for (const edge of childEdges) {
         const rel = edge.relationship;
@@ -82,19 +85,21 @@ export async function fetchTruthNodeWithRelations(nodeId: string): Promise<Fetch
     }
 
     // Parents: edges where this node is the target (target_id = nodeId); source_id = parent
-    const { data: parentEdges, error: parentEdgesError } = await supabase
+    const { data: parentEdgesData, error: parentEdgesError } = await supabase
       .from("truth_edges")
       .select("source_id")
       .eq("target_id", nodeId);
 
+    const parentEdges = (parentEdgesData ?? []) as { source_id: string }[];
     let parents: TruthNode[] = [];
-    if (!parentEdgesError && parentEdges?.length) {
+    if (!parentEdgesError && parentEdges.length) {
       const parentIds = [...new Set(parentEdges.map((e) => e.source_id))];
-      const { data: parentRows } = await supabase
+      const { data: parentRowsData } = await supabase
         .from("truth_nodes")
         .select("id, author_wallet, content, created_at, is_macro_root")
         .in("id", parentIds);
-      parents = (parentRows ?? []).map(rowToNode);
+      const parentRows = (parentRowsData ?? []) as NodeRow[];
+      parents = parentRows.map(rowToNode);
     }
 
     const data: TruthNodeWithRelations = {
@@ -121,7 +126,7 @@ export async function fetchMacroRoots(): Promise<MacroRootWithMeta[]> {
   try {
     const supabase = createServerSupabase();
 
-    const { data: rows, error } = await supabase
+    const { data: rowsData, error } = await supabase
       .from("truth_nodes")
       .select("id, author_wallet, content, created_at, is_macro_root")
       .eq("is_macro_root", true)
@@ -129,16 +134,19 @@ export async function fetchMacroRoots(): Promise<MacroRootWithMeta[]> {
       .limit(MACRO_ROOTS_LIMIT);
 
     if (error) return [];
-    if (!rows?.length) return [];
+    type NodeRow = { id: string; author_wallet: string | null; content: string; created_at: string; is_macro_root: boolean };
+    const rows = (rowsData ?? []) as NodeRow[];
+    if (!rows.length) return [];
 
     const nodeIds = rows.map((r) => r.id);
-    const { data: edgeRows } = await supabase
+    const { data: edgeRowsData } = await supabase
       .from("truth_edges")
       .select("source_id")
       .in("source_id", nodeIds);
 
+    const edgeRows = (edgeRowsData ?? []) as { source_id: string }[];
     const countBySource = new Map<string, number>();
-    for (const e of edgeRows ?? []) {
+    for (const e of edgeRows) {
       countBySource.set(e.source_id, (countBySource.get(e.source_id) ?? 0) + 1);
     }
 

@@ -21,7 +21,7 @@ const STEP_SEASON = 2;
 const STEP_REALM = 3;
 const STEP_GENESIS = 4;
 
-const transition = { duration: 0.35, ease: "easeInOut" };
+const transition = { duration: 0.35, ease: "easeInOut" as const };
 
 export function OnboardingFlow() {
   const router = useRouter();
@@ -138,7 +138,7 @@ export function OnboardingFlow() {
                   transition={{
                     duration: 3,
                     repeat: Number.POSITIVE_INFINITY,
-                    ease: "easeInOut",
+                    ease: "easeInOut" as const,
                   }}
                 />
               </button>

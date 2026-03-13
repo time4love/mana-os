@@ -36,6 +36,9 @@ export interface ProposalResourcePlanJson {
   }>;
 }
 
+/** Empty relationships array type for Supabase GenericTable compatibility. */
+type TableRelationships = { foreignKeyName: string; columns: string[]; referencedRelation: string; referencedColumns: string[] }[];
+
 export interface Database {
   public: {
     Tables: {
@@ -61,6 +64,7 @@ export interface Database {
           status?: ProfileStatus;
           created_at?: string;
         };
+        Relationships: TableRelationships;
       };
       proposals: {
         Row: {
@@ -93,6 +97,7 @@ export interface Database {
           created_at?: string;
           oracle_insight?: string | null;
         };
+        Relationships: TableRelationships;
       };
       communities: {
         Row: {
@@ -122,6 +127,7 @@ export interface Database {
           status?: CommunityStatus;
           created_at?: string;
         };
+        Relationships: TableRelationships;
       };
       community_members: {
         Row: {
@@ -134,11 +140,7 @@ export interface Database {
           wallet_address: string;
           joined_at?: string;
         };
-        Update: {
-          community_id?: string;
-          wallet_address?: string;
-          joined_at?: string;
-        };
+        Relationships: TableRelationships;
       };
       os_feature_proposals: {
         Row: {
@@ -168,6 +170,7 @@ export interface Database {
           status?: OsFeatureProposalStatus;
           created_at?: string;
         };
+        Relationships: TableRelationships;
       };
       proposal_upgrades: {
         Row: {
@@ -200,6 +203,7 @@ export interface Database {
           created_at?: string;
           physics_forecast?: PhysicsForecastDeltaJson[] | null;
         };
+        Relationships: TableRelationships;
       };
       seed_discourse: {
         Row: {
@@ -223,6 +227,7 @@ export interface Database {
           wisdom?: string;
           created_at?: string;
         };
+        Relationships: TableRelationships;
       };
       map_pins: {
         Row: {
@@ -255,6 +260,7 @@ export interface Database {
           description?: string;
           created_at?: string;
         };
+        Relationships: TableRelationships;
       };
       truth_nodes: {
         Row: {
@@ -281,6 +287,7 @@ export interface Database {
           created_at?: string;
           is_macro_root?: boolean;
         };
+        Relationships: TableRelationships;
       };
       truth_edges: {
         Row: {
@@ -304,8 +311,10 @@ export interface Database {
           relationship?: "supports" | "challenges" | "ai_analysis";
           created_at?: string;
         };
+        Relationships: TableRelationships;
       };
     };
+    Views: Record<string, { Row: Record<string, unknown>; Relationships: TableRelationships }>;
     Functions: {
       match_truth_nodes: {
         Args: {

@@ -18,9 +18,9 @@ import { Leaf } from "lucide-react";
 const QRCode = dynamic(
   () =>
     import("react-qr-code")
-      .then((m) => m?.default ?? (m as { QRCode?: unknown }).QRCode)
-      .catch(() => null),
-  { ssr: false }
+      .then((m) => m?.default ?? (m as { QRCode?: React.ComponentType<{ value: string; size?: number; level?: string; className?: string }> }).QRCode)
+      .catch(() => ({ default: function QRCodeFallback(): JSX.Element | null { return null; } })),
+  { ssr: false, loading: () => <div className="text-muted-foreground text-sm py-8 text-center">Creating Genesis Anchor QR…</div> }
 );
 
 /** Normalize contract return: getTokenIdsOf returns uint256[] (bigint[]). */

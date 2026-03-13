@@ -1,35 +1,20 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocale } from "@/lib/i18n/context";
-import { proposeTruthNode, attachTruthEdge, anchorPrismDraft } from "@/app/actions/truthWeaver";
-import type { MatchTruthNodeResult, EdgeRelationship, EpistemicPrismResult } from "@/types/truth";
+import { anchorPrismDraft } from "@/app/actions/truthWeaver";
+import type { EdgeRelationship, EpistemicPrismResult } from "@/types/truth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { ClaimEvaluationCard } from "@/components/truth/ClaimEvaluationCard";
+import { ForgeChat } from "@/components/truth/ForgeChat";
 import { Paperclip } from "lucide-react";
-
-const PLACEHOLDER = {
-  he: "שתף הנחת יסוד או מסקנה לוגית…",
-  en: "Share a foundational premise or deduction…",
-};
-
-const ANCHOR_BTN = {
-  he: "עגן למארג",
-  en: "Anchor to the Graph",
-};
 
 /** Attach PDF — solarpunk CTA for Epistemic Prism upload. */
 const ATTACH_PDF = {
   he: "חבר מסמך הגות (PDF)",
   en: "Attach PDF Document",
-};
-
-const ANALYZE_AS_DOC = {
-  he: "נתח כטקסט מסמך",
-  en: "Analyze as document",
 };
 
 /** Serene pulsing loading copy for Prism analysis (no urgency). */
@@ -52,26 +37,6 @@ const ANCHOR_WEAVE_CTA = {
 const THESIS_LABEL = {
   he: "תזת המסמך",
   en: "Document thesis",
-};
-
-const RESONANCE_MESSAGE = {
-  he: "שוזר המשמעויות מזהה הדהוד זהה במארג האמת…",
-  en: "The Semantic Weaver senses structural resonance elsewhere in the graph…",
-};
-
-const ATTACH_EDGE = {
-  he: "חבר את הטיעון שלי כאן",
-  en: "Attach My Edge Here",
-};
-
-const BYPASS_ANCHOR = {
-  he: "הניואנס שלי שונה במהותו — עגן כצומת חדש",
-  en: "My nuance is strictly different, anchor it newly.",
-};
-
-const SIMILARITY_LABEL = {
-  he: "דמיון",
-  en: "Similarity",
 };
 
 /** Serene success note after anchoring prism to the weave. */
@@ -101,86 +66,33 @@ export function TruthWeaverInput({
   const isRtl = locale === "he";
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [content, setContent] = useState("");
-  const [pendingContent, setPendingContent] = useState("");
-  const [loading, setLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [prismAnchoring, setPrismAnchoring] = useState(false);
   const [prismDraft, setPrismDraft] = useState<EpistemicPrismResult | null>(null);
   const [anchorSuccessNote, setAnchorSuccessNote] = useState<string | null>(null);
-  const [matches, setMatches] = useState<MatchTruthNodeResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [attachingId, setAttachingId] = useState<string | null>(null);
+  const [forgeContext, setForgeContext] = useState<{
+    parentId?: string;
+    targetNodeContext?: string;
+  } | null>(null);
   const router = useRouter();
 
-  const placeholder = locale === "he" ? PLACEHOLDER.he : PLACEHOLDER.en;
-  const anchorBtn = locale === "he" ? ANCHOR_BTN.he : ANCHOR_BTN.en;
-  const resonanceMsg = locale === "he" ? RESONANCE_MESSAGE.he : RESONANCE_MESSAGE.en;
-  const attachEdge = locale === "he" ? ATTACH_EDGE.he : ATTACH_EDGE.en;
-  const bypassAnchor = locale === "he" ? BYPASS_ANCHOR.he : BYPASS_ANCHOR.en;
-  const similarityLabel = locale === "he" ? SIMILARITY_LABEL.he : SIMILARITY_LABEL.en;
-
-  async function handleSubmit(forceBypass: boolean) {
-    const text = (forceBypass ? pendingContent : content).trim();
-    if (!text) return;
-
-    setError(null);
-    if (!forceBypass) {
-      setLoading(true);
-      setMatches(null);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("truthForgeContext");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { parentId?: string; targetNodeContext?: string };
+      if (parsed.parentId || parsed.targetNodeContext) {
+        setForgeContext({
+          parentId: parsed.parentId,
+          targetNodeContext: parsed.targetNodeContext,
+        });
+      }
+      sessionStorage.removeItem("truthForgeContext");
+    } catch {
+      // ignore
     }
-
-    const result = await proposeTruthNode(
-      text,
-      authorWallet,
-      parentId,
-      relationship,
-      forceBypass
-    );
-
-    setLoading(false);
-
-    if (result.status === "resonance_found") {
-      setPendingContent(text);
-      setMatches(result.matches);
-      return;
-    }
-
-    if (result.status === "anchored") {
-      setContent("");
-      setPendingContent("");
-      setMatches(null);
-      onAnchored?.(result.nodeId);
-      return;
-    }
-
-    setError(result.error);
-  }
-
-  async function handleAttachHere(matchId: string) {
-    const text = pendingContent.trim();
-    if (!text) return;
-
-    setAttachingId(matchId);
-    setError(null);
-
-    const result = await attachTruthEdge(
-      matchId,
-      text,
-      authorWallet,
-      relationship ?? "supports"
-    );
-
-    setAttachingId(null);
-
-    if (result.success) {
-      setPendingContent("");
-      setMatches(null);
-      onEdgeAttached?.(result.edgeId);
-    } else {
-      setError(result.error);
-    }
-  }
+  }, []);
 
   /** Native fetch to /api/truth/prism (bypasses Server Action size limits). */
   async function handlePrismUpload(file: File) {
@@ -218,36 +130,6 @@ export function TruthWeaverInput({
     await handlePrismUpload(file);
   }
 
-  async function handleAnalyzeTextAsDocument() {
-    const text = content.trim();
-    if (!text) return;
-    setError(null);
-    setPrismDraft(null);
-    setIsAnalyzing(true);
-
-    const formData = new FormData();
-    formData.append("text", text);
-
-    try {
-      const res = await fetch("/api/truth/prism", { method: "POST", body: formData });
-      const json = await res.json();
-
-      if (!res.ok) {
-        setError((json?.error as string) ?? res.statusText);
-        return;
-      }
-      if (json.success && json.data) {
-        setPrismDraft(json.data as EpistemicPrismResult);
-      } else {
-        setError((json?.error as string) ?? "Prism analysis failed");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Analysis failed");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }
-
   async function handleAnchorPrism() {
     if (!prismDraft) return;
     setError(null);
@@ -271,9 +153,8 @@ export function TruthWeaverInput({
     }
   }
 
-  const showInterceptor = matches && matches.length > 0;
   const showPrismPreview = prismDraft && !isAnalyzing;
-  const busy = loading || isAnalyzing || prismAnchoring;
+  const busy = isAnalyzing || prismAnchoring;
 
   return (
     <div
@@ -292,32 +173,21 @@ export function TruthWeaverInput({
       <AnimatePresence mode="wait">
         {!prismDraft ? (
           <motion.div
-            key="input"
+            key="forge-and-pdf"
             initial={{ opacity: 1 }}
             exit={{ opacity: 0, height: 0, overflow: "hidden" }}
             transition={{ duration: 0.25 }}
-            className="flex flex-col gap-2"
+            className="flex flex-col gap-3"
           >
-            <textarea
-              value={showInterceptor ? pendingContent : content}
-              onChange={(e) =>
-                showInterceptor ? setPendingContent(e.target.value) : setContent(e.target.value)
-              }
-              placeholder={placeholder}
-              rows={4}
-              className="w-full resize-y rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-              disabled={busy}
-              aria-label={placeholder}
+            <ForgeChat
+              authorWallet={authorWallet}
+              parentId={forgeContext?.parentId ?? parentId}
+              relationship={relationship}
+              targetNodeContext={forgeContext?.targetNodeContext ?? undefined}
+              onAnchored={onAnchored}
+              onEdgeAttached={onEdgeAttached}
             />
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                onClick={() => handleSubmit(false)}
-                disabled={busy || !content.trim()}
-                className="bg-primary text-primary-foreground shadow-soft hover:opacity-90"
-              >
-                {loading ? (locale === "he" ? "בודק…" : "Checking…") : anchorBtn}
-              </Button>
               <Button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -328,16 +198,6 @@ export function TruthWeaverInput({
                 <Paperclip className="size-4 me-2 shrink-0" aria-hidden />
                 {locale === "he" ? ATTACH_PDF.he : ATTACH_PDF.en}
               </Button>
-              {content.trim().length > 100 && (
-                <Button
-                  type="button"
-                  onClick={handleAnalyzeTextAsDocument}
-                  disabled={busy}
-                  className="border border-border bg-card text-foreground hover:bg-accent"
-                >
-                  {locale === "he" ? ANALYZE_AS_DOC.he : ANALYZE_AS_DOC.en}
-                </Button>
-              )}
             </div>
           </motion.div>
         ) : null}
@@ -439,48 +299,6 @@ export function TruthWeaverInput({
         <p className="text-sm text-destructive" role="alert">
           {error}
         </p>
-      )}
-
-      {showInterceptor && (
-        <div
-          className="rounded-lg border border-border bg-card/80 p-4 shadow-soft"
-          role="status"
-          aria-live="polite"
-        >
-          <p className="mb-3 text-sm text-muted-foreground">{resonanceMsg}</p>
-          <ul className="flex flex-col gap-2">
-            {matches!.map((m) => (
-              <li key={m.id}>
-                <Card className="overflow-hidden border-border bg-background/95 shadow-soft">
-                  <CardContent className="p-4">
-                    <p className="mb-2 text-sm text-foreground">{m.content}</p>
-                    <p className="mb-3 text-xs text-muted-foreground">
-                      {similarityLabel}: {Math.round(m.similarity * 100)}%
-                    </p>
-                    <Button
-                      type="button"
-                      onClick={() => handleAttachHere(m.id)}
-                      disabled={attachingId !== null}
-                      className="border border-primary/50 bg-transparent text-primary hover:bg-primary/10"
-                    >
-                      {attachingId === m.id
-                        ? (locale === "he" ? "מחבר…" : "Attaching…")
-                        : attachEdge}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            onClick={() => handleSubmit(true)}
-            disabled={loading}
-            className="mt-3 text-sm text-primary underline underline-offset-2 hover:no-underline"
-          >
-            {bypassAnchor}
-          </button>
-        </div>
       )}
     </div>
   );

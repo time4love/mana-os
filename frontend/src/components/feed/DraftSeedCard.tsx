@@ -7,7 +7,7 @@ import { ORACLE_SEED_AUTHOR } from "@/lib/oracle/constants";
 import type { PhysicsForecastDeltaJson } from "@/lib/supabase/types";
 import { Leaf } from "lucide-react";
 
-const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] };
+const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] as const };
 
 export interface DraftSeedCardProps {
   proposalId: string;

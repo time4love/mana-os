@@ -9,7 +9,7 @@ import { ORACLE_SEED_AUTHOR } from "@/lib/oracle/constants";
 import type { PhysicsForecastDeltaJson, ProposalUpgradeRow, SeedDiscourseRow } from "@/lib/supabase/types";
 import { ChevronDown, ChevronUp, Radio } from "lucide-react";
 
-const transition = { duration: 0.3, ease: [0.32, 0.72, 0, 1] };
+const transition = { duration: 0.3, ease: [0.32, 0.72, 0, 1] as const };
 
 export interface UpgradeSeedCardProps {
   upgrade: ProposalUpgradeRow;

@@ -75,7 +75,6 @@ export async function POST(request: Request) {
       system: GATEKEEPER_SYSTEM_PROMPT,
       messages: await convertToModelMessages(messages, { tools: gatekeeperTools }),
       tools: gatekeeperTools,
-      maxSteps: 1,
     });
 
     return result.toUIMessageStreamResponse({

@@ -42,25 +42,27 @@ export async function resonateProposal(
 
   try {
     const supabase = createServerSupabase();
+    const payload = {
+      creator_wallet: creatorWallet.toLowerCase(),
+      title: trimmedTitle,
+      description: description?.trim() ?? "",
+      resource_plan: resourcePlan as unknown as Record<string, unknown>,
+      status: "pending_resonance",
+    };
     const { data, error } = await supabase
       .from("proposals")
-      .insert({
-        creator_wallet: creatorWallet.toLowerCase(),
-        title: trimmedTitle,
-        description: description?.trim() ?? "",
-        resource_plan: resourcePlan as unknown as Record<string, unknown>,
-        status: "pending_resonance",
-      })
+      .insert(payload as never)
       .select("id")
       .single();
 
     if (error) {
       return { success: false, error: error.message };
     }
-    if (!data?.id) {
+    const row = data as { id: string } | null;
+    if (!row?.id) {
       return { success: false, error: "Proposal created but no id returned" };
     }
-    return { success: true, id: data.id };
+    return { success: true, id: row.id };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to resonate proposal";
     return { success: false, error: message };
@@ -123,7 +125,7 @@ export async function syncProposalStatusToApproved(
     const supabase = createServerSupabase();
     const { error } = await supabase
       .from("proposals")
-      .update({ status: "approved" })
+      .update({ status: "approved" } as never)
       .eq("id", proposalId);
     if (error) return { success: false, error: error.message };
     return { success: true, updated: true };

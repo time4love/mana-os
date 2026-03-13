@@ -159,7 +159,7 @@ export default function MapPage() {
         className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1100] pointer-events-auto"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+        transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] as const }}
       >
         <button
           type="button"

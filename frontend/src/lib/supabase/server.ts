@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 
 /**
@@ -6,7 +6,7 @@ import type { Database } from "@/lib/supabase/types";
  * for profiles (e.g. anchor Soul Contract). Writes run on the server, so the key
  * is not exposed to the client. No service role required.
  */
-export function createServerSupabase() {
+export function createServerSupabase(): SupabaseClient<Database> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseAnonKey) {

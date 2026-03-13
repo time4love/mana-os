@@ -8,7 +8,7 @@ import type { ProposalRow } from "@/lib/supabase/types";
 import { LivingProposal } from "@/components/proposals/LivingProposal";
 import { CodexSheet } from "@/components/ui/CodexSheet";
 
-const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] };
+const transition = { duration: 0.35, ease: [0.32, 0.72, 0, 1] as const };
 
 export default function FeedPage() {
   const { locale, tProposals } = useLocale();
@@ -116,7 +116,7 @@ export default function FeedPage() {
                 key={proposal.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05, ...transition }}
+                transition={{ delay: index * 0.05, duration: 0.35, ease: [0.32, 0.72, 0, 1] as const }}
               >
                 <LivingProposal
                   proposal={proposal}

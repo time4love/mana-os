@@ -22,13 +22,14 @@ export function useProfileGuard() {
       return;
     }
 
+    const validAddress: string = address;
     const isOnOnboarding = pathname?.startsWith("/onboarding");
     if (isOnOnboarding) return;
 
     let cancelled = false;
 
     async function checkAndRedirect() {
-      const result = await getProfileByWallet(address);
+      const result = await getProfileByWallet(validAddress);
       if (cancelled) return;
       if (!result.success) return;
       const profile = result.profile;

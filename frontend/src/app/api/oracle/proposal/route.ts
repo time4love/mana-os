@@ -120,7 +120,6 @@ ${languageHint}`;
       system: systemPrompt,
       messages: await convertToModelMessages(messages, { tools: proposalTools }),
       tools: proposalTools,
-      maxSteps: 5, // Allow text + tool call in same response (e.g. draft_oracle_seed)
     });
 
     return result.toUIMessageStreamResponse({
