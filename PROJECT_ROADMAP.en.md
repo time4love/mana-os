@@ -98,6 +98,7 @@ This flow ensures that every component—Socratic Oracle, DAO, Callings Board, a
 - [ ] **Localized Epistemic Windows:** Develop isolated context payloads preventing cross-pollution into main nodes until `Context Bubbling` commits resolved propositions.
 - [ ] **Background Memory Consolidation Worker:** Architect an async CRON workflow instructing the Gemini 1.5 core via tree-traversal API to condense noise into `Refined Thought Trajectory` records stored via pgvector, not needing active response generation overhead on chat execution logic, serving to reset stale tokens.
 - [ ] **LLM-As-A-Judge Sync Verification:** Tool testing condensed graph structures post consolidation checking unparsed logic/debunk loss before applying strictly.
+- [ ] **Multi-Agent Flow Refactoring:** Deprecate single-prompt AI calls for large documents. Adopt Agentic pipelining mapping array inputs asynchronously against: The Sieve, The Matcher, The Logician, and The Scout before batching for human visual approval on UI and finalizing Postgres relations.
 
 ### 🔮 Phase 11: The Council of Elders (Multi-Agent Swarm & Co-Governance)
 - [ ] **Multi-Agent Architecture:** Upgrading the Oracle from a single LLM to an Agentic Workflow where specialized AI entities debate backend before responding.

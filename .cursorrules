@@ -52,6 +52,9 @@ CRITICAL: The system MUST support multiple natural languages from Day 1, with fl
 - **AI/Logic**: Vercel AI SDK, OpenAI/Anthropic APIs (structured JSON outputs).
 - **DB**: Supabase (PostgreSQL + pgvector).
 
+## 🔧 Backend & Architecture Guidelines
+- **AGENTIC SWARM PATTERN:** Never rely on a single massive Zero-Shot LLM prompt for highly complex Epistemic / AI operations. Code workflows must utilize specialized micro-agents piped together (An Orchestrator sending jobs to 'Extractor', 'Logician', and 'Challenger' utility functions in parallel via `Promise.all()`). Always implement Semantic matching (Vector PGVector calls) strictly BETWEEN the extraction agent and logic evaluation agent to instantly deduplicate thought structures and save processing tokens.
+
 ## 🧼 Clean Code & Engineering Standards (CRITICAL)
 You must write production-grade, enterprise-level code following Clean Code and SOLID principles:
 1. **Single Responsibility Principle (SRP)**: Components, functions, and smart contracts must do ONE thing perfectly. Keep files small and focused.

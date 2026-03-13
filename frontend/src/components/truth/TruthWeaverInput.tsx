@@ -3,8 +3,8 @@
 import { useState, useRef } from "react";
 import { useLocale } from "@/lib/i18n/context";
 import { proposeTruthNode, attachTruthEdge, anchorPrismToGraph } from "@/app/actions/truthWeaver";
-import { ingestDocumentAsPrism } from "@/app/actions/prismIngestion";
 import type { MatchTruthNodeResult, EdgeRelationship, EpistemicPrismResult } from "@/types/truth";
+import type { IngestPrismResult } from "@/app/actions/prismIngestion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Paperclip } from "lucide-react";
@@ -175,6 +175,19 @@ export function TruthWeaverInput({
     }
   }
 
+  /** Uses API route to avoid 1 MB Server Action body limit (multipart/form-data). */
+  async function ingestPrismViaApi(formData: FormData): Promise<IngestPrismResult> {
+    const res = await fetch("/api/truth/ingest-prism", {
+      method: "POST",
+      body: formData,
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return { success: false, error: json?.error ?? res.statusText };
+    }
+    return json as IngestPrismResult;
+  }
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -185,7 +198,7 @@ export function TruthWeaverInput({
     const formData = new FormData();
     formData.set("document", file);
 
-    const result = await ingestDocumentAsPrism(formData);
+    const result = await ingestPrismViaApi(formData);
     setPrismLoading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
 
@@ -206,7 +219,7 @@ export function TruthWeaverInput({
     const formData = new FormData();
     formData.set("text", text);
 
-    const result = await ingestDocumentAsPrism(formData);
+    const result = await ingestPrismViaApi(formData);
     setPrismLoading(false);
 
     if (result.success) {

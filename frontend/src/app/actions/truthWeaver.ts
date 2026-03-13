@@ -29,6 +29,11 @@ export type ProposeTruthNodeResult =
   | { status: "anchored"; nodeId: string }
   | { status: "error"; error: string };
 
+function toErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 /**
  * Proposes a truth node: generates embedding, runs semantic deduplication via
  * match_truth_nodes, and either returns existing matches or inserts the node (and optional edge).
@@ -40,6 +45,7 @@ export async function proposeTruthNode(
   relationship?: EdgeRelationship,
   forceBypass?: boolean
 ): Promise<ProposeTruthNodeResult> {
+  try {
   const parsed = ProposeTruthNodeParamsSchema.safeParse({
     content: content?.trim(),
     authorWallet: authorWallet?.trim(),
@@ -126,6 +132,9 @@ export async function proposeTruthNode(
   }
 
   return { status: "anchored", nodeId: newNode.id };
+  } catch (err) {
+    return { status: "error", error: toErrorMessage(err) || "An error occurred" };
+  }
 }
 
 /** Attach the current user's premise as an edge to an existing node (no new node). */
@@ -150,77 +159,76 @@ export async function attachTruthEdge(
   authorWallet: string,
   relationship: EdgeRelationship
 ): Promise<AttachTruthEdgeResult> {
-  const parsed = AttachEdgeParamsSchema.safeParse({
-    sourceId,
-    targetContent: targetContent?.trim(),
-    authorWallet: authorWallet?.trim(),
-    relationship,
-  });
-
-  if (!parsed.success) {
-    return {
-      success: false,
-      error: parsed.error.errors.map((e) => e.message).join("; "),
-    };
-  }
-
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return { success: false, error: "OpenAI API key not configured" };
-  }
-
-  const openai = createOpenAI({ apiKey });
-  const embeddingModel = openai.embeddingModel("text-embedding-3-small");
-
-  let embedding: number[];
   try {
+    const parsed = AttachEdgeParamsSchema.safeParse({
+      sourceId,
+      targetContent: targetContent?.trim(),
+      authorWallet: authorWallet?.trim(),
+      relationship,
+    });
+
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.errors.map((e) => e.message).join("; "),
+      };
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return { success: false, error: "OpenAI API key not configured" };
+    }
+
+    const openai = createOpenAI({ apiKey });
+    const embeddingModel = openai.embeddingModel("text-embedding-3-small");
+
+    let embedding: number[];
     const result = await embed({
       model: embeddingModel,
       value: parsed.data.targetContent,
     });
     embedding = Array.from(result.embedding);
+
+    const supabase = createServerSupabase();
+
+    const { data: newNode, error: insertNodeError } = await supabase
+      .from("truth_nodes")
+      .insert({
+        author_wallet: parsed.data.authorWallet.toLowerCase(),
+        content: parsed.data.targetContent,
+        embedding,
+      })
+      .select("id")
+      .single();
+
+    if (insertNodeError || !newNode?.id) {
+      return {
+        success: false,
+        error: insertNodeError?.message ?? "Failed to create truth node",
+      };
+    }
+
+    const { data: newEdge, error: edgeError } = await supabase
+      .from("truth_edges")
+      .insert({
+        source_id: parsed.data.sourceId,
+        target_id: newNode.id,
+        relationship: parsed.data.relationship as EdgeRelationship,
+      })
+      .select("id")
+      .single();
+
+    if (edgeError || !newEdge?.id) {
+      return {
+        success: false,
+        error: edgeError?.message ?? "Failed to create edge",
+      };
+    }
+
+    return { success: true, edgeId: newEdge.id };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Embedding failed";
-    return { success: false, error: message };
+    return { success: false, error: toErrorMessage(err) || "An error occurred" };
   }
-
-  const supabase = createServerSupabase();
-
-  const { data: newNode, error: insertNodeError } = await supabase
-    .from("truth_nodes")
-    .insert({
-      author_wallet: parsed.data.authorWallet.toLowerCase(),
-      content: parsed.data.targetContent,
-      embedding,
-    })
-    .select("id")
-    .single();
-
-  if (insertNodeError || !newNode?.id) {
-    return {
-      success: false,
-      error: insertNodeError?.message ?? "Failed to create truth node",
-    };
-  }
-
-  const { data: newEdge, error: edgeError } = await supabase
-    .from("truth_edges")
-    .insert({
-      source_id: parsed.data.sourceId,
-      target_id: newNode.id,
-      relationship: parsed.data.relationship as EdgeRelationship,
-    })
-    .select("id")
-    .single();
-
-  if (edgeError || !newEdge?.id) {
-    return {
-      success: false,
-      error: edgeError?.message ?? "Failed to create edge",
-    };
-  }
-
-  return { success: true, edgeId: newEdge.id };
 }
 
 // ---------------------------------------------------------------------------
@@ -260,32 +268,32 @@ export async function anchorPrismToGraph(
     challengePrompt: string;
   }>
 ): Promise<AnchorPrismResult> {
-  const parsed = AnchorPrismParamsSchema.safeParse({
-    authorWallet: authorWallet?.trim(),
-    documentThesis: documentThesis?.trim(),
-    extractedClaims: extractedClaims ?? [],
-  });
-
-  if (!parsed.success) {
-    return {
-      success: false,
-      error: parsed.error.errors.map((e) => e.message).join("; "),
-    };
-  }
-
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return { success: false, error: "OpenAI API key not configured" };
-  }
-
-  const openai = createOpenAI({ apiKey });
-  const embeddingModel = openai.embeddingModel("text-embedding-3-small");
-  const supabase = createServerSupabase();
-  const wallet = parsed.data.authorWallet.toLowerCase();
-
-  let thesisId: string;
-
   try {
+    const parsed = AnchorPrismParamsSchema.safeParse({
+      authorWallet: authorWallet?.trim(),
+      documentThesis: documentThesis?.trim(),
+      extractedClaims: extractedClaims ?? [],
+    });
+
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.errors.map((e) => e.message).join("; "),
+      };
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return { success: false, error: "OpenAI API key not configured" };
+    }
+
+    const openai = createOpenAI({ apiKey });
+    const embeddingModel = openai.embeddingModel("text-embedding-3-small");
+    const supabase = createServerSupabase();
+    const wallet = parsed.data.authorWallet.toLowerCase();
+
+    let thesisId: string;
+
     const thesisEmbedResult = await embed({
       model: embeddingModel,
       value: parsed.data.documentThesis,
@@ -309,47 +317,46 @@ export async function anchorPrismToGraph(
       };
     }
     thesisId = thesisRow.id;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Embedding failed";
-    return { success: false, error: message };
-  }
 
-  let claimsAnchored = 0;
-  for (const claim of parsed.data.extractedClaims) {
-    const claimContent = `${claim.assertion}\n[Score: ${claim.logicalCoherenceScore}] ${claim.reasoning}`;
-    try {
-      const claimEmbedResult = await embed({
-        model: embeddingModel,
-        value: claimContent.slice(0, 8000),
-      });
-      const claimEmbedding = Array.from(claimEmbedResult.embedding);
+    let claimsAnchored = 0;
+    for (const claim of parsed.data.extractedClaims) {
+      const claimContent = `${claim.assertion}\n[Score: ${claim.logicalCoherenceScore}] ${claim.reasoning}`;
+      try {
+        const claimEmbedResult = await embed({
+          model: embeddingModel,
+          value: claimContent.slice(0, 8000),
+        });
+        const claimEmbedding = Array.from(claimEmbedResult.embedding);
 
-      const { data: claimRow, error: claimError } = await supabase
-        .from("truth_nodes")
-        .insert({
-          author_wallet: wallet,
-          content: claimContent,
-          embedding: claimEmbedding,
-        })
-        .select("id")
-        .single();
+        const { data: claimRow, error: claimError } = await supabase
+          .from("truth_nodes")
+          .insert({
+            author_wallet: wallet,
+            content: claimContent,
+            embedding: claimEmbedding,
+          })
+          .select("id")
+          .single();
 
-      if (claimError || !claimRow?.id) continue;
+        if (claimError || !claimRow?.id) continue;
 
-      await supabase.from("truth_edges").insert({
-        source_id: thesisId,
-        target_id: claimRow.id,
-        relationship: "ai_analysis",
-      });
-      claimsAnchored += 1;
-    } catch {
-      // Skip this claim on embed/insert failure
+        await supabase.from("truth_edges").insert({
+          source_id: thesisId,
+          target_id: claimRow.id,
+          relationship: "ai_analysis",
+        });
+        claimsAnchored += 1;
+      } catch {
+        // Skip this claim on embed/insert failure
+      }
     }
-  }
 
-  return {
-    success: true,
-    thesisNodeId: thesisId,
-    claimsAnchored,
-  };
+    return {
+      success: true,
+      thesisNodeId: thesisId,
+      claimsAnchored,
+    };
+  } catch (err) {
+    return { success: false, error: toErrorMessage(err) || "An error occurred" };
+  }
 }

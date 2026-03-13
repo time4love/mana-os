@@ -88,7 +88,7 @@ We use a modern, developer-friendly Monorepo:
 *   **Framework:** Next.js (App Router), React, TypeScript.
 *   **Styling:** TailwindCSS (Logical Properties ONLY) + shadcn/ui.
 *   **Web3 Integration:** Wagmi, Viem.
-*   **AI:** Vercel AI SDK + OpenAI/Anthropic APIs.
+*   **AI:** Vercel AI SDK + OpenAI/Anthropic APIs. **Multi-Agent Systems & Swarm Workflows** for the Epistemic Prism and Truth Engine: specialized agents (Extractor, Matcher, Logician, Scout) orchestrated via Next.js and Vercel AI for high-fidelity cognitive pipelines.
 *   **Off-chain DB:** Supabase (PostgreSQL + pgvector).
 
 ### `Smart Contracts`
