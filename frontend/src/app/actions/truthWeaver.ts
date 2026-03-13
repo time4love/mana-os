@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { embed } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
@@ -8,6 +9,7 @@ import type { EdgeRelationship } from "@/types/truth";
 import {
   isEdgeRelationship,
   type MatchTruthNodeResult,
+  type EpistemicPrismResult,
 } from "@/types/truth";
 
 const MATCH_THRESHOLD = 0.85;
@@ -106,6 +108,7 @@ export async function proposeTruthNode(
       author_wallet: wallet.toLowerCase(),
       content: trimmedContent,
       embedding,
+      is_macro_root: !parent,
     })
     .select("id")
     .single();
@@ -197,6 +200,7 @@ export async function attachTruthEdge(
         author_wallet: parsed.data.authorWallet.toLowerCase(),
         content: parsed.data.targetContent,
         embedding,
+        is_macro_root: false,
       })
       .select("id")
       .single();
@@ -306,6 +310,7 @@ export async function anchorPrismToGraph(
         author_wallet: wallet,
         content: parsed.data.documentThesis,
         embedding: thesisEmbedding,
+        is_macro_root: true,
       })
       .select("id")
       .single();
@@ -334,6 +339,7 @@ export async function anchorPrismToGraph(
             author_wallet: wallet,
             content: claimContent,
             embedding: claimEmbedding,
+            is_macro_root: false,
           })
           .select("id")
           .single();
@@ -355,6 +361,158 @@ export async function anchorPrismToGraph(
       success: true,
       thesisNodeId: thesisId,
       claimsAnchored,
+    };
+  } catch (err) {
+    return { success: false, error: toErrorMessage(err) || "An error occurred" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bulk DAG injector — Prism draft → thesis node + claim nodes + supports edges
+// ---------------------------------------------------------------------------
+
+const AnchorPrismDraftSchema = z.object({
+  authorWallet: z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Invalid wallet address"),
+  documentThesis: z.string().min(1).max(50000),
+  extractedClaims: z.array(
+    z.object({
+      assertion: z.string(),
+      logicalCoherenceScore: z.number(),
+      reasoning: z.string(),
+      hiddenAssumptions: z.array(z.string()),
+      challengePrompt: z.string(),
+    })
+  ).max(50),
+});
+
+/** Formats a single claim for storage in truth_nodes (Logician + Scout). */
+function formatClaimContent(claim: {
+  assertion: string;
+  logicalCoherenceScore: number;
+  reasoning: string;
+  hiddenAssumptions: string[];
+  challengePrompt: string;
+}): string {
+  const assumptions = claim.hiddenAssumptions?.length
+    ? claim.hiddenAssumptions.join(", ")
+    : "—";
+  return `Content: ${claim.assertion}\n\n[Logician's Pulse: ${claim.logicalCoherenceScore}/100]\nRationale: ${claim.reasoning}\n\n[The Scout's Edge] Hidden Assumptions: ${assumptions}\nFalsification Prompt: ${claim.challengePrompt}`;
+}
+
+/**
+ * Saves a full Epistemic Prism draft to the DAG: thesis as root node, each claim
+ * as a child node, and bulk edges with relationship "supports".
+ */
+export async function anchorPrismDraft(
+  prismResult: EpistemicPrismResult,
+  authorWallet: string
+): Promise<AnchorPrismResult> {
+  try {
+    const parsed = AnchorPrismDraftSchema.safeParse({
+      authorWallet: authorWallet?.trim(),
+      documentThesis: prismResult?.documentThesis?.trim() ?? "",
+      extractedClaims: prismResult?.extractedClaims ?? [],
+    });
+
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.errors.map((e) => e.message).join("; "),
+      };
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return { success: false, error: "OpenAI API key not configured" };
+    }
+
+    const openai = createOpenAI({ apiKey });
+    const embeddingModel = openai.embeddingModel("text-embedding-3-small");
+    const supabase = createServerSupabase();
+    const wallet = parsed.data.authorWallet.toLowerCase();
+
+    // Step A: Insert thesis node with embedding
+    let thesisEmbedding: number[];
+    try {
+      const thesisEmbedResult = await embed({
+        model: embeddingModel,
+        value: parsed.data.documentThesis,
+      });
+      thesisEmbedding = Array.from(thesisEmbedResult.embedding);
+    } catch (err) {
+      return { success: false, error: toErrorMessage(err) || "Thesis embedding failed" };
+    }
+
+    const { data: thesisRow, error: thesisError } = await supabase
+      .from("truth_nodes")
+      .insert({
+        author_wallet: wallet,
+        content: parsed.data.documentThesis,
+        embedding: thesisEmbedding,
+        is_macro_root: true,
+      })
+      .select("id")
+      .single();
+
+    if (thesisError || !thesisRow?.id) {
+      return {
+        success: false,
+        error: thesisError?.message ?? "Failed to create thesis node",
+      };
+    }
+    const thesisNodeId = thesisRow.id;
+
+    // Step B & C: Format each claim, embed, insert as child nodes, collect IDs
+    const childIds: string[] = [];
+    for (const claim of parsed.data.extractedClaims) {
+      try {
+        const content = formatClaimContent(claim);
+        const claimEmbedResult = await embed({
+          model: embeddingModel,
+          value: content.slice(0, 8000),
+        });
+        const claimEmbedding = Array.from(claimEmbedResult.embedding);
+
+        const { data: claimRow, error: claimError } = await supabase
+          .from("truth_nodes")
+          .insert({
+            author_wallet: wallet,
+            content,
+            embedding: claimEmbedding,
+            is_macro_root: false,
+          })
+          .select("id")
+          .single();
+
+        if (claimError || !claimRow?.id) continue;
+        childIds.push(claimRow.id);
+      } catch {
+        // Skip this claim on embed/insert failure; continue with others
+      }
+    }
+
+    // Step D: Bulk insert edges (thesis → each claim, relationship: supports)
+    if (childIds.length > 0) {
+      const edges = childIds.map((target_id) => ({
+        source_id: thesisNodeId,
+        target_id,
+        relationship: "supports" as const,
+      }));
+      const { error: edgesError } = await supabase.from("truth_edges").insert(edges);
+      if (edgesError) {
+        return {
+          success: false,
+          error: `Nodes created but edges failed: ${edgesError.message}`,
+        };
+      }
+    }
+
+    revalidatePath("/truth");
+
+    return {
+      success: true,
+      thesisNodeId,
+      claimsAnchored: childIds.length,
     };
   } catch (err) {
     return { success: false, error: toErrorMessage(err) || "An error occurred" };

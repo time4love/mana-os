@@ -63,7 +63,7 @@ export async function runPrismOnSourceText(sourceText: string): Promise<IngestPr
       return { success: false, error: "Document or text too short to analyze" };
     }
 
-    const model = google("gemini-1.5-pro-latest");
+    const model = google("gemini-2.5-pro");
 
     const { object } = await generateObject({
       model,

@@ -263,6 +263,7 @@ export interface Database {
           content: string;
           embedding: number[] | null;
           created_at: string;
+          is_macro_root: boolean;
         };
         Insert: {
           id?: string;
@@ -270,6 +271,7 @@ export interface Database {
           content: string;
           embedding?: number[] | null;
           created_at?: string;
+          is_macro_root?: boolean;
         };
         Update: {
           id?: string;
@@ -277,6 +279,7 @@ export interface Database {
           content?: string;
           embedding?: number[] | null;
           created_at?: string;
+          is_macro_root?: boolean;
         };
       };
       truth_edges: {

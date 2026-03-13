@@ -49,6 +49,8 @@ export interface TruthNode {
   embedding: TruthEmbedding | null;
   /** Insert time (UTC). */
   created_at: string;
+  /** True for document theses and standalone premises (hub entry points); false for sub-claims. */
+  is_macro_root?: boolean;
 }
 
 /** Input shape when inserting a node (id and created_at are generated). */
@@ -58,7 +60,7 @@ export type TruthNodeInsert = Omit<TruthNode, "id" | "created_at"> & {
 };
 
 /** Shape when updating a node (partial; e.g. setting embedding after compute). */
-export type TruthNodeUpdate = Partial<Pick<TruthNode, "content" | "embedding" | "author_wallet">>;
+export type TruthNodeUpdate = Partial<Pick<TruthNode, "content" | "embedding" | "author_wallet" | "is_macro_root">>;
 
 // ---------------------------------------------------------------------------
 // TruthEdge — DAG edge (table: public.truth_edges)
@@ -110,4 +112,28 @@ export interface ExtractedClaim {
 export interface EpistemicPrismResult {
   documentThesis: string;
   extractedClaims: ExtractedClaim[];
+}
+
+// ---------------------------------------------------------------------------
+// Graph traversal — node with children and parents (Endless Dive)
+// ---------------------------------------------------------------------------
+
+/** Child nodes grouped by edge relationship for a single focal node. */
+export interface ChildrenByRelationship {
+  supports: TruthNode[];
+  challenges: TruthNode[];
+  ai_analysis: TruthNode[];
+}
+
+/** Focal node plus its relational layer for viewport rendering. */
+export interface TruthNodeWithRelations {
+  node: TruthNode;
+  childrenByRelationship: ChildrenByRelationship;
+  parents: TruthNode[];
+}
+
+/** Macro root node with claim count for hub portals ("Dismantled to n claims"). */
+export interface MacroRootWithMeta {
+  node: TruthNode;
+  claimsCount: number;
 }
