@@ -1,20 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, ArrowUp, PlusCircle } from "lucide-react";
+import { ChevronRight, ArrowUp, PlusCircle, MessageCirclePlus } from "lucide-react";
+import { useAccount } from "wagmi";
 import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent, truncateAssertion } from "@/lib/utils/truthParser";
 import { Button } from "@/components/ui/button";
+import { ForgeSheet, type ForgeSheetMode } from "@/components/truth/ForgeSheet";
 import type { TruthNodeWithRelations, TruthNode } from "@/types/truth";
 
-const FORGE_ENTRY = {
-  he: "הוסף אתגר או תמיכה",
-  en: "Add a challenge or support",
+const ADD_SUPPORT = {
+  he: "הוסף תמיכה",
+  en: "Add Support",
 };
 
-const STORAGE_KEY = "truthForgeContext";
+const ADD_CHALLENGE = {
+  he: "הוסף אתגר",
+  en: "Add Challenge",
+};
 
 const CHILD_ASSERTION_MAX_LEN = 180;
 
@@ -159,22 +164,18 @@ function ChildCard({
 
 export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
   const { locale } = useLocale();
-  const router = useRouter();
+  const { address } = useAccount();
   const isRtl = locale === "he";
   const { node, childrenByRelationship, parents } = data;
   const firstParent = parents[0] ?? null;
   const focalAssertion = parseNodeContent(node.content).assertion || node.content.slice(0, 500);
 
-  function openForgeWithContext() {
-    try {
-      sessionStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ parentId: node.id, targetNodeContext: focalAssertion })
-      );
-    } catch {
-      // ignore
-    }
-    router.push("/truth");
+  const [forgeOpen, setForgeOpen] = useState(false);
+  const [forgeMode, setForgeMode] = useState<ForgeSheetMode>("support");
+
+  function openForge(mode: "challenge" | "support") {
+    setForgeMode(mode);
+    setForgeOpen(true);
   }
 
   const hasChildren =
@@ -218,23 +219,49 @@ export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
         {/* Core pivot: central node — parsed assertion, pulse bar, rationale, scout */}
         <FocalPivot content={node.content} />
 
-        {/* Epistemic Forge entry: add challenge or support (navigate to hub with context) */}
-        <motion.section
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="rounded-xl border border-border bg-card/60 p-4 shadow-soft"
-        >
-          <Button
-            type="button"
-            variant="outline"
-            onClick={openForgeWithContext}
-            className="w-full sm:w-auto border-primary/40 text-primary hover:bg-primary/10"
+        {/* Epistemic Forge: Add Support / Add Challenge open the drawer; columns stay in place, sheet overlays */}
+        {address && (
+          <motion.section
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="rounded-xl border border-border bg-card/60 p-4 shadow-soft"
           >
-            <PlusCircle className="size-4 me-2 shrink-0" aria-hidden />
-            {locale === "he" ? FORGE_ENTRY.he : FORGE_ENTRY.en}
-          </Button>
-        </motion.section>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => openForge("support")}
+                className="border-primary/40 text-primary hover:bg-primary/10"
+              >
+                <PlusCircle className="size-4 me-2 shrink-0" aria-hidden />
+                {locale === "he" ? ADD_SUPPORT.he : ADD_SUPPORT.en}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => openForge("challenge")}
+                className="border-amber-500/50 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+              >
+                <MessageCirclePlus className="size-4 me-2 shrink-0" aria-hidden />
+                {locale === "he" ? ADD_CHALLENGE.he : ADD_CHALLENGE.en}
+              </Button>
+            </div>
+          </motion.section>
+        )}
+
+        {address && (
+          <ForgeSheet
+            isOpen={forgeOpen}
+            onOpenChange={setForgeOpen}
+            targetNodeContext={focalAssertion}
+            mode={forgeMode}
+            authorWallet={address}
+            parentId={node.id}
+            relationship={forgeMode === "challenge" ? "challenges" : "supports"}
+            onAnchored={() => setForgeOpen(false)}
+          />
+        )}
 
         {/* Categorical horizons: pillars & frictions */}
         {hasChildren && (

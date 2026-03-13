@@ -6,6 +6,7 @@ import { useAccount } from "wagmi";
 import { motion } from "framer-motion";
 import { useLocale } from "@/lib/i18n/context";
 import { TruthWeaverInput } from "@/components/truth/TruthWeaverInput";
+import { ForgeSheet } from "@/components/truth/ForgeSheet";
 import { parseNodeContent, truncateAssertion } from "@/lib/utils/truthParser";
 import type { MacroRootWithMeta } from "@/types/truth";
 
@@ -47,6 +48,11 @@ const SEARCH_PLACEHOLDER = {
   en: "Ask the Semantic Weave…",
 };
 
+const INITIATE_ROOT = {
+  he: "יזום הנחת יסוד במארג…",
+  en: "Initiate Foundational Root…",
+};
+
 const TAB_RECENT = {
   he: "אדוות אחרונות",
   en: "Recent Horizons",
@@ -71,6 +77,7 @@ export function TruthHub({ macroRoots }: TruthHubProps) {
   const { address } = useAccount();
   const [activeTab, setActiveTab] = useState<TabId>("recent");
   const [searchQuery, setSearchQuery] = useState("");
+  const [forgeSheetOpen, setForgeSheetOpen] = useState(false);
 
   const title = locale === "he" ? TITLE.he : TITLE.en;
   const subtitle = locale === "he" ? SUBTITLE.he : SUBTITLE.en;
@@ -78,6 +85,7 @@ export function TruthHub({ macroRoots }: TruthHubProps) {
   const portalsHeading = locale === "he" ? PORTALS_HEADING.he : PORTALS_HEADING.en;
   const readPremise = locale === "he" ? READ_PREMISE.he : READ_PREMISE.en;
   const searchPlaceholder = locale === "he" ? SEARCH_PLACEHOLDER.he : SEARCH_PLACEHOLDER.en;
+  const initiateRootLabel = locale === "he" ? INITIATE_ROOT.he : INITIATE_ROOT.en;
   const tabRecent = locale === "he" ? TAB_RECENT.he : TAB_RECENT.en;
   const tabFires = locale === "he" ? TAB_FIRES.he : TAB_FIRES.en;
 
@@ -125,7 +133,7 @@ export function TruthHub({ macroRoots }: TruthHubProps) {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...TRANSITION, delay: STAGGER * 1.5 }}
-          className="w-full"
+          className="w-full space-y-3"
           aria-label="Search the weave"
         >
           <input
@@ -136,24 +144,39 @@ export function TruthHub({ macroRoots }: TruthHubProps) {
             className="w-full rounded-xl border border-border bg-card/80 px-4 py-3 text-foreground placeholder:text-muted-foreground shadow-soft focus:outline-none focus:ring-2 focus:ring-primary/30"
             aria-label={searchPlaceholder}
           />
+          {address && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setForgeSheetOpen(true)}
+                className="inline-flex items-center justify-center rounded-xl border border-primary/40 bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                aria-label={initiateRootLabel}
+              >
+                {initiateRootLabel}
+              </button>
+              <TruthWeaverInput
+                authorWallet={address}
+                variant="pdf-only"
+                onAnchored={() => {}}
+                onEdgeAttached={() => {}}
+                className="inline"
+              />
+            </div>
+          )}
         </motion.section>
 
         {address ? (
-          <motion.section
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...TRANSITION, delay: STAGGER * 2 }}
-            className="flex flex-col items-center"
-          >
-            <div className="w-full max-w-2xl">
-              <TruthWeaverInput
-                authorWallet={address}
-                onAnchored={() => {}}
-                onEdgeAttached={() => {}}
-              />
-            </div>
-          </motion.section>
-        ) : (
+          <ForgeSheet
+            isOpen={forgeSheetOpen}
+            onOpenChange={setForgeSheetOpen}
+            targetNodeContext={null}
+            mode="root"
+            authorWallet={address}
+            onAnchored={() => setForgeSheetOpen(false)}
+          />
+        ) : null}
+
+        {!address && (
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

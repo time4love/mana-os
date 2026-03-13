@@ -45,12 +45,16 @@ const ANCHOR_SUCCESS_NOTE = {
   en: "Truth frameworks anchored in the weave.",
 };
 
+export type TruthWeaverInputVariant = "full" | "pdf-only";
+
 interface TruthWeaverInputProps {
   authorWallet: string;
   parentId?: string;
   relationship?: EdgeRelationship;
   onAnchored?: (nodeId: string) => void;
   onEdgeAttached?: (edgeId: string) => void;
+  /** When "pdf-only", only the Attach PDF / Prism pipeline is shown (no Forge chat). Used when Forge lives in ForgeSheet. */
+  variant?: TruthWeaverInputVariant;
   className?: string;
 }
 
@@ -60,6 +64,7 @@ export function TruthWeaverInput({
   relationship,
   onAnchored,
   onEdgeAttached,
+  variant = "full",
   className = "",
 }: TruthWeaverInputProps) {
   const { locale } = useLocale();
@@ -77,7 +82,10 @@ export function TruthWeaverInput({
   } | null>(null);
   const router = useRouter();
 
+  const isPdfOnly = variant === "pdf-only";
+
   useEffect(() => {
+    if (isPdfOnly) return;
     try {
       const raw = sessionStorage.getItem("truthForgeContext");
       if (!raw) return;
@@ -92,7 +100,7 @@ export function TruthWeaverInput({
     } catch {
       // ignore
     }
-  }, []);
+  }, [isPdfOnly]);
 
   /** Native fetch to /api/truth/prism (bypasses Server Action size limits). */
   async function handlePrismUpload(file: File) {
@@ -170,38 +178,56 @@ export function TruthWeaverInput({
         aria-hidden
       />
 
-      <AnimatePresence mode="wait">
-        {!prismDraft ? (
-          <motion.div
-            key="forge-and-pdf"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0, height: 0, overflow: "hidden" }}
-            transition={{ duration: 0.25 }}
-            className="flex flex-col gap-3"
+      {!isPdfOnly && (
+        <AnimatePresence mode="wait">
+          {!prismDraft ? (
+            <motion.div
+              key="forge-and-pdf"
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0, height: 0, overflow: "hidden" }}
+              transition={{ duration: 0.25 }}
+              className="flex flex-col gap-3"
+            >
+              <ForgeChat
+                authorWallet={authorWallet}
+                parentId={forgeContext?.parentId ?? parentId}
+                relationship={relationship}
+                targetNodeContext={forgeContext?.targetNodeContext ?? undefined}
+                onAnchored={onAnchored}
+                onEdgeAttached={onEdgeAttached}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={busy}
+                  className="border border-border bg-card text-foreground hover:bg-accent ring-2 ring-primary/20 ring-offset-2 ring-offset-background hover:ring-primary/40 transition-shadow shadow-soft"
+                  aria-label={locale === "he" ? ATTACH_PDF.he : ATTACH_PDF.en}
+                >
+                  <Paperclip className="size-4 me-2 shrink-0" aria-hidden />
+                  {locale === "he" ? ATTACH_PDF.he : ATTACH_PDF.en}
+                </Button>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      )}
+
+      {isPdfOnly && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={busy}
+            variant="outline"
+            className="border border-border bg-card text-foreground hover:bg-accent shadow-soft"
+            aria-label={locale === "he" ? ATTACH_PDF.he : ATTACH_PDF.en}
           >
-            <ForgeChat
-              authorWallet={authorWallet}
-              parentId={forgeContext?.parentId ?? parentId}
-              relationship={relationship}
-              targetNodeContext={forgeContext?.targetNodeContext ?? undefined}
-              onAnchored={onAnchored}
-              onEdgeAttached={onEdgeAttached}
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={busy}
-                className="border border-border bg-card text-foreground hover:bg-accent ring-2 ring-primary/20 ring-offset-2 ring-offset-background hover:ring-primary/40 transition-shadow shadow-soft"
-                aria-label={locale === "he" ? ATTACH_PDF.he : ATTACH_PDF.en}
-              >
-                <Paperclip className="size-4 me-2 shrink-0" aria-hidden />
-                {locale === "he" ? ATTACH_PDF.he : ATTACH_PDF.en}
-              </Button>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+            <Paperclip className="size-4 me-2 shrink-0" aria-hidden />
+            {locale === "he" ? ATTACH_PDF.he : ATTACH_PDF.en}
+          </Button>
+        </div>
+      )}
 
       {isAnalyzing && (
         <motion.p
