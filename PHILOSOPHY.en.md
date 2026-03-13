@@ -1,6 +1,6 @@
 # The Mana OS Manifesto: A Healing Operating System (Healing OS)
 
-Mana OS is not merely software; it is an exit gate from the capitalist and industrial matrix. It was built for sovereign and infinite beings, and is founded on the laws of creation, biomimicry, and natural abundance. These are the 12 pillars of the system:
+Mana OS is not merely software; it is an exit gate from the capitalist and industrial matrix. It was built for sovereign and infinite beings, and is founded on the laws of creation, biomimicry, and natural abundance. These are the 13 pillars of the system:
 
 1. **Mana Cycles and the Master’s Paradox (Mana Cycles):**
 We reject the equation “time = money” and the measurement of work in hours, which punishes masters for their efficiency (a healer who resolves pain in 5 minutes) and incentivizes stretching time. We measure human investment through “cycles” (Cycles) and completions. Every skill belongs to a Realm of matter, spirit, or consciousness.
@@ -38,3 +38,9 @@ We reject transactional barter between communities. The model is based on the �
 
 12. **The Self-Aware OS & The Living Codex:**
 Mana OS allows its citizens to reprogram it even without code. Users hold a Socratic dialogue with the “Architect Oracle” on the system’s rules, propose improvements (Open Source), and read from **The Living Codex**, which weaves the functional experience with spiritual philosophy.
+
+13. **The Fractal Truth Engine (Epistemic Freedom):**
+In the Matrix, algorithms and fact-checkers dictate consensus. In Mana OS, we provide the Truth Engine. Deep reasoning is mapped as a Semantic Directed Acyclic Graph (DAG), not a linear feed.
+- *The Pure Logician AI:* AI acts exclusively as an objective mapper of formal logic, identifying premises, deductions, and hidden assumptions while banning 'Appeal to Authority'.
+- *Semantic Merging:* Using Vector Embeddings, the AI prevents fragmented discussions by detecting identical underlying premises globally and suggesting users merge their insights into existing canonical nodes.
+- *Epistemic Verification & Troll Defense:* Truth is not a popularity contest. Users don't 'Upvote'; they 'Verify Logic' or 'Flag Fallacy'. Supported by the SBT (Proof of Humanity) requirement, bot-farm spam is impossible. Visually, a thesis reflects the integrity of its sub-nodes; if foundations are proven logically bankrupt, the parent narrative visually crumbles.

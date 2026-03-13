@@ -89,7 +89,14 @@ This flow ensures that every component—Socratic Oracle, DAO, Callings Board, a
 - [ ] Publicly launch the GitHub repo.
 - [ ] **The Weave: Fractal Economy & Surplus Overflow routing** — Inter-community surplus flow: communities in surplus resonate overflow to the network; others take what they need. No barter, trade, or debt. Macro-projects (bridges between communities) require Macro-Resonance pooled from multiple hubs.
 
-### 🔮 Phase 10: The Council of Elders (Multi-Agent Swarm & Co-Governance)
+### 🔮 Phase 10: The Fractal Truth Engine
+- [ ] **DAG Database Structure:** Map nested assertions as canonical standalone entities rather than tied parents, using Supabase UUID foreign keys.
+- [ ] **Semantic Weaver (AI):** Implement `pgvector` search prior to saving a node to propose merging duplicates into the Semantic Graph.
+- [ ] **Endless Dive UX:** Discard deep-nested margins. Use a column/stacking sliding UI, treating each node as a flat context before sliding horizontally deeper into a child node.
+- [ ] **Logician AI Tooling:** Integrate the non-aligned "Neutral Sieve" Oracle designed solely for exposing fallacies and assumptions.
+- [ ] **Community Verification Mechanics:** Replace standard likes with logic validation tags backed by ManaSkills SBT logic.
+
+### 🔮 Phase 11: The Council of Elders (Multi-Agent Swarm & Co-Governance)
 - [ ] **Multi-Agent Architecture:** Upgrading the Oracle from a single LLM to an Agentic Workflow where specialized AI entities debate backend before responding.
 - [ ] **Agent 1: The Earth Architect:** Master of the Material Realm (Biomimicry, Permaculture, ecological physics). Calculates raw resource needs.
 - [ ] **Agent 2: The Spirit Weaver:** Master of the Energetic Realm. Monitors human capacity, Soul Contracts (seasons), and prevents community burnout by pacing projects organically.
