@@ -240,7 +240,8 @@ export function TruthHub({ macroRoots }: TruthHubProps) {
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filteredRoots.map(({ node, claimsCount }, idx) => {
-                const parsed = parseNodeContent(node.content);
+                const parsed = parseNodeContent(node.content, locale);
+                const tags = node.thematic_tags?.filter((t): t is string => typeof t === "string" && t.trim().length > 0) ?? [];
                 return (
                   <motion.div
                     key={node.id}
@@ -253,6 +254,18 @@ export function TruthHub({ macroRoots }: TruthHubProps) {
                       className="group block rounded-xl border border-border bg-card p-4 shadow-soft transition-shadow hover:shadow-soft-md focus:outline-none focus:ring-2 focus:ring-primary/30"
                       title={readPremise}
                     >
+                      {tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-3" aria-label="Thematic constellation">
+                          {tags.slice(0, 3).map((tag) => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-sm text-foreground leading-relaxed line-clamp-4 flex-1 min-w-0">
                           {truncateAssertion(parsed.assertion, HUB_ASSERTION_MAX_LEN)}

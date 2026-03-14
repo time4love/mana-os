@@ -19,6 +19,7 @@ function rowToNode(row: {
   content: string;
   created_at: string;
   is_macro_root?: boolean;
+  thematic_tags?: string[] | null;
 }): TruthNode {
   return {
     id: row.id,
@@ -27,6 +28,7 @@ function rowToNode(row: {
     embedding: null,
     created_at: row.created_at,
     is_macro_root: row.is_macro_root ?? false,
+    thematic_tags: Array.isArray(row.thematic_tags) ? row.thematic_tags : undefined,
   };
 }
 
@@ -41,7 +43,7 @@ export async function fetchTruthNodeWithRelations(nodeId: string): Promise<Fetch
 
     const { data: nodeRow, error: nodeError } = await supabase
       .from("truth_nodes")
-      .select("id, author_wallet, content, created_at, is_macro_root")
+      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags")
       .eq("id", nodeId)
       .single();
 
@@ -49,7 +51,7 @@ export async function fetchTruthNodeWithRelations(nodeId: string): Promise<Fetch
       return { success: false, error: nodeError?.message ?? "Node not found" };
     }
 
-    type NodeRow = { id: string; author_wallet: string | null; content: string; created_at: string; is_macro_root: boolean };
+    type NodeRow = { id: string; author_wallet: string | null; content: string; created_at: string; is_macro_root: boolean; thematic_tags?: string[] | null };
     const node = rowToNode(nodeRow as NodeRow);
 
     // Children: edges where this node is the source (source_id = nodeId); target_id = child
@@ -69,7 +71,7 @@ export async function fetchTruthNodeWithRelations(nodeId: string): Promise<Fetch
       const targetIds = [...new Set(childEdges.map((e) => e.target_id))];
       const { data: childRowsData } = await supabase
         .from("truth_nodes")
-        .select("id, author_wallet, content, created_at, is_macro_root")
+        .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags")
         .in("id", targetIds);
 
       const childRows = (childRowsData ?? []) as NodeRow[];
@@ -96,7 +98,7 @@ export async function fetchTruthNodeWithRelations(nodeId: string): Promise<Fetch
       const parentIds = [...new Set(parentEdges.map((e) => e.source_id))];
       const { data: parentRowsData } = await supabase
         .from("truth_nodes")
-        .select("id, author_wallet, content, created_at, is_macro_root")
+        .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags")
         .in("id", parentIds);
       const parentRows = (parentRowsData ?? []) as NodeRow[];
       parents = parentRows.map(rowToNode);
@@ -128,13 +130,13 @@ export async function fetchMacroRoots(): Promise<MacroRootWithMeta[]> {
 
     const { data: rowsData, error } = await supabase
       .from("truth_nodes")
-      .select("id, author_wallet, content, created_at, is_macro_root")
+      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags")
       .eq("is_macro_root", true)
       .order("created_at", { ascending: false })
       .limit(MACRO_ROOTS_LIMIT);
 
     if (error) return [];
-    type NodeRow = { id: string; author_wallet: string | null; content: string; created_at: string; is_macro_root: boolean };
+    type NodeRow = { id: string; author_wallet: string | null; content: string; created_at: string; is_macro_root: boolean; thematic_tags?: string[] | null };
     const rows = (rowsData ?? []) as NodeRow[];
     if (!rows.length) return [];
 

@@ -7,10 +7,46 @@ import { DefaultChatTransport } from "ai";
 import { RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocale } from "@/lib/i18n/context";
+import { useArchitectMode } from "@/lib/context/ArchitectModeContext";
 import { Button } from "@/components/ui/button";
 import { anchorForgeDraft } from "@/app/actions/truthWeaver";
 import { DraftNodeCard, type ForgeDraft } from "@/components/truth/DraftNodeCard";
 import type { EdgeRelationship, MatchTruthNodeResult } from "@/types/truth";
+
+const SWARM_TELEMETRY_PREFIX = "[SWARM_TELEMETRY]:";
+
+export interface RagTelemetryPayload {
+  source: "rag";
+  rawQuery?: string;
+  query?: string;
+  expandedQueryDisplay?: string;
+  expandedQuery?: string;
+  matchThreshold?: number;
+  matchCount: number;
+  matchBreakdown?: string;
+  errorMessage?: string;
+  topMatches: Array<{ id: string; similarity: number; contentPreview: string }>;
+  systemPromptOverride: boolean;
+}
+
+function parseTelemetryFromText(text: string): { telemetry: RagTelemetryPayload | null; visibleText: string } {
+  const idx = text.indexOf(SWARM_TELEMETRY_PREFIX);
+  if (idx === -1) return { telemetry: null, visibleText: text };
+  const payloadStart = idx + SWARM_TELEMETRY_PREFIX.length;
+  const after = text.slice(payloadStart);
+  const endMatch = after.match(/\n\n/);
+  const jsonEnd = endMatch ? endMatch.index! + endMatch[0].length : after.length;
+  const jsonStr = after.slice(0, endMatch ? endMatch.index : undefined).trim();
+  let telemetry: RagTelemetryPayload | null = null;
+  try {
+    const parsed = JSON.parse(jsonStr) as RagTelemetryPayload;
+    if (parsed?.source === "rag" && (typeof parsed.rawQuery === "string" || typeof parsed.query === "string" || typeof parsed.matchCount === "number")) telemetry = parsed;
+  } catch {
+    // ignore
+  }
+  const visibleText = (text.slice(0, idx) + (endMatch ? after.slice(jsonEnd) : "")).trim();
+  return { telemetry, visibleText };
+}
 
 const SHOW_MORE = { he: "קרא עוד", en: "Show More" };
 const SHOW_LESS = { he: "צמצם", en: "Show Less" };
@@ -213,10 +249,12 @@ export function ForgeChat({
   className = "",
 }: ForgeChatProps) {
   const { locale } = useLocale();
+  const { isArchitectMode } = useArchitectMode();
   const router = useRouter();
   const [input, setInput] = useState("");
   const [isAnchoring, setIsAnchoring] = useState(false);
   const [anchorError, setAnchorError] = useState<string | null>(null);
+  const [lastWriteTelemetry, setLastWriteTelemetry] = useState<string[] | null>(null);
 
   const cacheKey = getForgeCacheKey(parentId);
 
@@ -241,6 +279,7 @@ export function ForgeChat({
       body: {
         locale,
         targetNodeContext: targetNodeContext ?? undefined,
+        architectMode: isArchitectMode,
       },
     }),
   });
@@ -279,16 +318,14 @@ export function ForgeChat({
         const p = part as {
           type?: string;
           state?: string;
-          output?: { draft?: ForgeDraft };
+          output?: { draft?: ForgeDraft; ok?: boolean };
           input?: ForgeDraft & { relationshipToContext?: "supports" | "challenges" };
         };
-        if (
-          p.type === "tool-draft_epistemic_node" &&
-          (p.state === "output-available" || p.state === "input-available")
-        ) {
-          const draft = p.output?.draft ?? p.input;
-          if (draft?.assertion) return draft as ForgeDraft;
-        }
+        if (p.type !== "tool-draft_epistemic_node") continue;
+        const draft = p.output?.draft ?? p.input;
+        const hasAssertion = draft && ((draft as ForgeDraft).assertionEn ?? (draft as { assertion?: string }).assertion);
+        if (hasAssertion) return draft as ForgeDraft;
+        if (p.state === "output-error" && p.input && (p.input as ForgeDraft).assertionEn) return p.input as ForgeDraft;
       }
     }
     return null;
@@ -300,6 +337,7 @@ export function ForgeChat({
     if (!latestDraft) return;
     setAnchorError(null);
     setSemanticDuplicates(null);
+    setLastWriteTelemetry(null);
     setIsAnchoring(true);
     const dynamicRelationship = latestDraft.relationshipToContext ?? relationship ?? "supports";
     const result = await anchorForgeDraft(
@@ -309,6 +347,7 @@ export function ForgeChat({
       dynamicRelationship,
       forceBypass ?? false
     );
+    setLastWriteTelemetry(result.writeTelemetry ?? null);
     setIsAnchoring(false);
     if (result.success) {
       setSemanticDuplicates(null);
@@ -319,11 +358,18 @@ export function ForgeChat({
       }
       onAnchored?.(result.nodeId);
       router.push(parentId ? `/truth/node/${parentId}` : "/truth");
-    } else if ("code" in result && result.code === "semantic_resonance") {
-      setSemanticDuplicates(result.duplicates);
-    } else {
-      setAnchorError("error" in result ? result.error : "An error occurred");
+      return;
     }
+    const hasSemanticResonance =
+      result.success === false &&
+      "duplicates" in result &&
+      Array.isArray(result.duplicates) &&
+      result.duplicates.length > 0;
+    if (hasSemanticResonance) {
+      setSemanticDuplicates(result.duplicates as MatchTruthNodeResult[]);
+      return;
+    }
+    setAnchorError("error" in result ? result.error : "An error occurred");
   }
 
   async function handleForcePlant() {
@@ -368,10 +414,12 @@ export function ForgeChat({
             {locale === "he" ? FORGE_PLACEHOLDER.he : FORGE_PLACEHOLDER.en}
           </p>
         )}
-        {messages.map((message) => (
+        {messages.map((message) => {
+          let lastTelemetry: RagTelemetryPayload | null = null;
+          return (
           <div
             key={message.id}
-            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} flex-col gap-2`}
           >
             <div
               className={`max-w-[90%] text-start ${
@@ -381,33 +429,89 @@ export function ForgeChat({
               }`}
             >
               <div className="space-y-2 text-sm text-start">
-                {(message.parts ?? []).map((part, partIndex) => {
-                  const p = part as { type?: string; text?: string; state?: string };
-                  if (p.type === "text" && "text" in p && p.text) {
+                {(() => {
+                  const parts = message.parts ?? [];
+                  let hasVisible = false;
+                  const rendered = parts.map((part, partIndex) => {
+                    const p = part as { type?: string; text?: string; state?: string; errorText?: string };
+                    if (p.type === "text" && "text" in p && p.text) {
+                      const { telemetry, visibleText } = parseTelemetryFromText(p.text);
+                      if (telemetry) lastTelemetry = telemetry;
+                      if (visibleText.trim()) {
+                        hasVisible = true;
+                        return (
+                          <ExpandableBubbleText
+                            key={partIndex}
+                            text={visibleText}
+                            maxLength={250}
+                          />
+                        );
+                      }
+                      return null;
+                    }
+                    if (
+                      p.type === "tool-draft_epistemic_node" &&
+                      (p.state === "input-streaming" || p.state === "partial-call")
+                    ) {
+                      hasVisible = true;
+                      return (
+                        <p key={partIndex} className="text-muted-foreground italic text-start">
+                          {locale === "he" ? "המנסר מעבד…" : "The Forge is processing…"}
+                        </p>
+                      );
+                    }
+                    if (p.type === "tool-draft_epistemic_node" && p.state === "output-error" && "errorText" in p && p.errorText) {
+                      hasVisible = true;
+                      return (
+                        <p key={partIndex} className="text-destructive text-sm" role="alert">
+                          {locale === "he" ? "שגיאה: " : "Error: "}{p.errorText}
+                        </p>
+                      );
+                    }
+                    return null;
+                  });
+                  if (message.role === "assistant" && parts.length > 0 && !hasVisible) {
                     return (
-                      <ExpandableBubbleText
-                        key={partIndex}
-                        text={p.text}
-                        maxLength={250}
-                      />
-                    );
-                  }
-                  if (
-                    p.type === "tool-draft_epistemic_node" &&
-                    (p.state === "input-streaming" || p.state === "partial-call")
-                  ) {
-                    return (
-                      <p key={partIndex} className="text-muted-foreground italic text-start">
-                        …
+                      <p key="placeholder" className="text-muted-foreground italic text-start">
+                        {locale === "he" ? "המנסר מכין את הטיוטה…" : "The Forge is preparing your draft…"}
                       </p>
                     );
                   }
-                  return null;
-                })}
+                  return rendered;
+                })()}
               </div>
             </div>
+            {message.role === "assistant" && isArchitectMode && lastTelemetry && (
+              <div
+                className="self-start max-w-[90%] w-full rounded-lg border border-border bg-zinc-900 text-zinc-300 px-3 py-2.5 font-mono text-xs overflow-x-auto whitespace-pre-wrap"
+                role="region"
+                aria-label="Swarm Telemetry - RAG Injection"
+              >
+                <p className="text-amber-400/90 font-semibold mb-1.5">
+                  [Swarm Telemetry — RAG Injection]
+                </p>
+                <p className="text-zinc-400">Raw Query: &apos;{lastTelemetry.rawQuery ?? lastTelemetry.query ?? ""}&apos;</p>
+                <p className="text-zinc-400">
+                  Expanded (AI) Vector Query: &apos;{lastTelemetry.expandedQueryDisplay ?? lastTelemetry.expandedQuery ?? "FAILED_TO_EXPAND_USED_RAW"}&apos;
+                </p>
+                <p className="text-zinc-400">Match Threshold: {(lastTelemetry.matchThreshold ?? 0.5).toFixed(2)}</p>
+                <p className="text-zinc-400">
+                  Vector Search Result: Found {lastTelemetry.matchCount} matching Node(s).
+                </p>
+                {lastTelemetry.matchBreakdown ? (
+                  <pre className="text-zinc-500 text-xs mt-1 mb-1 overflow-x-auto">{lastTelemetry.matchBreakdown}</pre>
+                ) : null}
+                {lastTelemetry.errorMessage && (
+                  <p className="text-red-400/90 mt-1" role="alert">{lastTelemetry.errorMessage}</p>
+                )}
+                {lastTelemetry.systemPromptOverride && (
+                  <p className="text-emerald-500/90 mt-1">System prompt override initiated.</p>
+                )}
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
         <AnimatePresence>
           {latestDraft && (
             <motion.div
@@ -425,6 +529,8 @@ export function ForgeChat({
                 relationship={relationship}
                 semanticDuplicates={semanticDuplicates}
                 onForcePlant={handleForcePlant}
+                writeTelemetry={lastWriteTelemetry}
+                isArchitectMode={isArchitectMode}
               />
             </motion.div>
           )}

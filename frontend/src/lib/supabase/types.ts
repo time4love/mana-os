@@ -270,6 +270,7 @@ export interface Database {
           embedding: number[] | null;
           created_at: string;
           is_macro_root: boolean;
+          thematic_tags: string[];
         };
         Insert: {
           id?: string;
@@ -278,6 +279,7 @@ export interface Database {
           embedding?: number[] | null;
           created_at?: string;
           is_macro_root?: boolean;
+          thematic_tags?: string[];
         };
         Update: {
           id?: string;
@@ -286,6 +288,7 @@ export interface Database {
           embedding?: number[] | null;
           created_at?: string;
           is_macro_root?: boolean;
+          thematic_tags?: string[];
         };
         Relationships: TableRelationships;
       };
@@ -313,6 +316,30 @@ export interface Database {
         };
         Relationships: TableRelationships;
       };
+      epistemic_constellations: {
+        Row: {
+          id: string;
+          theme_name: string;
+          living_summary: string;
+          embedding: number[] | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          theme_name: string;
+          living_summary?: string;
+          embedding?: number[] | null;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          theme_name?: string;
+          living_summary?: string;
+          embedding?: number[] | null;
+          updated_at?: string;
+        };
+        Relationships: TableRelationships;
+      };
     };
     Views: Record<string, { Row: Record<string, unknown>; Relationships: TableRelationships }>;
     Functions: {
@@ -323,6 +350,14 @@ export interface Database {
           match_count: number;
         };
         Returns: Array<{ id: string; content: string; similarity: number }>;
+      };
+      match_constellations: {
+        Args: {
+          query_embedding: number[];
+          match_threshold: number;
+          match_count: number;
+        };
+        Returns: Array<{ id: string; theme_name: string; living_summary: string; similarity: number }>;
       };
     };
   };

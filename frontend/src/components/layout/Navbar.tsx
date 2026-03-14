@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Menu, Network } from "lucide-react";
+import { Menu, Network, SquareTerminal } from "lucide-react";
+import { useArchitectMode } from "@/lib/context/ArchitectModeContext";
 import {
   Sheet,
   SheetContent,
@@ -18,6 +19,7 @@ import { useLocale } from "@/lib/i18n/context";
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { locale, tProposals, tCommunities, tOracle, tMap } = useLocale();
+  const { isArchitectMode, toggleArchitectMode } = useArchitectMode();
   const isRtl = locale === "he";
 
   return (
@@ -46,6 +48,19 @@ export function Navbar() {
 
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
+            <button
+              type="button"
+              onClick={toggleArchitectMode}
+              className={`inline-flex size-10 items-center justify-center rounded-lg outline-none transition focus-visible:ring-2 focus-visible:ring-ring ${
+                isArchitectMode
+                  ? "bg-primary/15 text-primary border border-primary/30"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+              aria-label={isArchitectMode ? "Disable Architect Mode" : "Enable Architect Mode (telemetry)"}
+              title={isArchitectMode ? "Architect Mode ON — Use Forge chat or upload PDF on Truth page to see telemetry" : "Architect Mode OFF — Click to show RAG & Swarm telemetry"}
+            >
+              <SquareTerminal className="size-5" aria-hidden />
+            </button>
             <button
               type="button"
               onClick={() => setMenuOpen(true)}

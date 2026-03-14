@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/i18n/context";
+import { getDisplayAssertion } from "@/lib/utils/truthParser";
 import type { MatchTruthNodeResult } from "@/types/truth";
+import type { ForgeDraftBilingual } from "@/types/truth";
 
 const ANCHOR_CTA = {
   he: "עגן טיעון למארג",
@@ -30,15 +32,8 @@ const FORCE_PLANT_CTA = {
 
 const REVIEW_EXISTING = { he: "עיין או הדהד בשורש הקיים", en: "Review or resonate with existing node" };
 
-export interface ForgeDraft {
-  assertion: string;
-  logicalCoherenceScore: number;
-  reasoning: string;
-  hiddenAssumptions: string[];
-  challengePrompt: string;
-  /** Classified by the Logician: supports or challenges the parent premise. */
-  relationshipToContext?: "supports" | "challenges";
-}
+/** Bilingual Forge draft (Rosetta): display uses locale; vector uses assertionEn. */
+export type ForgeDraft = ForgeDraftBilingual;
 
 interface DraftNodeCardProps {
   draft: ForgeDraft;
@@ -51,6 +46,10 @@ interface DraftNodeCardProps {
   semanticDuplicates?: MatchTruthNodeResult[] | null;
   /** Call to anchor with forceBypass (plant new seed despite similar existing nodes). */
   onForcePlant?: () => void;
+  /** Backend write pipeline telemetry (anchor steps); shown in Architect mode or when present. */
+  writeTelemetry?: string[] | null;
+  /** When true, show write telemetry terminal even if only for dev visibility. */
+  isArchitectMode?: boolean;
 }
 
 export function DraftNodeCard({
@@ -59,10 +58,30 @@ export function DraftNodeCard({
   isAnchoring = false,
   semanticDuplicates = null,
   onForcePlant,
+  writeTelemetry = null,
+  isArchitectMode = false,
 }: DraftNodeCardProps) {
   const { locale } = useLocale();
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const hasDetails = draft.reasoning || draft.hiddenAssumptions?.length > 0 || draft.challengePrompt;
+  const [telemetryOpen, setTelemetryOpen] = useState(true);
+  const [resonanceBlock, setResonanceBlock] = useState<{
+    isBlocked: boolean;
+    duplicates: MatchTruthNodeResult[];
+  }>({ isBlocked: false, duplicates: [] });
+
+  useEffect(() => {
+    const hasDuplicates = Array.isArray(semanticDuplicates) && semanticDuplicates.length > 0;
+    setResonanceBlock({
+      isBlocked: hasDuplicates,
+      duplicates: hasDuplicates ? semanticDuplicates : [],
+    });
+  }, [semanticDuplicates]);
+
+  const assertion = (locale === "he" && (draft.assertionHe ?? "").trim()) ? (draft.assertionHe ?? "").trim() : (draft.assertionEn ?? "").trim();
+  const reasoning = (locale === "he" && (draft.reasoningHe ?? "").trim()) ? (draft.reasoningHe ?? "").trim() : (draft.reasoningEn ?? "").trim();
+  const hiddenAssumptions = (locale === "he" && (draft.hiddenAssumptionsHe ?? []).length > 0) ? (draft.hiddenAssumptionsHe ?? []) : (draft.hiddenAssumptionsEn ?? []);
+  const challengePrompt = (locale === "he" && (draft.challengePromptHe ?? "").trim()) ? (draft.challengePromptHe ?? "").trim() : (draft.challengePromptEn ?? "").trim();
+  const hasDetails = reasoning || (hiddenAssumptions?.length ?? 0) > 0 || challengePrompt;
 
   const anchorLabel = locale === "he" ? ANCHOR_CTA.he : ANCHOR_CTA.en;
   const rationaleLabel = locale === "he" ? RATIONALE_LABEL.he : RATIONALE_LABEL.en;
@@ -74,7 +93,7 @@ export function DraftNodeCard({
   const supportsLabel = locale === "he" ? BADGE_SUPPORTS.he : BADGE_SUPPORTS.en;
   const challengesLabel = locale === "he" ? BADGE_CHALLENGES.he : BADGE_CHALLENGES.en;
 
-  const showSemanticBlock = Array.isArray(semanticDuplicates) && semanticDuplicates.length > 0;
+  const showSemanticBlock = resonanceBlock.isBlocked && resonanceBlock.duplicates.length > 0;
   const semanticWarningText = locale === "he" ? SEMANTIC_WARNING.he : SEMANTIC_WARNING.en;
   const forcePlantLabel = locale === "he" ? FORCE_PLANT_CTA.he : FORCE_PLANT_CTA.en;
   const reviewLabel = locale === "he" ? REVIEW_EXISTING.he : REVIEW_EXISTING.en;
@@ -106,7 +125,7 @@ export function DraftNodeCard({
           </div>
         )}
         <p className="text-lg font-medium text-foreground leading-relaxed">
-          {draft.assertion}
+          {assertion}
         </p>
         <div className="flex items-center gap-2">
           <span
@@ -131,29 +150,29 @@ export function DraftNodeCard({
             animate={{ height: "auto", opacity: 1 }}
             className="space-y-3 pt-2 border-t border-border"
           >
-            {draft.reasoning && (
+            {reasoning && (
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
                   {rationaleLabel}
                 </p>
-                <p className="text-sm text-foreground leading-relaxed">{draft.reasoning}</p>
+                <p className="text-sm text-foreground leading-relaxed">{reasoning}</p>
               </div>
             )}
-            {(draft.hiddenAssumptions?.length > 0 || draft.challengePrompt) && (
+            {(hiddenAssumptions?.length > 0 || challengePrompt) && (
               <div className="rounded-lg border border-amber-200/70 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2">
                 <p className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-1">
                   {scoutLabel}
                 </p>
-                {draft.hiddenAssumptions?.length > 0 && (
+                {hiddenAssumptions?.length > 0 && (
                   <ul className="list-disc list-inside text-xs text-amber-900/90 dark:text-amber-100/90 mb-1">
-                    {draft.hiddenAssumptions.map((a, i) => (
+                    {hiddenAssumptions.map((a, i) => (
                       <li key={i}>{a}</li>
                     ))}
                   </ul>
                 )}
-                {draft.challengePrompt && (
+                {challengePrompt && (
                   <p className="text-xs text-amber-900/90 dark:text-amber-100/90">
-                    {draft.challengePrompt}
+                    {challengePrompt}
                   </p>
                 )}
               </div>
@@ -166,20 +185,23 @@ export function DraftNodeCard({
               {semanticWarningText}
             </p>
             <ul className="space-y-2 text-start">
-              {semanticDuplicates!.map((dup) => (
+              {resonanceBlock.duplicates.map((dup) => {
+                const display = getDisplayAssertion(dup.content, locale);
+                return (
                 <li key={dup.id}>
                   <Link
                     href={`/truth/node/${dup.id}`}
                     className="text-sm text-primary hover:underline font-medium block"
                   >
-                    {dup.content.slice(0, 120)}
-                    {dup.content.length > 120 ? "…" : ""}
+                    {display.slice(0, 120)}
+                    {display.length > 120 ? "…" : ""}
                   </Link>
                   <span className="text-xs text-muted-foreground ms-1" title={reviewLabel}>
                     → /truth/node/{dup.id.slice(0, 8)}…
                   </span>
                 </li>
-              ))}
+                );
+              })}
             </ul>
             {onForcePlant && (
               <Button
@@ -203,6 +225,35 @@ export function DraftNodeCard({
           >
             {isAnchoring ? (locale === "he" ? "עוגן…" : "Anchoring…") : anchorLabel}
           </Button>
+        )}
+        {Array.isArray(writeTelemetry) && writeTelemetry.length > 0 && (isArchitectMode || writeTelemetry.some((l) => l.startsWith("[CRITICAL]"))) && (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setTelemetryOpen((o) => !o)}
+              className="w-full flex items-center justify-between px-3 py-2 bg-zinc-900/90 text-zinc-400 font-mono text-xs text-start hover:bg-zinc-800/90"
+              aria-expanded={telemetryOpen}
+            >
+              <span className="text-emerald-400/90 font-semibold">
+                [Write Telemetry] {writeTelemetry.length} line(s)
+              </span>
+              <span aria-hidden>{telemetryOpen ? "−" : "+"}</span>
+            </button>
+            {telemetryOpen && (
+              <pre
+                className="p-3 bg-black text-emerald-400 font-mono text-xs leading-relaxed overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-words"
+                role="log"
+                aria-label="Backend anchor pipeline telemetry"
+              >
+                {writeTelemetry.map((line, i) => (
+                  <span key={i} className={line.startsWith("[CRITICAL]") ? "text-red-400" : undefined}>
+                    {line}
+                    {"\n"}
+                  </span>
+                ))}
+              </pre>
+            )}
+          </div>
         )}
       </div>
     </motion.div>

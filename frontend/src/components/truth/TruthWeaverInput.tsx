@@ -4,8 +4,9 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocale } from "@/lib/i18n/context";
+import { useArchitectMode } from "@/lib/context/ArchitectModeContext";
 import { anchorPrismDraft } from "@/app/actions/truthWeaver";
-import type { EdgeRelationship, EpistemicPrismResult } from "@/types/truth";
+import type { EdgeRelationship, EpistemicPrismResult, AgentTraceEntry } from "@/types/truth";
 import { Button } from "@/components/ui/button";
 import { ClaimEvaluationCard } from "@/components/truth/ClaimEvaluationCard";
 import { ForgeChat } from "@/components/truth/ForgeChat";
@@ -58,6 +59,8 @@ interface TruthWeaverInputProps {
   className?: string;
 }
 
+const SWARM_TELEMETRY_LABEL = { he: "טלמטריית נחיל", en: "Swarm Telemetry" };
+
 export function TruthWeaverInput({
   authorWallet,
   parentId,
@@ -68,12 +71,14 @@ export function TruthWeaverInput({
   className = "",
 }: TruthWeaverInputProps) {
   const { locale } = useLocale();
+  const { isArchitectMode } = useArchitectMode();
   const isRtl = locale === "he";
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [prismAnchoring, setPrismAnchoring] = useState(false);
   const [prismDraft, setPrismDraft] = useState<EpistemicPrismResult | null>(null);
+  const [agentTraces, setAgentTraces] = useState<AgentTraceEntry[]>([]);
   const [anchorSuccessNote, setAnchorSuccessNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [forgeContext, setForgeContext] = useState<{
@@ -106,10 +111,12 @@ export function TruthWeaverInput({
   async function handlePrismUpload(file: File) {
     setError(null);
     setPrismDraft(null);
+    setAgentTraces([]);
     setIsAnalyzing(true);
 
     const formData = new FormData();
     formData.append("document", file);
+    if (isArchitectMode) formData.append("architectMode", "true");
 
     try {
       const res = await fetch("/api/truth/prism", { method: "POST", body: formData });
@@ -121,6 +128,9 @@ export function TruthWeaverInput({
       }
       if (json.success && json.data) {
         setPrismDraft(json.data as EpistemicPrismResult);
+        if (Array.isArray(json.agentTraces)) {
+          setAgentTraces(json.agentTraces as AgentTraceEntry[]);
+        }
       } else {
         setError((json?.error as string) ?? "Prism analysis failed");
       }
@@ -296,12 +306,26 @@ export function TruthWeaverInput({
               </Button>
               <button
                 type="button"
-                onClick={() => setPrismDraft(null)}
+                onClick={() => { setPrismDraft(null); setAgentTraces([]); }}
                 className="text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
               >
                 {locale === "he" ? "חבר מסמך אחר" : "Analyze another document"}
               </button>
             </div>
+
+            {isArchitectMode && agentTraces.length > 0 && (
+              <details
+                className="mt-4 rounded-lg border border-border bg-card/80 overflow-hidden"
+                open
+              >
+                <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  {locale === "he" ? SWARM_TELEMETRY_LABEL.he : SWARM_TELEMETRY_LABEL.en}
+                </summary>
+                <pre className="p-4 text-xs font-mono text-emerald-700/90 dark:text-emerald-400/80 bg-emerald-50/50 dark:bg-emerald-950/30 border-t border-border overflow-x-auto whitespace-pre-wrap break-words">
+                  {JSON.stringify(agentTraces, null, 2)}
+                </pre>
+              </details>
+            )}
           </motion.section>
         )}
       </AnimatePresence>

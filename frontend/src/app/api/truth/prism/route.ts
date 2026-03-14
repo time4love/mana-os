@@ -22,7 +22,7 @@ import { pdfBufferToText } from "@/lib/prism/ingestCore";
 import { extractClaims } from "@/lib/agents/TheSieve";
 import { evaluateLogic } from "@/lib/agents/TheLogician";
 import { findHiddenAssumptions } from "@/lib/agents/TheScout";
-import type { EpistemicPrismResult, ExtractedClaim } from "@/types/truth";
+import type { EpistemicPrismResult, ExtractedClaim, AgentTraceEntry } from "@/types/truth";
 
 const MAX_PDF_BYTES = 50 * 1024 * 1024; // 50 MB
 const MAX_TEXT_LENGTH = 500_000;
@@ -56,11 +56,18 @@ function toErrorMessage(err: unknown): string {
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
+    const architectMode = formData.get("architectMode") === "true";
     const file = (formData.get("file") ?? formData.get("document")) as File | null;
     const rawTextParam = formData.get("text") as string | null;
 
+    const agentTraces: AgentTraceEntry[] = [];
+    const trace = (agent: string, task: string, timeMs: number, extra?: { found?: number; status?: string }) => {
+      agentTraces.push({ agent, task, timeMs, ...extra });
+    };
+
     let sourceText: string;
 
+    const t0 = Date.now();
     if (file && file.size > 0) {
       if (file.size > MAX_PDF_BYTES) {
         return NextResponse.json(
@@ -77,8 +84,10 @@ export async function POST(request: Request) {
       }
       const buffer = Buffer.from(await file.arrayBuffer());
       sourceText = await pdfBufferToText(buffer);
+      if (architectMode) trace("PDF Parser", "PDF buffer to text", Date.now() - t0, { found: sourceText.length });
     } else if (rawTextParam?.trim()) {
       sourceText = rawTextParam.trim().slice(0, MAX_TEXT_LENGTH);
+      if (architectMode) trace("Input", "Raw text ingestion", Date.now() - t0, { found: sourceText.length });
     } else {
       return NextResponse.json(
         { success: false, error: "Provide a PDF file (field 'file' or 'document') or 'text'" },
@@ -94,41 +103,70 @@ export async function POST(request: Request) {
       );
     }
 
+    const tSieve = Date.now();
     const [claims, documentThesis] = await Promise.all([
       extractClaims(trimmed),
       getDocumentThesis(trimmed),
     ]);
+    if (architectMode) {
+      trace("The Sieve", "PDF Parsing & Claim Extraction", Date.now() - tSieve, { found: claims.length });
+    }
 
     if (claims.length === 0) {
       const result: EpistemicPrismResult = {
         documentThesis: documentThesis || "No distinct claims could be extracted.",
         extractedClaims: [],
       };
-      return NextResponse.json({ success: true, data: result });
+      return NextResponse.json(
+        architectMode ? { success: true, data: result, agentTraces } : { success: true, data: result }
+      );
     }
 
-    const extractedClaims: ExtractedClaim[] = await Promise.all(
-      claims.map(async (assertion): Promise<ExtractedClaim> => {
-        const [logic, scout] = await Promise.all([
+    const extractedClaims: ExtractedClaim[] = [];
+    for (let i = 0; i < claims.length; i++) {
+      const assertion = claims[i];
+      let logic: { coherenceScore: number; logicalReasoning: string };
+      let scout: { hiddenAssumptions: string[]; falsificationChallenge: string };
+      if (architectMode) {
+        const tLogician = Date.now();
+        logic = await evaluateLogic(assertion);
+        trace(
+          "The Logician",
+          `Validating structural soundness of Claim ${i + 1}…`,
+          Date.now() - tLogician,
+          { status: `Scored ${logic.coherenceScore}/100` }
+        );
+        const tScout = Date.now();
+        scout = await findHiddenAssumptions(assertion);
+        trace(
+          "The Scout",
+          `Hidden assumptions for Claim ${i + 1}`,
+          Date.now() - tScout,
+          { status: `Found ${scout.hiddenAssumptions.length} assumption(s)` }
+        );
+      } else {
+        [logic, scout] = await Promise.all([
           evaluateLogic(assertion),
           findHiddenAssumptions(assertion),
         ]);
-        return {
-          assertion,
-          logicalCoherenceScore: logic.coherenceScore,
-          reasoning: logic.logicalReasoning,
-          hiddenAssumptions: scout.hiddenAssumptions,
-          challengePrompt: scout.falsificationChallenge,
-        };
-      })
-    );
+      }
+      extractedClaims.push({
+        assertion,
+        logicalCoherenceScore: logic.coherenceScore,
+        reasoning: logic.logicalReasoning,
+        hiddenAssumptions: scout.hiddenAssumptions,
+        challengePrompt: scout.falsificationChallenge,
+      });
+    }
 
     const result: EpistemicPrismResult = {
       documentThesis: documentThesis || "Epistemic breakdown (no single thesis extracted).",
       extractedClaims,
     };
 
-    return NextResponse.json({ success: true, data: result });
+    return NextResponse.json(
+      architectMode ? { success: true, data: result, agentTraces } : { success: true, data: result }
+    );
   } catch (err) {
     const message = toErrorMessage(err) || "Prism pipeline failed";
     return NextResponse.json({ success: false, error: message }, { status: 500 });

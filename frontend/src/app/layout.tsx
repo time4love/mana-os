@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Web3Provider } from "@/components/Web3Provider";
 import { LocaleProvider } from "@/lib/i18n/context";
+import { ArchitectModeProvider } from "@/lib/context/ArchitectModeContext";
 import { Navbar } from "@/components/layout/Navbar";
 import "./globals.css";
 
@@ -18,10 +19,12 @@ export default function RootLayout({
     <html lang="he" dir="rtl" suppressHydrationWarning>
       <body>
         <LocaleProvider>
-          <Web3Provider>
-            <Navbar />
-            {children}
-          </Web3Provider>
+          <ArchitectModeProvider>
+            <Web3Provider>
+              <Navbar />
+              {children}
+            </Web3Provider>
+          </ArchitectModeProvider>
         </LocaleProvider>
       </body>
     </html>

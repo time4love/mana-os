@@ -1,8 +1,12 @@
 "use server";
 
+/**
+ * All embeddings use Google gemini-embedding-001 with outputDimensionality: 768.
+ * DB: run migration 014_google_embedding_768.sql so truth_nodes.embedding and match_truth_nodes use vector(768).
+ */
 import { revalidatePath } from "next/cache";
 import { embed } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
+import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { EdgeRelationship } from "@/types/truth";
@@ -11,6 +15,7 @@ import {
   type MatchTruthNodeResult,
   type EpistemicPrismResult,
 } from "@/types/truth";
+import { syncConstellationMap } from "@/lib/agents/TheCartographer";
 
 const MATCH_THRESHOLD = 0.85;
 const MATCH_COUNT = 3;
@@ -64,19 +69,19 @@ export async function proposeTruthNode(
 
   const { content: trimmedContent, authorWallet: wallet, parentId: parent, relationship: rel, forceBypass: bypass } = parsed.data;
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!apiKey) {
-    return { status: "error", error: "OpenAI API key not configured" };
+    return { status: "error", error: "Google API key not configured" };
   }
 
-  const openai = createOpenAI({ apiKey });
-  const embeddingModel = openai.embeddingModel("text-embedding-3-small");
+  const embeddingModel = google.textEmbeddingModel("gemini-embedding-001");
 
   let embedding: number[];
   try {
     const result = await embed({
       model: embeddingModel,
       value: trimmedContent,
+      providerOptions: { google: { outputDimensionality: 768 } },
     });
     embedding = Array.from(result.embedding);
   } catch (err) {
@@ -182,18 +187,18 @@ export async function attachTruthEdge(
       };
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!apiKey) {
-      return { success: false, error: "OpenAI API key not configured" };
+      return { success: false, error: "Google API key not configured" };
     }
 
-    const openai = createOpenAI({ apiKey });
-    const embeddingModel = openai.embeddingModel("text-embedding-3-small");
+    const embeddingModel = google.textEmbeddingModel("gemini-embedding-001");
 
     let embedding: number[];
     const result = await embed({
       model: embeddingModel,
       value: parsed.data.targetContent,
+      providerOptions: { google: { outputDimensionality: 768 } },
     });
     embedding = Array.from(result.embedding);
 
@@ -295,13 +300,12 @@ export async function anchorPrismToGraph(
       };
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!apiKey) {
-      return { success: false, error: "OpenAI API key not configured" };
+      return { success: false, error: "Google API key not configured" };
     }
 
-    const openai = createOpenAI({ apiKey });
-    const embeddingModel = openai.embeddingModel("text-embedding-3-small");
+    const embeddingModel = google.textEmbeddingModel("gemini-embedding-001");
     const supabase = createServerSupabase();
     const wallet = parsed.data.authorWallet.toLowerCase();
 
@@ -310,6 +314,7 @@ export async function anchorPrismToGraph(
     const thesisEmbedResult = await embed({
       model: embeddingModel,
       value: parsed.data.documentThesis,
+      providerOptions: { google: { outputDimensionality: 768 } },
     });
     const thesisEmbedding = Array.from(thesisEmbedResult.embedding);
 
@@ -341,6 +346,7 @@ export async function anchorPrismToGraph(
         const claimEmbedResult = await embed({
           model: embeddingModel,
           value: claimContent.slice(0, 8000),
+          providerOptions: { google: { outputDimensionality: 768 } },
         });
         const claimEmbedding = Array.from(claimEmbedResult.embedding);
 
@@ -398,7 +404,7 @@ const AnchorPrismDraftSchema = z.object({
   ).max(50),
 });
 
-/** Formats a single claim for storage in truth_nodes (Logician + Scout). */
+/** Formats a single claim for storage in truth_nodes (Logician + Scout). Legacy format. */
 function formatClaimContent(claim: {
   assertion: string;
   logicalCoherenceScore: number;
@@ -410,6 +416,28 @@ function formatClaimContent(claim: {
     ? claim.hiddenAssumptions.join(", ")
     : "—";
   return `Content: ${claim.assertion}\n\n[Logician's Pulse: ${claim.logicalCoherenceScore}/100]\nRationale: ${claim.reasoning}\n\n[The Scout's Edge] Hidden Assumptions: ${assumptions}\nFalsification Prompt: ${claim.challengePrompt}`;
+}
+
+/** Builds Rosetta (bilingual) content JSON for truth_nodes.content — en = vector, he = display (fallback to en when he empty). */
+function formatRosettaContent(draft: z.infer<typeof ForgeDraftSchema>): string {
+  const enAssertion = draft.assertionEn.trim();
+  const heAssertion = (draft.assertionHe ?? "").trim() || enAssertion;
+  const rosetta = {
+    pulse: draft.logicalCoherenceScore,
+    en: {
+      assertion: enAssertion,
+      reasoning: (draft.reasoningEn ?? "").trim(),
+      hiddenAssumptions: Array.isArray(draft.hiddenAssumptionsEn) ? draft.hiddenAssumptionsEn : [],
+      challengePrompt: (draft.challengePromptEn ?? "").trim(),
+    },
+    he: {
+      assertion: heAssertion,
+      reasoning: (draft.reasoningHe ?? "").trim() || (draft.reasoningEn ?? "").trim(),
+      hiddenAssumptions: Array.isArray(draft.hiddenAssumptionsHe) ? draft.hiddenAssumptionsHe : (Array.isArray(draft.hiddenAssumptionsEn) ? draft.hiddenAssumptionsEn : []),
+      challengePrompt: (draft.challengePromptHe ?? "").trim() || (draft.challengePromptEn ?? "").trim(),
+    },
+  };
+  return JSON.stringify(rosetta);
 }
 
 /**
@@ -434,13 +462,12 @@ export async function anchorPrismDraft(
       };
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!apiKey) {
-      return { success: false, error: "OpenAI API key not configured" };
+      return { success: false, error: "Google API key not configured" };
     }
 
-    const openai = createOpenAI({ apiKey });
-    const embeddingModel = openai.embeddingModel("text-embedding-3-small");
+    const embeddingModel = google.textEmbeddingModel("gemini-embedding-001");
     const supabase = createServerSupabase();
     const wallet = parsed.data.authorWallet.toLowerCase();
 
@@ -450,6 +477,7 @@ export async function anchorPrismDraft(
       const thesisEmbedResult = await embed({
         model: embeddingModel,
         value: parsed.data.documentThesis,
+        providerOptions: { google: { outputDimensionality: 768 } },
       });
       thesisEmbedding = Array.from(thesisEmbedResult.embedding);
     } catch (err) {
@@ -485,6 +513,7 @@ export async function anchorPrismDraft(
         const claimEmbedResult = await embed({
           model: embeddingModel,
           value: content.slice(0, 8000),
+          providerOptions: { google: { outputDimensionality: 768 } },
         });
         const claimEmbedding = Array.from(claimEmbedResult.embedding);
 
@@ -540,26 +569,34 @@ export async function anchorPrismDraft(
 // Epistemic Forge — single draft anchor (from Socratic chat)
 // ---------------------------------------------------------------------------
 
+/** Bilingual Forge draft (Rosetta Protocol): en = vector/algorithm, he = display (optional fallback to en). */
 const ForgeDraftSchema = z.object({
-  assertion: z.string().min(1),
+  assertionEn: z.string().min(1),
+  assertionHe: z.string().optional().default(""),
   logicalCoherenceScore: z.number().min(0).max(100),
-  reasoning: z.string(),
-  hiddenAssumptions: z.array(z.string()),
-  challengePrompt: z.string(),
+  reasoningEn: z.string().optional().default(""),
+  reasoningHe: z.string().optional().default(""),
+  hiddenAssumptionsEn: z.array(z.string()).default([]),
+  hiddenAssumptionsHe: z.array(z.string()).default([]),
+  challengePromptEn: z.string().optional().default(""),
+  challengePromptHe: z.string().optional().default(""),
+  relationshipToContext: z.enum(["supports", "challenges"]).optional(),
+  thematicTags: z.array(z.string()).max(3).optional().default([]),
 });
 
 export type AnchorForgeDraftResult =
-  | { success: true; nodeId: string }
-  | { success: false; code: "semantic_resonance"; duplicates: MatchTruthNodeResult[] }
-  | { success: false; error: string };
+  | { success: true; nodeId: string; writeTelemetry?: string[] }
+  | { success: false; code: "semantic_resonance"; duplicates: MatchTruthNodeResult[]; writeTelemetry?: string[] }
+  | { success: false; error: string; writeTelemetry?: string[] };
 
-const FORGE_MATCH_THRESHOLD = 0.88;
+/** pgvector similarity threshold: > 0.85 triggers semantic_resonance (avoid duplicate canonical truths). */
+const FORGE_MATCH_THRESHOLD = 0.85;
 const FORGE_MATCH_COUNT = 3;
 
 /**
  * Anchors a single Epistemic Forge draft to the graph: one node (formatted content),
  * optionally linked to a parent. Used when the user approves the draft from the Forge chat.
- * Runs semantic deduplication on draft.assertion; if near-duplicate nodes exist and
+ * Runs semantic deduplication on draft.assertionEn (Universal vector); if near-duplicate nodes exist and
  * forceBypass is not true, returns semantic_resonance with duplicates instead of inserting.
  */
 export async function anchorForgeDraft(
@@ -569,35 +606,52 @@ export async function anchorForgeDraft(
   relationship?: EdgeRelationship,
   forceBypass?: boolean
 ): Promise<AnchorForgeDraftResult> {
+  const writeTelemetry: string[] = [];
+
   try {
     const parsed = ForgeDraftSchema.safeParse(draft);
     if (!parsed.success) {
       const issues = "issues" in parsed.error ? parsed.error.issues : [];
-      return { success: false, error: (issues as { message: string }[]).map((e) => e.message).join("; ") };
+      return { success: false, error: (issues as { message: string }[]).map((e) => e.message).join("; "), writeTelemetry };
     }
 
     const wallet = authorWallet?.trim().toLowerCase();
     if (!/^0x[a-fa-f0-9]{40}$/.test(wallet)) {
-      return { success: false, error: "Invalid wallet address" };
+      return { success: false, error: "Invalid wallet address", writeTelemetry };
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return { success: false, error: "OpenAI API key not configured" };
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    if (!apiKey) {
+      writeTelemetry.push("[CRITICAL] Google API key not configured.");
+      return { success: false, error: "Google API key not configured", writeTelemetry };
+    }
 
-    const openai = createOpenAI({ apiKey });
-    const embeddingModel = openai.embeddingModel("text-embedding-3-small");
     const supabase = createServerSupabase();
+    const assertionEnText = parsed.data.assertionEn.trim().slice(0, 8000);
 
-    // 1. Embed the assertion text for semantic deduplication (canonical truth matching)
-    const assertionEmbedResult = await embed({
-      model: embeddingModel,
-      value: parsed.data.assertion.trim().slice(0, 8000),
-    });
-    const assertionEmbedding = Array.from(assertionEmbedResult.embedding);
+    writeTelemetry.push("[1] Started anchoring process for assertion (en): " + assertionEnText.slice(0, 80) + (assertionEnText.length > 80 ? "…" : ""));
+    writeTelemetry.push("[2] Requesting Google Vector Embedding (gemini-embedding-001, 768 dims)...");
+
+    let embedding: number[];
+    try {
+      const embeddingModel = google.textEmbeddingModel("gemini-embedding-001");
+      const assertionEmbedResult = await embed({
+        model: embeddingModel,
+        value: assertionEnText,
+        providerOptions: { google: { outputDimensionality: 768 } },
+      });
+      embedding = Array.from(assertionEmbedResult.embedding);
+      writeTelemetry.push("[3] Embedding generated successfully (Dimensions: " + embedding.length + ")");
+    } catch (embedErr) {
+      const errMsg = embedErr instanceof Error ? embedErr.message : String(embedErr);
+      writeTelemetry.push("[CRITICAL] Embedding Failed: " + errMsg);
+      return { success: false, error: "Embedding failed: " + errMsg, writeTelemetry };
+    }
 
     if (!forceBypass) {
+      writeTelemetry.push("[4] Querying DB for semantic duplicates...");
       const { data: matches, error: rpcError } = await supabase.rpc("match_truth_nodes", {
-        query_embedding: assertionEmbedding,
+        query_embedding: embedding,
         match_threshold: FORGE_MATCH_THRESHOLD,
         match_count: FORGE_MATCH_COUNT,
       } as never);
@@ -609,23 +663,23 @@ export async function anchorForgeDraft(
           content: m.content,
           similarity: Number(m.similarity),
         }));
-        return { success: false, code: "semantic_resonance", duplicates };
+        writeTelemetry.push("[4] Semantic resonance: " + matchList.length + " duplicate(s) found; anchoring halted.");
+        return { success: false, code: "semantic_resonance", duplicates, writeTelemetry };
       }
     }
 
-    // 2. No duplicate gate: build full content and storage embedding, then insert
-    const content = formatClaimContent(parsed.data);
-    const embedResult = await embed({
-      model: embeddingModel,
-      value: content.slice(0, 8000),
-    });
-    const embedding = Array.from(embedResult.embedding);
+    const content = formatRosettaContent(parsed.data);
+    const thematicTags = Array.isArray(parsed.data.thematicTags)
+      ? parsed.data.thematicTags.slice(0, 3).filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+      : [];
 
+    writeTelemetry.push("[5] Executing Supabase Insert...");
     const nodePayload = {
       author_wallet: wallet,
       content,
       embedding,
       is_macro_root: !parentId,
+      thematic_tags: thematicTags.length > 0 ? thematicTags : undefined,
     };
     const { data: rowData, error: insertError } = await supabase
       .from("truth_nodes")
@@ -635,7 +689,8 @@ export async function anchorForgeDraft(
 
     const row = rowData as { id: string } | null;
     if (insertError || !row?.id) {
-      return { success: false, error: insertError?.message ?? "Failed to create node" };
+      writeTelemetry.push("[5] Insert failed: " + (insertError?.message ?? "Unknown"));
+      return { success: false, error: insertError?.message ?? "Failed to create node", writeTelemetry };
     }
 
     if (parentId && relationship) {
@@ -645,13 +700,22 @@ export async function anchorForgeDraft(
         relationship,
       } as never);
       if (edgeError) {
-        return { success: false, error: `Node created but edge failed: ${edgeError.message}` };
+        return { success: false, error: `Node created but edge failed: ${edgeError.message}`, writeTelemetry };
       }
     }
 
     revalidatePath("/truth");
-    return { success: true, nodeId: row.id };
+
+    if (thematicTags.length > 0) {
+      for (const tag of thematicTags) {
+        void syncConstellationMap(tag, content);
+      }
+    }
+
+    writeTelemetry.push("[5] Insert succeeded. Node ID: " + row.id);
+    return { success: true, nodeId: row.id, writeTelemetry };
   } catch (err) {
-    return { success: false, error: toErrorMessage(err) || "An error occurred" };
+    writeTelemetry.push("[CRITICAL] " + toErrorMessage(err));
+    return { success: false, error: toErrorMessage(err) || "An error occurred", writeTelemetry };
   }
 }

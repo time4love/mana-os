@@ -43,9 +43,10 @@ const BACK_TO_ENGINE = {
   en: "Back to Truth Engine",
 };
 
-function FocalPivot({ content }: { content: string }) {
-  const parsed = parseNodeContent(content);
+function FocalPivot({ content, thematicTags, locale }: { content: string; thematicTags?: string[]; locale: "he" | "en" }) {
+  const parsed = parseNodeContent(content, locale);
   const hasPulse = parsed.pulse != null;
+  const tags = thematicTags?.filter((t): t is string => typeof t === "string" && t.trim().length > 0) ?? [];
 
   return (
     <motion.section
@@ -55,6 +56,18 @@ function FocalPivot({ content }: { content: string }) {
       className="rounded-xl border-2 border-primary/40 bg-primary/5 shadow-soft-md p-6 sm:p-8 space-y-5"
     >
       <div className="rounded-lg border border-primary/20 bg-background/80 p-5 sm:p-6 space-y-5">
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-2" aria-label="Thematic constellation">
+            {tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center rounded-md border border-primary/25 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
         <p className="text-lg sm:text-xl text-foreground leading-relaxed font-medium">
           {parsed.assertion}
         </p>
@@ -121,7 +134,7 @@ function ChildCard({
   relationship: "supports" | "challenges" | "ai_analysis";
   locale: "he" | "en";
 }) {
-  const parsed = parseNodeContent(node.content);
+  const parsed = parseNodeContent(node.content, locale);
   const isRtl = locale === "he";
 
   const variant =
@@ -163,7 +176,7 @@ export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
   const isRtl = locale === "he";
   const { node, childrenByRelationship, parents } = data;
   const firstParent = parents[0] ?? null;
-  const focalAssertion = parseNodeContent(node.content).assertion || node.content.slice(0, 500);
+  const focalAssertion = parseNodeContent(node.content, locale).assertion || node.content.slice(0, 500);
 
   const [forgeOpen, setForgeOpen] = useState(false);
 
@@ -209,8 +222,8 @@ export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
           )}
         </nav>
 
-        {/* Core pivot: central node — parsed assertion, pulse bar, rationale, scout */}
-        <FocalPivot content={node.content} />
+        {/* Core pivot: central node — thematic tags, parsed assertion, pulse bar, rationale, scout */}
+        <FocalPivot content={node.content} thematicTags={node.thematic_tags} locale={locale} />
 
         {/* Epistemic Forge: single exploratory entry — relationship emerges from the Socratic process */}
         {address && (

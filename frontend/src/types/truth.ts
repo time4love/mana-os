@@ -27,10 +27,10 @@ export function isEdgeRelationship(value: string): value is EdgeRelationship {
 }
 
 // ---------------------------------------------------------------------------
-// Vector embedding (OpenAI text-embedding-3-small: 1536 dimensions)
+// Vector embedding (Google gemini-embedding-001, outputDimensionality: 768)
 // ---------------------------------------------------------------------------
 
-export const TRUTH_EMBEDDING_DIMENSIONS = 1536;
+export const TRUTH_EMBEDDING_DIMENSIONS = 768;
 
 export type TruthEmbedding = number[];
 
@@ -51,6 +51,8 @@ export interface TruthNode {
   created_at: string;
   /** True for document theses and standalone premises (hub entry points); false for sub-claims. */
   is_macro_root?: boolean;
+  /** Macro-themes for constellation grouping (e.g. Cosmology, Space Hoax, Finance). */
+  thematic_tags?: string[];
 }
 
 /** Input shape when inserting a node (id and created_at are generated). */
@@ -60,7 +62,9 @@ export type TruthNodeInsert = Omit<TruthNode, "id" | "created_at"> & {
 };
 
 /** Shape when updating a node (partial; e.g. setting embedding after compute). */
-export type TruthNodeUpdate = Partial<Pick<TruthNode, "content" | "embedding" | "author_wallet" | "is_macro_root">>;
+export type TruthNodeUpdate = Partial<
+  Pick<TruthNode, "content" | "embedding" | "author_wallet" | "is_macro_root" | "thematic_tags">
+>;
 
 // ---------------------------------------------------------------------------
 // TruthEdge — DAG edge (table: public.truth_edges)
@@ -98,6 +102,44 @@ export interface MatchTruthNodeResult {
 }
 
 // ---------------------------------------------------------------------------
+// Universal Rosetta Node — bilingual storage (en = vector/algorithm, he = display)
+// ---------------------------------------------------------------------------
+
+/** Per-language block for a single epistemic node (assertion, reasoning, scout). */
+export interface RosettaContentBlock {
+  assertion: string;
+  reasoning: string;
+  hiddenAssumptions: string[];
+  challengePrompt: string;
+}
+
+/** Stored in truth_nodes.content when using Rosetta format: en + he for global vector + localized UI. */
+export interface RosettaContentJson {
+  en: RosettaContentBlock;
+  he: RosettaContentBlock;
+}
+
+/** Type guard: true if raw content is stringified RosettaContentJson. */
+export function isRosettaContentJson(raw: unknown): raw is string {
+  if (typeof raw !== "string" || !raw.trim()) return false;
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("{") || !trimmed.includes('"en"') || !trimmed.includes('"he"')) return false;
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    return (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "en" in parsed &&
+      "he" in parsed &&
+      typeof (parsed as RosettaContentJson).en === "object" &&
+      typeof (parsed as RosettaContentJson).he === "object"
+    );
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Epistemic Prism — document deconstruction (AI-extracted claims)
 // ---------------------------------------------------------------------------
 
@@ -112,6 +154,24 @@ export interface ExtractedClaim {
 export interface EpistemicPrismResult {
   documentThesis: string;
   extractedClaims: ExtractedClaim[];
+}
+
+// ---------------------------------------------------------------------------
+// Forge draft — bilingual tool output (Universal English + Hebrew)
+// ---------------------------------------------------------------------------
+
+export interface ForgeDraftBilingual {
+  assertionEn: string;
+  assertionHe: string;
+  reasoningEn: string;
+  reasoningHe: string;
+  hiddenAssumptionsEn: string[];
+  hiddenAssumptionsHe: string[];
+  challengePromptEn: string;
+  challengePromptHe: string;
+  logicalCoherenceScore: number;
+  relationshipToContext?: "supports" | "challenges";
+  thematicTags?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -136,4 +196,13 @@ export interface TruthNodeWithRelations {
 export interface MacroRootWithMeta {
   node: TruthNode;
   claimsCount: number;
+}
+
+/** Agentic telemetry entry for Swarm Observer (Architect Mode). */
+export interface AgentTraceEntry {
+  agent: string;
+  task: string;
+  timeMs: number;
+  found?: number;
+  status?: string;
 }

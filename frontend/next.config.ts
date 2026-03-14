@@ -9,6 +9,16 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "50mb",
     },
   },
+  webpack: (config, { isServer }) => {
+    // Stub optional/transitive deps that are not used in the Next.js web build.
+    config.resolve ??= {};
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      "@react-native-async-storage/async-storage": false,
+      "pino-pretty": false,
+    };
+    return config;
+  },
 };
 
 export default nextConfig;
