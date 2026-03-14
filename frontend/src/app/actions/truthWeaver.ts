@@ -550,17 +550,24 @@ const ForgeDraftSchema = z.object({
 
 export type AnchorForgeDraftResult =
   | { success: true; nodeId: string }
+  | { success: false; code: "semantic_resonance"; duplicates: MatchTruthNodeResult[] }
   | { success: false; error: string };
+
+const FORGE_MATCH_THRESHOLD = 0.88;
+const FORGE_MATCH_COUNT = 3;
 
 /**
  * Anchors a single Epistemic Forge draft to the graph: one node (formatted content),
  * optionally linked to a parent. Used when the user approves the draft from the Forge chat.
+ * Runs semantic deduplication on draft.assertion; if near-duplicate nodes exist and
+ * forceBypass is not true, returns semantic_resonance with duplicates instead of inserting.
  */
 export async function anchorForgeDraft(
   draft: z.infer<typeof ForgeDraftSchema>,
   authorWallet: string,
   parentId?: string,
-  relationship?: EdgeRelationship
+  relationship?: EdgeRelationship,
+  forceBypass?: boolean
 ): Promise<AnchorForgeDraftResult> {
   try {
     const parsed = ForgeDraftSchema.safeParse(draft);
@@ -577,17 +584,43 @@ export async function anchorForgeDraft(
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return { success: false, error: "OpenAI API key not configured" };
 
-    const content = formatClaimContent(parsed.data);
     const openai = createOpenAI({ apiKey });
     const embeddingModel = openai.embeddingModel("text-embedding-3-small");
+    const supabase = createServerSupabase();
 
+    // 1. Embed the assertion text for semantic deduplication (canonical truth matching)
+    const assertionEmbedResult = await embed({
+      model: embeddingModel,
+      value: parsed.data.assertion.trim().slice(0, 8000),
+    });
+    const assertionEmbedding = Array.from(assertionEmbedResult.embedding);
+
+    if (!forceBypass) {
+      const { data: matches, error: rpcError } = await supabase.rpc("match_truth_nodes", {
+        query_embedding: assertionEmbedding,
+        match_threshold: FORGE_MATCH_THRESHOLD,
+        match_count: FORGE_MATCH_COUNT,
+      } as never);
+      const matchList = matches as { id: string; content: string; similarity: number }[] | null;
+
+      if (!rpcError && Array.isArray(matchList) && matchList.length > 0) {
+        const duplicates: MatchTruthNodeResult[] = matchList.map((m) => ({
+          id: m.id,
+          content: m.content,
+          similarity: Number(m.similarity),
+        }));
+        return { success: false, code: "semantic_resonance", duplicates };
+      }
+    }
+
+    // 2. No duplicate gate: build full content and storage embedding, then insert
+    const content = formatClaimContent(parsed.data);
     const embedResult = await embed({
       model: embeddingModel,
       value: content.slice(0, 8000),
     });
     const embedding = Array.from(embedResult.embedding);
 
-    const supabase = createServerSupabase();
     const nodePayload = {
       author_wallet: wallet,
       content,

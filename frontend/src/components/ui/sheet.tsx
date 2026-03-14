@@ -60,12 +60,18 @@ interface SheetContentProps {
   side?: SheetContentSide;
   className?: string;
   children: React.ReactNode;
+  /** When true, clicking the backdrop does not close the sheet. User must use an explicit close control. */
+  preventBackdropClose?: boolean;
+  /** Called when user interacts outside the panel (e.g. backdrop click). Call e.preventDefault() to block closing. */
+  onInteractOutside?: (e: React.MouseEvent) => void;
 }
 
 function SheetContent({
   side = "end",
   className = "",
   children,
+  preventBackdropClose = false,
+  onInteractOutside,
 }: SheetContentProps) {
   const { open, onOpenChange } = useSheetContext();
   const isHorizontal = side === "start" || side === "end";
@@ -79,6 +85,12 @@ function SheetContent({
     : side === "top"
       ? "inset-x-0 top-0"
       : "inset-x-0 bottom-0";
+
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    onInteractOutside?.(e);
+    if (e.defaultPrevented || preventBackdropClose) return;
+    onOpenChange(false);
+  };
 
   React.useEffect(() => {
     if (!open) return;
@@ -101,7 +113,7 @@ function SheetContent({
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
       className="fixed inset-0 z-[1200] bg-overlay"
-      onClick={() => onOpenChange(false)}
+      onClick={handleOverlayClick}
     />
   );
 

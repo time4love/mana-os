@@ -3,22 +3,17 @@
 import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, ArrowUp, PlusCircle, MessageCirclePlus } from "lucide-react";
+import { ChevronRight, ArrowUp, Feather } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent, truncateAssertion } from "@/lib/utils/truthParser";
 import { Button } from "@/components/ui/button";
-import { ForgeSheet, type ForgeSheetMode } from "@/components/truth/ForgeSheet";
+import { ForgeSheet } from "@/components/truth/ForgeSheet";
 import type { TruthNodeWithRelations, TruthNode } from "@/types/truth";
 
-const ADD_SUPPORT = {
-  he: "הוסף תמיכה",
-  en: "Add Support",
-};
-
-const ADD_CHALLENGE = {
-  he: "הוסף אתגר",
-  en: "Add Challenge",
+const FORGE_ENTRY = {
+  he: "לטש תובנה במארג…",
+  en: "Refine an insight in the Weave…",
 };
 
 const CHILD_ASSERTION_MAX_LEN = 180;
@@ -171,10 +166,8 @@ export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
   const focalAssertion = parseNodeContent(node.content).assertion || node.content.slice(0, 500);
 
   const [forgeOpen, setForgeOpen] = useState(false);
-  const [forgeMode, setForgeMode] = useState<ForgeSheetMode>("support");
 
-  function openForge(mode: "challenge" | "support") {
-    setForgeMode(mode);
+  function openForge() {
     setForgeOpen(true);
   }
 
@@ -219,7 +212,7 @@ export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
         {/* Core pivot: central node — parsed assertion, pulse bar, rationale, scout */}
         <FocalPivot content={node.content} />
 
-        {/* Epistemic Forge: Add Support / Add Challenge open the drawer; columns stay in place, sheet overlays */}
+        {/* Epistemic Forge: single exploratory entry — relationship emerges from the Socratic process */}
         {address && (
           <motion.section
             initial={{ opacity: 0, y: 4 }}
@@ -227,24 +220,16 @@ export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
             transition={{ delay: 0.15 }}
             className="rounded-xl border border-border bg-card/60 p-4 shadow-soft"
           >
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex justify-center">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => openForge("support")}
-                className="border-primary/40 text-primary hover:bg-primary/10"
+                onClick={openForge}
+                className="border-primary/40 text-primary hover:bg-primary/10 focus-visible:ring-primary/40"
+                aria-label={locale === "he" ? FORGE_ENTRY.he : FORGE_ENTRY.en}
               >
-                <PlusCircle className="size-4 me-2 shrink-0" aria-hidden />
-                {locale === "he" ? ADD_SUPPORT.he : ADD_SUPPORT.en}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => openForge("challenge")}
-                className="border-amber-500/50 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
-              >
-                <MessageCirclePlus className="size-4 me-2 shrink-0" aria-hidden />
-                {locale === "he" ? ADD_CHALLENGE.he : ADD_CHALLENGE.en}
+                <Feather className="size-4 me-2 shrink-0 opacity-90" aria-hidden />
+                {locale === "he" ? FORGE_ENTRY.he : FORGE_ENTRY.en}
               </Button>
             </div>
           </motion.section>
@@ -255,10 +240,9 @@ export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
             isOpen={forgeOpen}
             onOpenChange={setForgeOpen}
             targetNodeContext={focalAssertion}
-            mode={forgeMode}
+            mode="branch"
             authorWallet={address}
             parentId={node.id}
-            relationship={forgeMode === "challenge" ? "challenges" : "supports"}
             onAnchored={() => setForgeOpen(false)}
           />
         )}
