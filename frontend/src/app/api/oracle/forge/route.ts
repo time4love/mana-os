@@ -1,4 +1,4 @@
-import { convertToModelMessages, streamText, embed, generateText, stepCountIs } from "ai";
+import { convertToModelMessages, streamText, embed, generateText, generateObject } from "ai";
 import type { UIMessage } from "ai";
 import { google } from "@ai-sdk/google";
 import { NextResponse } from "next/server";
@@ -14,22 +14,10 @@ const QUERY_EXPANSION_SYSTEM = `You are an absolute objective Epistemic Search A
 const FORGE_SYSTEM = `You are The Epistemic Forge. A Socratic, Pure Logician guiding a human. Converse in the user's language (Hebrew or English). Never leave the user with a blank message.
 
 TOOL TRIGGER CONDITIONS (The Structural Gate):
-- **Naked assertions**: If the user types a simple claim, greeting, or short phrase (e.g. "The earth is flat", "Apples are good", "שלום", "השמש קרה") with no supporting reasoning or mechanism—DO NOT call \`draft_epistemic_nodes\`. You are Socrates. Ask them for the physical mechanism, formal logic, or observation behind the claim. Keep the conversation going.
-- **Structured arguments**: ONLY when the user provides a fleshed-out argument with reasoning, evidence, or mechanism, you MUST call \`draft_epistemic_nodes\` ONCE with an array of ALL distinct claims you identify. Do not evaluate conversational banter or simple statements with the tool.
-
-When you do call \`draft_epistemic_nodes\`: Pass a single \`drafts\` array containing EVERY new structured claim. For each draft, set \`matchedExistingNodeId\` to the matching node's UUID if the injected RAG context lists one; otherwise null. Score 0–100 (naked assertions 20–30). Populate assertionEn, assertionHe, reasoning, hiddenAssumptions, challengePrompt. Do not leave any distinct argument behind—batch them all in one call.
+- **Naked assertions**: If the user types a simple claim, greeting, or short phrase (e.g. "The earth is flat", "Apples are good", "שלום", "השמש קרה") with no supporting reasoning or mechanism—DO NOT call \`epistemic_triage\`. You are Socrates. Ask them for the physical mechanism, formal logic, or observation behind the claim. Keep the conversation going.
+- **Structured arguments**: ONLY when the user provides a fleshed-out argument with reasoning, evidence, or mechanism, you MUST call \`epistemic_triage\` EXACTLY ONCE. Use \`existingNodesToDisplay\` for any RAG-matched nodes; use \`newDrafts\` for every new structured claim you evaluate. Score 0–100. Populate assertionEn, assertionHe, reasoning, hiddenAssumptions, challengePrompt.
 
 RULES: Neutrality—treat the user as a peer. First Principles—analyze physics/logic by formulas and constraints, not by appeals to institutions.`;
-
-const ShowExistingNodesSchema = z.object({
-  nodes: z.array(
-    z.object({
-      id: z.string(),
-      assertionEn: z.string(),
-      assertionHe: z.string().optional(),
-    })
-  ),
-});
 
 const DraftEpistemicNodeSchema = z.object({
   assertionEn: z.string().min(1).describe("The sharp logical premise in English"),
@@ -47,13 +35,24 @@ const DraftEpistemicNodeSchema = z.object({
     .optional()
     .describe("If this claim strongly matches one of the existing nodes in the injected Weave overlap context, put that node's exact UUID here; otherwise null."),
   relationshipToContext: z.enum(["supports", "challenges"]).optional().default("supports"),
-  thematicTags: z.array(z.string()).max(3).optional().default([]),
+  thematicTags: z.array(z.string()).max(10).optional().default([]),
 });
 
-const DraftEpistemicNodesSchema = z.object({
-  drafts: z
+const EpistemicTriageSchema = z.object({
+  existingNodesToDisplay: z
+    .array(
+      z.object({
+        id: z.string(),
+        assertionEn: z.string(),
+        assertionHe: z.string().optional(),
+      })
+    )
+    .optional()
+    .describe("Pass the existing nodes here to show them as portals to the user."),
+  newDrafts: z
     .array(DraftEpistemicNodeSchema)
-    .describe("An array of all new, unmatched claims that need drafting. You MUST include every distinct new structured argument the user provided."),
+    .optional()
+    .describe("Pass the newly evaluated claims here to generate draft cards."),
 });
 
 export const maxDuration = 30;
@@ -132,6 +131,10 @@ export async function POST(request: Request) {
 
         const matchList = (matches ?? []) as any[];
 
+        let newClaimsToDraft: string[] = [];
+        let splitterRun = false;
+        let splitterError = "";
+
         if (matchList.length > 0) {
           const nodesForTool = matchList.map((m: { id: string; content?: string }) => ({
             id: m.id,
@@ -139,24 +142,48 @@ export async function POST(request: Request) {
             assertionHe: getDisplayAssertion(m.content || "", "he"),
           }));
 
+          if (lastUserText.length > 100) {
+            splitterRun = true;
+            try {
+              const splitResult = await generateObject({
+                model: google("gemini-2.5-flash"),
+                schema: z.object({
+                  newClaims: z
+                    .array(z.string())
+                    .describe("Extract ONLY the distinct arguments from the user's text that are completely NEW and NOT addressed by the existing DB matches."),
+                }),
+                prompt: `USER TEXT:\n${lastUserText}\n\nEXISTING DB MATCHES:\n${JSON.stringify(matchList.map((m: { id?: string; content?: string }) => ({ id: m.id, contentPreview: (m.content ?? "").slice(0, 200) })))}\n\nTASK: Analyze the user text. Ignore anything that overlaps with the existing DB matches. Return an array of ONLY the new, unaddressed arguments/claims that require drafting.`,
+              });
+              newClaimsToDraft = splitResult.object.newClaims ?? [];
+            } catch (e: any) {
+              console.error("Splitter Agent failed:", e);
+              splitterError = e?.message ?? String(e);
+              newClaimsToDraft = [lastUserText];
+            }
+          } else {
+            newClaimsToDraft = [lastUserText];
+          }
+
           injectedKnowledge = `
 =========================================
-SYSTEM AWARENESS: PARTIAL WEAVE OVERLAP DETECTED
+CRITICAL SYSTEM OVERRIDE: PRE-PROCESSED COGNITIVE ROUTING
 =========================================
-The database contains nodes that semantically match SOME of the user's intent.
-Payload for show_existing_nodes: ${JSON.stringify({ nodes: nodesForTool })}
+The backend has already analyzed the user's input and split the cognitive load for you.
 
-MULTI-STAGE EPISTEMIC TRIAGE PROTOCOL:
-You are processing a multi-argument input. You MUST execute both of these stages in your current response:
-STAGE 1 (The Known): Call \`show_existing_nodes\` with the payload above. In your text, warmly acknowledge that these specific points are already in the Weave.
-STAGE 2 (The Unknown): You MUST deeply scan the rest of the user's input for ANY OTHER structured arguments (e.g., if they also mentioned gyroscopes or water). You MUST evaluate these NEW arguments according to the Scoring Rubric, and call the \`draft_epistemic_nodes\` tool EXACTLY ONCE, passing an array containing EVERY new valid draft.
+MANDATORY EXECUTION: You possess a single tool: \`epistemic_triage\`. You MUST call it EXACTLY ONCE in this response.
 
-Example of a correct multi-tool response structure:
-[Text: "Welcome. I see your point about X is already in the Weave... However, your points about Y and Z are fascinating new horizons. Let us draft them."]
-[Tool Call: show_existing_nodes (for X)]
-[Tool Call: draft_epistemic_nodes (Array containing drafts for Y and Z)]
+1. Place the existing matched nodes into \`existingNodesToDisplay\`: ${JSON.stringify(nodesForTool)}
 
-DO NOT HALT after Stage 1. Complete the full triage.`;
+2. The backend identified these NEW, unmatched claims: ${JSON.stringify(newClaimsToDraft)}
+   Evaluate them. To prevent cognitive overload, select the 2 or 3 most foundational new claims, score them strictly, and place them into the \`newDrafts\` array. Do NOT leave \`newDrafts\` empty if new claims were provided.
+
+YOUR RESPONSE FORMAT:
+- Warmly acknowledge the existing nodes; they will appear as portals.
+- Provide brief Socratic insight on the NEW claims you drafted.
+- State that you have prepared drafts below for anchoring.
+`;
+        } else {
+          newClaimsToDraft = [lastUserText];
         }
 
         if (architectMode) {
@@ -169,6 +196,9 @@ DO NOT HALT after Stage 1. Complete the full triage.`;
             matchBreakdown: matchList.map((m: any, i: number) => `Match ${i + 1}: Sim: ${(m.similarity * 100).toFixed(2)}% | ${m.content.substring(0, 40)}...`).join("\n"),
             errorMessage:[expansionError, rpcError?.message].filter(Boolean).join(" | "),
             systemPromptOverride: matchList.length > 0,
+            splitterRun,
+            splitterClaims: newClaimsToDraft,
+            splitterError: splitterError || undefined,
           };
         }
       }
@@ -187,25 +217,15 @@ DO NOT HALT after Stage 1. Complete the full triage.`;
 
   const model = google("gemini-2.5-pro");
 
-  const showExistingNodesTool = {
+  const epistemicTriageTool = {
     description:
-      "When the system alerts you that existing nodes match the user's query, call this tool with the provided nodes payload to display portal links. The UI will render them.",
-    inputSchema: ShowExistingNodesSchema,
-    execute: async (args: z.infer<typeof ShowExistingNodesSchema>) => ({ ok: true, nodes: args.nodes }),
-  };
-
-  const draftEpistemicNodesTool = {
-    description:
-      "Call ONLY when the user has provided a structured argument (reasoning, mechanism, or evidence). Break it into distinct logical claims and pass ALL of them in a single \`drafts\` array. For each draft set matchedExistingNodeId if it matches an existing node from RAG context, or null. Score 0–100. Do not call for simple statements or naked assertions—ask Socratic questions instead. You MUST call this tool exactly once per response with every new claim the user made.",
-    inputSchema: DraftEpistemicNodesSchema,
-    execute: async (args: z.infer<typeof DraftEpistemicNodesSchema>) => ({ ok: true, drafts: args.drafts }),
+      "MANDATORY TOOL: You MUST call this tool to render the UI. Use \`existingNodesToDisplay\` to show RAG-matched nodes as portals. Use \`newDrafts\` to generate draft cards for NEW arguments. Call exactly once per response when the user provides structured arguments.",
+    inputSchema: EpistemicTriageSchema,
+    execute: async (args: z.infer<typeof EpistemicTriageSchema>) => ({ ok: true, triage: args }),
   };
 
   const forgeTools = {
-    draft_epistemic_nodes: draftEpistemicNodesTool,
-    ...(injectedKnowledge.length > 0 && {
-      show_existing_nodes: showExistingNodesTool,
-    }),
+    epistemic_triage: epistemicTriageTool,
   };
 
   try {

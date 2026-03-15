@@ -29,6 +29,9 @@ export interface RagTelemetryPayload {
   errorMessage?: string;
   topMatches: Array<{ id: string; similarity: number; contentPreview: string }>;
   systemPromptOverride: boolean;
+  splitterRun?: boolean;
+  splitterClaims?: string[];
+  splitterError?: string;
 }
 
 /** Parses and strips out both the visible RAG header and the hidden JSON payload */
@@ -362,7 +365,7 @@ export function ForgeChat({
 
   const isLoading = status === "submitted" || status === "streaming";
 
-  /** Drafts from the latest draft_epistemic_nodes tool result (batch triage grid). */
+  /** Drafts from the latest epistemic_triage tool result (unified triage grid). */
   const draftsToRender = useMemo((): Array<ForgeDraft & { matchedExistingNodeId?: string | null }> => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
@@ -371,10 +374,11 @@ export function ForgeChat({
         const p = part as {
           type?: string;
           state?: string;
-          output?: { drafts?: Array<Record<string, unknown>> };
+          output?: { triage?: { newDrafts?: Array<Record<string, unknown>> } };
+          input?: { newDrafts?: Array<Record<string, unknown>> };
         };
-        if (p.type !== "tool-draft_epistemic_nodes") continue;
-        const rawDrafts = p.output?.drafts ?? (p as { result?: { drafts?: Array<Record<string, unknown>> } }).result?.drafts;
+        if (p.type !== "tool-epistemic_triage") continue;
+        const rawDrafts = p.output?.triage?.newDrafts ?? p.input?.newDrafts;
         if (!Array.isArray(rawDrafts) || rawDrafts.length === 0) continue;
         const drafts = rawDrafts as Array<Record<string, unknown>>;
         return drafts.map((c) => ({
@@ -501,8 +505,14 @@ export function ForgeChat({
                         state?: string;
                         errorText?: string;
                         output?: {
-                          drafts?: Array<Record<string, unknown>>;
-                          nodes?: Array<{ id: string; assertionEn?: string; assertionHe?: string }>;
+                          triage?: {
+                            existingNodesToDisplay?: Array<{ id: string; assertionEn?: string; assertionHe?: string }>;
+                            newDrafts?: Array<Record<string, unknown>>;
+                          };
+                        };
+                        input?: {
+                          existingNodesToDisplay?: Array<{ id: string; assertionEn?: string; assertionHe?: string }>;
+                          newDrafts?: Array<Record<string, unknown>>;
                         };
                       };
                       
@@ -519,15 +529,13 @@ export function ForgeChat({
                         return null;
                       }
 
-                      // RAG Portals: show existing nodes when AI called show_existing_nodes
+                      // Unified epistemic_triage: Portals from existingNodesToDisplay
+                      const existingNodes = p.output?.triage?.existingNodesToDisplay ?? p.input?.existingNodesToDisplay;
                       if (
-                        p.type === "tool-show_existing_nodes" &&
-                        (p.state === "output-available" || p.state === "result") &&
-                        Array.isArray(p.output?.nodes) &&
-                        p.output.nodes.length > 0
+                        p.type === "tool-epistemic_triage" &&
+                        Array.isArray(existingNodes) &&
+                        existingNodes.length > 0
                       ) {
-                        const nodes = p.output.nodes;
-                        if (nodes.length === 0) return null;
                         hasVisible = true;
                         return (
                           <div
@@ -537,7 +545,7 @@ export function ForgeChat({
                             <p className="text-sm font-semibold text-primary mb-1 break-words">
                               שערים לצמתים חופפים (Portals to Existing Nodes):
                             </p>
-                            {nodes.map((node) => (
+                            {existingNodes.map((node) => (
                               <div key={node.id} className="flex flex-col gap-2 p-3 bg-background rounded-lg shadow-sm border border-border/50 min-w-0 overflow-hidden">
                                 <p className="text-xs text-muted-foreground line-clamp-2 italic break-words">
                                   &quot;{node.assertionHe || node.assertionEn || ""}&quot;
@@ -554,12 +562,13 @@ export function ForgeChat({
                         );
                       }
 
-                      // Epistemic Triage: batch tool output is rendered as grid below (draftsToRender)
+                      // Unified epistemic_triage: draft result rendered as grid below (draftsToRender)
+                      const triageNewDrafts = p.output?.triage?.newDrafts ?? p.input?.newDrafts;
                       if (
-                        p.type === "tool-draft_epistemic_nodes" &&
+                        p.type === "tool-epistemic_triage" &&
                         (p.state === "output-available" || p.state === "result") &&
-                        Array.isArray(p.output?.drafts) &&
-                        p.output.drafts.length > 0
+                        Array.isArray(triageNewDrafts) &&
+                        triageNewDrafts.length > 0
                       ) {
                         hasVisible = true;
                         return (
@@ -569,13 +578,13 @@ export function ForgeChat({
                         );
                       }
                       if (
-                        p.type === "tool-draft_epistemic_nodes" &&
+                        p.type === "tool-epistemic_triage" &&
                         (p.state === "input-streaming" || p.state === "partial-call" || p.state === "input-available")
                       ) {
                         hasVisible = true;
-                        return <p key={partIndex} className="text-muted-foreground italic text-start">{locale === "he" ? "הכבשן מנתח טענות…" : "The Forge is triaging claims…"}</p>;
+                        return <p key={partIndex} className="text-muted-foreground italic text-start">{locale === "he" ? "הכבשן מנתח וממיין טענות…" : "The Forge is triaging claims…"}</p>;
                       }
-                      if (p.type === "tool-draft_epistemic_nodes" && p.state === "output-error" && "errorText" in p && p.errorText) {
+                      if (p.type === "tool-epistemic_triage" && p.state === "output-error" && "errorText" in p && p.errorText) {
                         hasVisible = true;
                         return <p key={partIndex} className="text-destructive text-sm" role="alert">{locale === "he" ? "שגיאה: " : "Error: "}{p.errorText}</p>;
                       }
@@ -613,6 +622,20 @@ export function ForgeChat({
                     {telemetry.matchBreakdown && <pre className="text-zinc-500 text-xs mt-1 mb-1 overflow-x-auto">{telemetry.matchBreakdown}</pre>}
                     {telemetry.errorMessage && <p className="text-red-400/90 mt-1" role="alert">{telemetry.errorMessage}</p>}
                     {telemetry.systemPromptOverride && <p className="text-emerald-500/90 mt-1">System prompt override initiated.</p>}
+                    {telemetry.splitterRun && (
+                      <>
+                        <p className="text-emerald-400/90 font-semibold mt-2 mb-1">[Splitter Agent Handoff]</p>
+                        <p className="text-zinc-400">New Claims Extracted: {telemetry.splitterClaims?.length ?? 0}</p>
+                        {telemetry.splitterClaims && telemetry.splitterClaims.length > 0 && (
+                          <ul className="text-zinc-400 list-disc list-inside mt-1 space-y-0.5">
+                            {telemetry.splitterClaims.map((claim, i) => (
+                              <li key={i} className="truncate max-w-full" title={claim}>{claim.slice(0, 80)}{claim.length > 80 ? "…" : ""}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {telemetry.splitterError && <p className="text-red-400/90 mt-1" role="alert">Splitter Error: {telemetry.splitterError}</p>}
+                      </>
+                    )}
                   </div>
                 );
               })()}
