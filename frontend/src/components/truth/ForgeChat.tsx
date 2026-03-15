@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, Fragment } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useChat, type UIMessage } from "@ai-sdk/react";
@@ -12,71 +12,22 @@ import { useArchitectMode } from "@/lib/context/ArchitectModeContext";
 import { Button } from "@/components/ui/button";
 import { anchorForgeDraft } from "@/app/actions/truthWeaver";
 import { DraftNodeCard, type ForgeDraft } from "@/components/truth/DraftNodeCard";
+import { ForgeTelemetryConsole } from "@/components/truth/ForgeTelemetryConsole";
+import {
+  parseTelemetryFromText,
+  isEpistemicTriagePart,
+  getTriageFromPart,
+  getToolPartState,
+  getLocalized,
+  extractDraftsFromMessages,
+  type RagTelemetryPayload,
+  type MessagePartLike,
+} from "@/components/truth/forgeChatLib";
 import type { EdgeRelationship, MatchTruthNodeResult } from "@/types/truth";
 
-const SWARM_TELEMETRY_PREFIX = "[SWARM_TELEMETRY]:";
-const SWARM_TELEMETRY_RAG_HEADER = "[Swarm Telemetry — RAG Injection]";
+export type { RagTelemetryPayload } from "@/components/truth/forgeChatLib";
 
-export interface RagTelemetryPayload {
-  source: "rag";
-  rawQuery?: string;
-  query?: string;
-  expandedQueryDisplay?: string;
-  expandedQuery?: string;
-  matchThreshold?: number;
-  matchCount: number;
-  matchBreakdown?: string;
-  errorMessage?: string;
-  topMatches: Array<{ id: string; similarity: number; contentPreview: string }>;
-  systemPromptOverride: boolean;
-  splitterRun?: boolean;
-  splitterClaims?: string[];
-  splitterError?: string;
-}
-
-/** Parses and strips out both the visible RAG header and the hidden JSON payload */
-function parseTelemetryFromText(text: string): { telemetry: RagTelemetryPayload | null; visibleText: string } {
-  const headerIdx = text.indexOf(SWARM_TELEMETRY_RAG_HEADER);
-  const jsonIdx = text.indexOf(SWARM_TELEMETRY_PREFIX);
-
-  let telemetry: RagTelemetryPayload | null = null;
-  let visibleText = text;
-
-  if (jsonIdx !== -1) {
-    const payloadStart = jsonIdx + SWARM_TELEMETRY_PREFIX.length;
-    const after = text.slice(payloadStart);
-    const endMatch = after.match(/\n\n/);
-    const jsonEnd = endMatch ? endMatch.index! + endMatch[0].length : after.length;
-    const jsonStr = after.slice(0, endMatch ? endMatch.index : undefined).trim();
-    try {
-      telemetry = JSON.parse(jsonStr) as RagTelemetryPayload;
-    } catch {
-      // ignore
-    }
-  }
-
-  // Strip the entire telemetry block from the user's view
-  if (headerIdx !== -1) {
-    if (jsonIdx !== -1) {
-      const payloadStart = jsonIdx + SWARM_TELEMETRY_PREFIX.length;
-      const after = text.slice(payloadStart);
-      const endMatch = after.match(/\n\n/);
-      const endCut = endMatch ? jsonIdx + SWARM_TELEMETRY_PREFIX.length + endMatch.index! + endMatch[0].length : text.length;
-      visibleText = text.slice(0, headerIdx) + text.slice(endCut);
-    } else {
-      const nextDoubleNewline = text.indexOf("\n\n", headerIdx);
-      visibleText = text.slice(0, headerIdx) + (nextDoubleNewline !== -1 ? text.slice(nextDoubleNewline + 2) : "");
-    }
-  } else if (jsonIdx !== -1) {
-    const payloadStart = jsonIdx + SWARM_TELEMETRY_PREFIX.length;
-    const after = text.slice(payloadStart);
-    const endMatch = after.match(/\n\n/);
-    const endCut = endMatch ? jsonIdx + SWARM_TELEMETRY_PREFIX.length + endMatch.index! + endMatch[0].length : text.length;
-    visibleText = text.slice(0, jsonIdx) + text.slice(endCut);
-  }
-
-  return { telemetry, visibleText: visibleText.trim() };
-}
+const BUBBLE_MAX_LENGTH = 250;
 
 const SHOW_MORE = { he: "קרא עוד", en: "Show More" };
 const SHOW_LESS = { he: "צמצם", en: "Show Less" };
@@ -285,6 +236,18 @@ const RELEASE_THOUGHT_TOOLTIP = { he: "טהר כבשן", en: "Purify the forge" 
 const CONFIRM_RELEASE = { he: "להתחיל דף נקי?", en: "Start with a blank slate?" };
 const RELEASE_CONFIRM_THRESHOLD = 4;
 
+const TRIAGE_MAPPING_LABEL = { he: "מיפוי טענות להלן.", en: "Claim mapping below." };
+const FORGE_TRIAGING_LABEL = {
+  he: "הכבשן מנתח וממיין טענות…",
+  en: "The Forge is triaging claims…",
+};
+const FORGE_PROCESSING_LABEL = { he: "הכבשן מעבד…", en: "The Forge is processing…" };
+const ERROR_PREFIX_LABEL = { he: "שגיאה: ", en: "Error: " };
+const ORACLE_CONTEMPLATING_LABEL = {
+  he: "האורקל מתבונן",
+  en: "The Oracle is contemplating",
+};
+
 interface ForgeChatProps {
   authorWallet: string;
   parentId?: string;
@@ -341,7 +304,7 @@ export function ForgeChat({
 
   function handleReleaseThought() {
     if (messages.length >= RELEASE_CONFIRM_THRESHOLD) {
-      const confirmMsg = locale === "he" ? CONFIRM_RELEASE.he : CONFIRM_RELEASE.en;
+      const confirmMsg = getLocalized(CONFIRM_RELEASE, locale);
       if (typeof window !== "undefined" && !window.confirm(confirmMsg)) return;
     }
     setMessages([]);
@@ -365,40 +328,11 @@ export function ForgeChat({
 
   const isLoading = status === "submitted" || status === "streaming";
 
-  /** Drafts from the latest epistemic_triage tool result (unified triage grid). */
-  const draftsToRender = useMemo((): Array<ForgeDraft & { matchedExistingNodeId?: string | null }> => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg.role !== "assistant" || !msg.parts) continue;
-      for (const part of msg.parts) {
-        const p = part as {
-          type?: string;
-          state?: string;
-          output?: { triage?: { newDrafts?: Array<Record<string, unknown>> } };
-          input?: { newDrafts?: Array<Record<string, unknown>> };
-        };
-        if (p.type !== "tool-epistemic_triage") continue;
-        const rawDrafts = p.output?.triage?.newDrafts ?? p.input?.newDrafts;
-        if (!Array.isArray(rawDrafts) || rawDrafts.length === 0) continue;
-        const drafts = rawDrafts as Array<Record<string, unknown>>;
-        return drafts.map((c) => ({
-          assertionEn: (c.assertionEn as string) ?? "",
-          assertionHe: (c.assertionHe as string) ?? "",
-          logicalCoherenceScore: typeof c.logicalCoherenceScore === "number" ? c.logicalCoherenceScore : 0,
-          reasoningEn: (c.reasoningEn as string) ?? "",
-          reasoningHe: (c.reasoningHe as string) ?? "",
-          hiddenAssumptionsEn: Array.isArray(c.hiddenAssumptionsEn) ? (c.hiddenAssumptionsEn as string[]) : [],
-          hiddenAssumptionsHe: Array.isArray(c.hiddenAssumptionsHe) ? (c.hiddenAssumptionsHe as string[]) : [],
-          challengePromptEn: (c.challengePromptEn as string) ?? "",
-          challengePromptHe: (c.challengePromptHe as string) ?? "",
-          relationshipToContext: (c.relationshipToContext as "supports" | "challenges") ?? "supports",
-          thematicTags: Array.isArray(c.thematicTags) ? (c.thematicTags as string[]) : [],
-          matchedExistingNodeId: typeof c.matchedExistingNodeId === "string" ? c.matchedExistingNodeId : null,
-        })) as Array<ForgeDraft & { matchedExistingNodeId?: string | null }>;
-      }
-    }
-    return [];
-  }, [messages]);
+  const draftsToRender = useMemo(
+    (): Array<ForgeDraft & { matchedExistingNodeId?: string | null }> =>
+      extractDraftsFromMessages(messages),
+    [messages]
+  );
 
   const [semanticDuplicates, setSemanticDuplicates] = useState<MatchTruthNodeResult[] | null>(null);
   const [duplicateDraft, setDuplicateDraft] = useState<ForgeDraft | null>(null);
@@ -458,8 +392,8 @@ export function ForgeChat({
 
   const isRtl = locale === "he";
 
-  const releaseLabel = locale === "he" ? RELEASE_THOUGHT_LABEL.he : RELEASE_THOUGHT_LABEL.en;
-  const releaseTooltip = locale === "he" ? RELEASE_THOUGHT_TOOLTIP.he : RELEASE_THOUGHT_TOOLTIP.en;
+  const releaseLabel = getLocalized(RELEASE_THOUGHT_LABEL, locale);
+  const releaseTooltip = getLocalized(RELEASE_THOUGHT_TOOLTIP, locale);
 
   return (
     <div className={`flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-soft ${className}`} dir={isRtl ? "rtl" : "ltr"}>
@@ -481,10 +415,10 @@ export function ForgeChat({
         )}
         {messages.length === 0 && (
           <p className="text-muted-foreground text-sm text-start py-8">
-            {locale === "he" ? FORGE_PLACEHOLDER.he : FORGE_PLACEHOLDER.en}
+            {getLocalized(FORGE_PLACEHOLDER, locale)}
           </p>
         )}
-        
+
         {messages.map((message) => {
           let lastTelemetry: RagTelemetryPayload | null = null;
           let rawTelemetryContent: string | null = null;
@@ -506,11 +440,13 @@ export function ForgeChat({
                         errorText?: string;
                         output?: {
                           triage?: {
+                            socraticMessage?: string;
                             existingNodesToDisplay?: Array<{ id: string; assertionEn?: string; assertionHe?: string }>;
                             newDrafts?: Array<Record<string, unknown>>;
                           };
                         };
                         input?: {
+                          socraticMessage?: string;
                           existingNodesToDisplay?: Array<{ id: string; assertionEn?: string; assertionHe?: string }>;
                           newDrafts?: Array<Record<string, unknown>>;
                         };
@@ -524,131 +460,125 @@ export function ForgeChat({
                         }
                         if (visibleText.trim()) {
                           hasVisible = true;
-                          return <ExpandableBubbleText key={partIndex} text={visibleText} maxLength={250} />;
+                          return (
+                            <ExpandableBubbleText
+                              key={partIndex}
+                              text={visibleText}
+                              maxLength={BUBBLE_MAX_LENGTH}
+                            />
+                          );
                         }
                         return null;
                       }
 
-                      // Unified epistemic_triage: Portals from existingNodesToDisplay
-                      const existingNodes = p.output?.triage?.existingNodesToDisplay ?? p.input?.existingNodesToDisplay;
-                      if (
-                        p.type === "tool-epistemic_triage" &&
-                        Array.isArray(existingNodes) &&
-                        existingNodes.length > 0
-                      ) {
+                      const partLike = p as MessagePartLike;
+                      if (!isEpistemicTriagePart(partLike)) return null;
+
+                      const triage = getTriageFromPart(partLike);
+                      const socraticMessage = ((triage?.socraticMessage ?? "") as string).trim();
+                      const existingNodes = (triage?.existingNodesToDisplay ?? []) as Array<{
+                        id: string;
+                        assertionEn?: string;
+                        assertionHe?: string;
+                      }>;
+                      const triageNewDrafts = (triage?.newDrafts ?? []) as Array<Record<string, unknown>>;
+                      const hasPortals = existingNodes.length > 0;
+                      const hasDrafts =
+                        triageNewDrafts.length > 0 &&
+                        triageNewDrafts.some((d) => (d.assertionEn as string)?.trim());
+
+                      const { isPending, isError, errorText } = getToolPartState(partLike);
+                      if (socraticMessage || hasPortals || hasDrafts || (isPending && !hasDrafts) || isError) {
                         hasVisible = true;
-                        return (
-                          <div
-                            key={partIndex}
-                            className="w-full max-w-full overflow-hidden flex flex-col gap-3 p-4 bg-primary/5 border border-primary/20 rounded-xl mt-2 box-border"
-                          >
-                            <p className="text-sm font-semibold text-primary mb-1 break-words">
-                              שערים לצמתים חופפים (Portals to Existing Nodes):
-                            </p>
-                            {existingNodes.map((node) => (
-                              <div key={node.id} className="flex flex-col gap-2 p-3 bg-background rounded-lg shadow-sm border border-border/50 min-w-0 overflow-hidden">
-                                <p className="text-xs text-muted-foreground line-clamp-2 italic break-words">
-                                  &quot;{node.assertionHe || node.assertionEn || ""}&quot;
-                                </p>
-                                <Link
-                                  href={`/truth/node/${node.id}`}
-                                  className="self-end text-xs font-medium px-4 py-1.5 rounded-full transition-all no-underline bg-primary text-primary-foreground hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                                >
-                                  צלול לצומת זה 🌊
-                                </Link>
-                              </div>
-                            ))}
-                          </div>
-                        );
                       }
 
-                      // Unified epistemic_triage: draft result rendered as grid below (draftsToRender)
-                      const triageNewDrafts = p.output?.triage?.newDrafts ?? p.input?.newDrafts;
-                      if (
-                        p.type === "tool-epistemic_triage" &&
-                        (p.state === "output-available" || p.state === "result") &&
-                        Array.isArray(triageNewDrafts) &&
-                        triageNewDrafts.length > 0
-                      ) {
-                        hasVisible = true;
-                        return (
-                          <p key={partIndex} className="text-muted-foreground italic text-start text-xs mt-1">
-                            {locale === "he" ? "מיפוי טענות להלן." : "Claim mapping below."}
-                          </p>
-                        );
-                      }
-                      if (
-                        p.type === "tool-epistemic_triage" &&
-                        (p.state === "input-streaming" || p.state === "partial-call" || p.state === "input-available")
-                      ) {
-                        hasVisible = true;
-                        return <p key={partIndex} className="text-muted-foreground italic text-start">{locale === "he" ? "הכבשן מנתח וממיין טענות…" : "The Forge is triaging claims…"}</p>;
-                      }
-                      if (p.type === "tool-epistemic_triage" && p.state === "output-error" && "errorText" in p && p.errorText) {
-                        hasVisible = true;
-                        return <p key={partIndex} className="text-destructive text-sm" role="alert">{locale === "he" ? "שגיאה: " : "Error: "}{p.errorText}</p>;
-                      }
-                      return null;
+                      return (
+                        <Fragment key={partIndex}>
+                          {socraticMessage ? (
+                            <div className="self-start max-w-[90%] bg-muted/60 text-foreground border border-border rounded-2xl rounded-ss-none px-4 py-3 mb-2">
+                              <ExpandableBubbleText
+                                text={socraticMessage}
+                                maxLength={BUBBLE_MAX_LENGTH}
+                              />
+                            </div>
+                          ) : null}
+                          {hasPortals ? (
+                            <div className="w-full max-w-full overflow-hidden flex flex-col gap-3 p-4 bg-primary/5 border border-primary/20 rounded-xl mt-2 box-border">
+                              <p className="text-sm font-semibold text-primary mb-1 break-words">
+                                שערים לצמתים חופפים (Portals to Existing Nodes):
+                              </p>
+                              {existingNodes.map((node) => (
+                                <div
+                                  key={node.id}
+                                  className="flex flex-col gap-2 p-3 bg-background rounded-lg shadow-sm border border-border/50 min-w-0 overflow-hidden"
+                                >
+                                  <p className="text-xs text-muted-foreground line-clamp-2 italic break-words">
+                                    &quot;{node.assertionHe || node.assertionEn || ""}&quot;
+                                  </p>
+                                  <Link
+                                    href={`/truth/node/${node.id}`}
+                                    className="self-end text-xs font-medium px-4 py-1.5 rounded-full transition-all no-underline bg-primary text-primary-foreground hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                                  >
+                                    צלול לצומת זה 🌊
+                                  </Link>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          {hasDrafts ? (
+                            <p className="text-muted-foreground italic text-start text-xs mt-1">
+                              {getLocalized(TRIAGE_MAPPING_LABEL, locale)}
+                            </p>
+                          ) : null}
+                          {isPending && !hasDrafts ? (
+                            <p className="text-muted-foreground italic text-xs text-start mt-4 mb-2 animate-pulse">
+                              {getLocalized(FORGE_TRIAGING_LABEL, locale)}
+                            </p>
+                          ) : null}
+                          {isError && errorText ? (
+                            <p className="text-destructive text-sm" role="alert">
+                              {getLocalized(ERROR_PREFIX_LABEL, locale)}
+                              {errorText}
+                            </p>
+                          ) : null}
+                        </Fragment>
+                      );
                     });
 
-                    if (message.role === "assistant" && parts.length > 0 && !hasVisible) {
-                      return <p key="placeholder" className="text-muted-foreground italic text-start">{locale === "he" ? "הכבשן מעבד…" : "The Forge is processing…"}</p>;
+                    if (message.role === "assistant" && (parts.length === 0 || !hasVisible)) {
+                      return (
+                        <p key="placeholder" className="text-muted-foreground italic text-start animate-pulse">
+                          {getLocalized(FORGE_PROCESSING_LABEL, locale)}
+                        </p>
+                      );
                     }
                     return rendered;
                   })()}
                 </div>
               </div>
 
-              {/* Architect Mode Telemetry Console */}
-              {message.role === "assistant" && isArchitectMode && (rawTelemetryContent || lastTelemetry) && (() => {
-                const raw = rawTelemetryContent;
-                const tel = lastTelemetry;
-                if (raw && !tel) {
-                  return (
-                    <div className="self-start max-w-[90%] w-full rounded-lg border border-border bg-black/80 text-emerald-400 px-3 py-2.5 font-mono text-xs overflow-x-auto whitespace-pre-wrap" role="region" aria-label="Swarm Telemetry">
-                      {raw}
-                    </div>
-                  );
-                }
-                if (!tel) return null;
-                const telemetry = tel as RagTelemetryPayload;
-                return (
-                  <div className="self-start max-w-[90%] w-full rounded-lg border border-border bg-black/80 text-emerald-400 px-3 py-2.5 font-mono text-xs overflow-x-auto whitespace-pre-wrap" role="region" aria-label="Swarm Telemetry - RAG Injection">
-                    <p className="text-amber-400/90 font-semibold mb-1.5">[Swarm Telemetry — RAG Injection]</p>
-                    <p className="text-zinc-400">Raw Query: &apos;{telemetry.rawQuery ?? telemetry.query ?? ""}&apos;</p>
-                    <p className="text-zinc-400">Expanded (AI) Vector Query: &apos;{telemetry.expandedQueryDisplay ?? telemetry.expandedQuery ?? "FAILED_TO_EXPAND_USED_RAW"}&apos;</p>
-                    <p className="text-zinc-400">Match Threshold: {(telemetry.matchThreshold ?? 0.5).toFixed(2)}</p>
-                    <p className="text-zinc-400">Vector Search Result: Found {telemetry.matchCount} matching Node(s).</p>
-                    {telemetry.matchBreakdown && <pre className="text-zinc-500 text-xs mt-1 mb-1 overflow-x-auto">{telemetry.matchBreakdown}</pre>}
-                    {telemetry.errorMessage && <p className="text-red-400/90 mt-1" role="alert">{telemetry.errorMessage}</p>}
-                    {telemetry.systemPromptOverride && <p className="text-emerald-500/90 mt-1">System prompt override initiated.</p>}
-                    {telemetry.splitterRun && (
-                      <>
-                        <p className="text-emerald-400/90 font-semibold mt-2 mb-1">[Splitter Agent Handoff]</p>
-                        <p className="text-zinc-400">New Claims Extracted: {telemetry.splitterClaims?.length ?? 0}</p>
-                        {telemetry.splitterClaims && telemetry.splitterClaims.length > 0 && (
-                          <ul className="text-zinc-400 list-disc list-inside mt-1 space-y-0.5">
-                            {telemetry.splitterClaims.map((claim, i) => (
-                              <li key={i} className="truncate max-w-full" title={claim}>{claim.slice(0, 80)}{claim.length > 80 ? "…" : ""}</li>
-                            ))}
-                          </ul>
-                        )}
-                        {telemetry.splitterError && <p className="text-red-400/90 mt-1" role="alert">Splitter Error: {telemetry.splitterError}</p>}
-                      </>
-                    )}
-                  </div>
-                );
-              })()}
+              {message.role === "assistant" && (
+                <ForgeTelemetryConsole
+                  rawContent={rawTelemetryContent}
+                  telemetry={lastTelemetry}
+                  isArchitectMode={isArchitectMode}
+                />
+              )}
             </div>
           );
         })}
 
         {isLoading && messages.length > 0 && messages[messages.length - 1]?.role === "user" && (
-          <div className="flex justify-start flex-col gap-2" role="status" aria-live="polite" aria-label={locale === "he" ? "האורקל מתבונן" : "The Oracle is contemplating"}>
+          <div
+            className="flex justify-start flex-col gap-2"
+            role="status"
+            aria-live="polite"
+            aria-label={getLocalized(ORACLE_CONTEMPLATING_LABEL, locale)}
+          >
             <div className="self-start bg-muted/30 text-muted-foreground border border-primary/10 rounded-2xl rounded-ss-none px-4 py-3 flex items-center gap-2 max-w-[90%]">
               <Sparkles className="size-4 shrink-0 animate-pulse text-primary/70" aria-hidden />
               <span className="text-sm">
-                {locale === "he" ? "האורקל מתבונן" : "The Oracle is contemplating"}
+                {getLocalized(ORACLE_CONTEMPLATING_LABEL, locale)}
                 <span className="inline-flex ms-0.5" aria-hidden>
                   <span className="animate-pulse opacity-70" style={{ animationDelay: "0ms" }}>.</span>
                   <span className="animate-pulse opacity-70" style={{ animationDelay: "200ms" }}>.</span>
@@ -699,10 +629,10 @@ export function ForgeChat({
       <FluidForgeInput
         value={input}
         onChange={setInput}
-        placeholder={locale === "he" ? FORGE_PLACEHOLDER.he : FORGE_PLACEHOLDER.en}
+        placeholder={getLocalized(FORGE_PLACEHOLDER, locale)}
         disabled={isLoading}
         onSubmit={handleSubmit}
-        submitLabel={locale === "he" ? FORGE_SEND.he : FORGE_SEND.en}
+        submitLabel={getLocalized(FORGE_SEND, locale)}
         isSubmitting={isLoading}
       />
     </div>

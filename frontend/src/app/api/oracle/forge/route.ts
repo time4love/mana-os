@@ -6,39 +6,36 @@ import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getDisplayAssertion } from "@/lib/utils/truthParser";
 
-const RAG_MATCH_THRESHOLD = 0.50;
+const RAG_MATCH_THRESHOLD = 0.5;
 const RAG_MATCH_COUNT = 5;
+const DRAFTER_QUALITY_GATE = 40;
+const SPLITTER_MIN_CHARS = 100;
 
-const QUERY_EXPANSION_SYSTEM = `You are an absolute objective Epistemic Search Architect. The user provided a raw chat message in a local language (Hebrew etc). Extract its CORE THEME and PHILOSOPHICAL ESSENCE. Return a flat comma-separated list of highly dense English keywords and alternative synonyms for this theme. Do not add any conversational text. For example: if user inputs 'הארץ שטוחה', return: 'Flat earth, non-spherical earth, geocentric planar cosmology, earth shape hoax, motionless earth plane'. Keep it under 25 words.`;
-
-const FORGE_SYSTEM = `You are The Epistemic Forge. A Socratic, Pure Logician guiding a human. Converse in the user's language (Hebrew or English). Never leave the user with a blank message.
-
-TOOL TRIGGER CONDITIONS (The Structural Gate):
-- **Naked assertions**: If the user types a simple claim, greeting, or short phrase (e.g. "The earth is flat", "Apples are good", "שלום", "השמש קרה") with no supporting reasoning or mechanism—DO NOT call \`epistemic_triage\`. You are Socrates. Ask them for the physical mechanism, formal logic, or observation behind the claim. Keep the conversation going.
-- **Structured arguments**: ONLY when the user provides a fleshed-out argument with reasoning, evidence, or mechanism, you MUST call \`epistemic_triage\` EXACTLY ONCE. Use \`existingNodesToDisplay\` for any RAG-matched nodes; use \`newDrafts\` for every new structured claim you evaluate. Score 0–100. Populate assertionEn, assertionHe, reasoning, hiddenAssumptions, challengePrompt.
-
-RULES: Neutrality—treat the user as a peer. First Principles—analyze physics/logic by formulas and constraints, not by appeals to institutions.`;
+// ---------------------------------------------------------------------------
+// Schemas (single source of truth)
+// ---------------------------------------------------------------------------
 
 const DraftEpistemicNodeSchema = z.object({
-  assertionEn: z.string().min(1).describe("The sharp logical premise in English"),
-  assertionHe: z.string().optional().default("").describe("Hebrew equivalent for UI"),
-  logicalCoherenceScore: z.number().min(0).max(100).describe("Structural coherence 0-100"),
-  reasoningEn: z.string().optional().default("").describe("Brief rationale in English"),
-  reasoningHe: z.string().optional().default("").describe("Brief rationale in Hebrew"),
-  hiddenAssumptionsEn: z.array(z.string()).optional().default([]),
-  hiddenAssumptionsHe: z.array(z.string()).optional().default([]),
-  challengePromptEn: z.string().optional().default(""),
-  challengePromptHe: z.string().optional().default(""),
-  matchedExistingNodeId: z
-    .string()
-    .nullable()
-    .optional()
-    .describe("If this claim strongly matches one of the existing nodes in the injected Weave overlap context, put that node's exact UUID here; otherwise null."),
-  relationshipToContext: z.enum(["supports", "challenges"]).optional().default("supports"),
-  thematicTags: z.array(z.string()).max(10).optional().default([]),
+  assertionEn: z.string().min(1).catch("Assertion unavailable"),
+  assertionHe: z.string().optional().catch(""),
+  logicalCoherenceScore: z.number().min(0).max(100).catch(50),
+  reasoningEn: z.string().optional().catch(""),
+  reasoningHe: z.string().optional().catch(""),
+  hiddenAssumptionsEn: z.array(z.string()).optional().catch([]),
+  hiddenAssumptionsHe: z.array(z.string()).optional().catch([]),
+  challengePromptEn: z.string().optional().catch(""),
+  challengePromptHe: z.string().optional().catch(""),
+  matchedExistingNodeId: z.string().nullable().optional().catch(null),
+  relationshipToContext: z.enum(["supports", "challenges"]).optional().catch("supports"),
+  thematicTags: z.array(z.string()).max(10).optional().catch([]),
 });
 
 const EpistemicTriageSchema = z.object({
+  socraticMessage: z
+    .string()
+    .describe(
+      "MANDATORY: Your warm, Socratic conversational response. You MUST write your analysis, philosophical insights, and greeting here. DO NOT leave this empty."
+    ),
   existingNodesToDisplay: z
     .array(
       z.object({
@@ -55,6 +52,47 @@ const EpistemicTriageSchema = z.object({
     .describe("Pass the newly evaluated claims here to generate draft cards."),
 });
 
+type DraftEpistemicNode = z.infer<typeof DraftEpistemicNodeSchema>;
+type ExistingNodeDisplay = z.infer<typeof EpistemicTriageSchema>["existingNodesToDisplay"];
+
+// ---------------------------------------------------------------------------
+// Prompts (micro-agents)
+// ---------------------------------------------------------------------------
+
+const QUERY_EXPANSION_SYSTEM = `You are an absolute objective Epistemic Search Architect. The user provided a raw chat message in a local language (Hebrew etc). Extract its CORE THEME and PHILOSOPHICAL ESSENCE. Return a flat comma-separated list of highly dense English keywords and alternative synonyms for this theme. Do not add any conversational text. For example: if user inputs 'הארץ שטוחה', return: 'Flat earth, non-spherical earth, geocentric planar cosmology, earth shape hoax, motionless earth plane'. Keep it under 25 words.`;
+
+const SPLITTER_SYSTEM = `You are a Claim Extractor. Given the user's raw text and a list of existing DB matches (if any), your ONLY job is to output an array of distinct NEW claims/arguments that the user made and that are NOT already addressed by the existing matches. Each item must be a single, self-contained claim in a short sentence. Return ONLY the new, unaddressed claims. If everything overlaps with existing content, return an empty array.`;
+
+// ---------------------------------------------------------------------------
+// Pipeline telemetry (for Architect mode)
+// ---------------------------------------------------------------------------
+
+interface SwarmTelemetry {
+  scoutMatches: number;
+  splitterClaims: number;
+  drafterProcessed: number;
+  drafterPassed: number;
+  expandedQueryDisplay: string;
+  splitterError?: string;
+  drafterErrors?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const MAX_MESSAGE_TEXT_LENGTH = 8000;
+
+function getMessageText(msg: { parts?: Array<{ type: string; text?: string }>; content?: string }): string {
+  if (!msg) return "";
+  const parts = (msg.parts ?? [])
+    .filter((p: { type: string }) => p.type === "text")
+    .map((p: { text?: string }) => p.text ?? "")
+    .join(" ")
+    .trim();
+  return (parts || (msg as { content?: string }).content || "").trim().slice(0, MAX_MESSAGE_TEXT_LENGTH);
+}
+
 export const maxDuration = 30;
 
 export async function POST(request: Request) {
@@ -63,7 +101,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "GOOGLE_GENERATIVE_AI_API_KEY is not configured" }, { status: 503 });
   }
 
-  let body: any;
+  let body: { messages?: UIMessage[]; architectMode?: boolean; targetNodeContext?: string; locale?: string };
   try {
     body = await request.json();
   } catch {
@@ -71,51 +109,55 @@ export async function POST(request: Request) {
   }
 
   const architectMode = body.architectMode === true;
-  const messages = Array.isArray(body.messages) ? body.messages :[];
+  const messages = Array.isArray(body.messages) ? body.messages : [];
   const targetNodeContext = typeof body.targetNodeContext === "string" ? body.targetNodeContext.trim() : null;
+  const locale = body.locale === "he" ? "he" : "en";
 
   const contextBlock = targetNodeContext
     ? `\n\nThe user is challenging or supporting the following existing claim (use this to frame your Socratic dialogue):\n---\n${targetNodeContext.slice(0, 8000)}\n---`
     : "";
 
-  const supabase = createServerSupabase();
-
-  let injectedKnowledge = "";
   const userMessages = messages.filter((m: UIMessage) => m.role === "user");
   const lastUserMessage = userMessages[userMessages.length - 1];
   const firstUserMessage = userMessages.length > 1 ? userMessages[0] : null;
+  const lastUserText = lastUserMessage ? getMessageText(lastUserMessage as Parameters<typeof getMessageText>[0]) : "";
+  const firstUserText = firstUserMessage ? getMessageText(firstUserMessage as Parameters<typeof getMessageText>[0]) : "";
+  const hasMultipleTurns = firstUserText.length > 0 && lastUserText.length > 0 && firstUserText !== lastUserText;
+  const textToEmbedBase = hasMultipleTurns ? `${firstUserText}\n\n${lastUserText}`.slice(0, 8000) : lastUserText;
 
-  const getMessageText = (msg: any): string => {
-    const parts = (msg?.parts ??[]).filter((p: any) => p.type === "text").map((p: any) => p.text).join(" ").trim();
-    return (parts || msg?.content || "").trim().slice(0, 8000);
+  const telemetry: SwarmTelemetry = {
+    scoutMatches: 0,
+    splitterClaims: 0,
+    drafterProcessed: 0,
+    drafterPassed: 0,
+    expandedQueryDisplay: "",
+    splitterError: undefined,
+    drafterErrors: undefined,
   };
 
-  const lastUserText = lastUserMessage ? getMessageText(lastUserMessage) : "";
-  const firstUserText = firstUserMessage ? getMessageText(firstUserMessage) : "";
-  const hasMultipleTurns = firstUserText.length > 0 && lastUserText.length > 0 && firstUserText !== lastUserText;
-  const locale = body.locale === "he" ? "he" : "en";
+  let existingMatches: ExistingNodeDisplay = [];
+  let preComputedDrafts: DraftEpistemicNode[] = [];
+  const supabase = createServerSupabase();
 
-  let ragTelemetry: any = null;
-  let textToEmbed = hasMultipleTurns ? `${firstUserText}\n\n${lastUserText}`.slice(0, 8000) : lastUserText;
+  // ========== 1. THE SCOUT (Query expansion + RAG) ==========
   let expandedQueryEn = "";
+  let textToEmbed = textToEmbedBase;
 
   if (lastUserText) {
     try {
-      let expansionError = "";
-      try {
-        const expansionResult = await generateText({
-          model: google("gemini-2.5-flash"),
-          system: QUERY_EXPANSION_SYSTEM,
-          prompt: lastUserText,
-          maxTokens: 120,
-        });
-        expandedQueryEn = (expansionResult.text ?? "").trim();
-        if (expandedQueryEn.length > 0) textToEmbed = expandedQueryEn;
-      } catch (err: any) {
-        expansionError = err.message;
-        textToEmbed = lastUserText;
-      }
+      const expansionResult = await generateText({
+        model: google("gemini-2.5-flash"),
+        system: QUERY_EXPANSION_SYSTEM,
+        prompt: lastUserText,
+      });
+      expandedQueryEn = (expansionResult.text ?? "").trim();
+      if (expandedQueryEn.length > 0) textToEmbed = expandedQueryEn;
+    } catch {
+      textToEmbed = lastUserText;
+    }
+    telemetry.expandedQueryDisplay = expandedQueryEn || "(used raw)";
 
+    try {
       const embeddingResult = await embed({
         model: google.textEmbeddingModel("gemini-embedding-001"),
         value: textToEmbed,
@@ -129,164 +171,186 @@ export async function POST(request: Request) {
           match_count: RAG_MATCH_COUNT,
         } as never);
 
-        const matchList = (matches ?? []) as any[];
+        const matchList = (matches ?? []) as Array<{ id: string; content?: string; similarity?: number }>;
+        telemetry.scoutMatches = matchList.length;
 
-        let newClaimsToDraft: string[] = [];
-        let splitterRun = false;
-        let splitterError = "";
-
-        if (matchList.length > 0) {
-          const nodesForTool = matchList.map((m: { id: string; content?: string }) => ({
-            id: m.id,
-            assertionEn: getDisplayAssertion(m.content || "", "en"),
-            assertionHe: getDisplayAssertion(m.content || "", "he"),
-          }));
-
-          if (lastUserText.length > 100) {
-            splitterRun = true;
-            try {
-              const splitResult = await generateObject({
-                model: google("gemini-2.5-flash"),
-                schema: z.object({
-                  newClaims: z
-                    .array(z.string())
-                    .describe("Extract ONLY the distinct arguments from the user's text that are completely NEW and NOT addressed by the existing DB matches."),
-                }),
-                prompt: `USER TEXT:\n${lastUserText}\n\nEXISTING DB MATCHES:\n${JSON.stringify(matchList.map((m: { id?: string; content?: string }) => ({ id: m.id, contentPreview: (m.content ?? "").slice(0, 200) })))}\n\nTASK: Analyze the user text. Ignore anything that overlaps with the existing DB matches. Return an array of ONLY the new, unaddressed arguments/claims that require drafting.`,
-              });
-              newClaimsToDraft = splitResult.object.newClaims ?? [];
-            } catch (e: any) {
-              console.error("Splitter Agent failed:", e);
-              splitterError = e?.message ?? String(e);
-              newClaimsToDraft = [lastUserText];
-            }
-          } else {
-            newClaimsToDraft = [lastUserText];
-          }
-
-          injectedKnowledge = `
-=========================================
-CRITICAL SYSTEM OVERRIDE: PRE-PROCESSED COGNITIVE ROUTING
-=========================================
-The backend has already analyzed the user's input and split the cognitive load for you.
-
-MANDATORY EXECUTION: You possess a single tool: \`epistemic_triage\`. You MUST call it EXACTLY ONCE in this response.
-
-1. Place the existing matched nodes into \`existingNodesToDisplay\`: ${JSON.stringify(nodesForTool)}
-
-2. The backend identified these NEW, unmatched claims: ${JSON.stringify(newClaimsToDraft)}
-   Evaluate them. To prevent cognitive overload, select the 2 or 3 most foundational new claims, score them strictly, and place them into the \`newDrafts\` array. Do NOT leave \`newDrafts\` empty if new claims were provided.
-
-YOUR RESPONSE FORMAT:
-- Warmly acknowledge the existing nodes; they will appear as portals.
-- Provide brief Socratic insight on the NEW claims you drafted.
-- State that you have prepared drafts below for anchoring.
-`;
-        } else {
-          newClaimsToDraft = [lastUserText];
-        }
-
-        if (architectMode) {
-          ragTelemetry = {
-            source: "rag",
-            rawQuery: lastUserText,
-            expandedQueryDisplay: expandedQueryEn || "FAILED_TO_EXPAND_USED_RAW",
-            matchThreshold: RAG_MATCH_THRESHOLD,
-            matchCount: matchList.length,
-            matchBreakdown: matchList.map((m: any, i: number) => `Match ${i + 1}: Sim: ${(m.similarity * 100).toFixed(2)}% | ${m.content.substring(0, 40)}...`).join("\n"),
-            errorMessage:[expansionError, rpcError?.message].filter(Boolean).join(" | "),
-            systemPromptOverride: matchList.length > 0,
-            splitterRun,
-            splitterClaims: newClaimsToDraft,
-            splitterError: splitterError || undefined,
-          };
-        }
+        existingMatches = matchList.map((m) => ({
+          id: m.id,
+          assertionEn: getDisplayAssertion(m.content ?? "", "en"),
+          assertionHe: getDisplayAssertion(m.content ?? "", "he"),
+        }));
       }
-    } catch (err: any) {
-      if (architectMode) {
-        ragTelemetry = { source: "rag", errorMessage: err.message, matchCount: 0 };
-      }
+    } catch (err) {
+      if (architectMode) telemetry.splitterError = err instanceof Error ? err.message : String(err);
     }
   }
 
-  // RAG override MUST be last so the model obeys it (avoids recency bias from FORGE_SYSTEM rules).
-  const systemPrompt =
-    injectedKnowledge.length > 0
-      ? `${FORGE_SYSTEM}${contextBlock}\n\n---\n\n${injectedKnowledge}`
-      : `${FORGE_SYSTEM}${contextBlock}`;
+  // ========== 2. THE SPLITTER (extract new claims only when text is substantial) ==========
+  let newClaimsToDraft: string[] = [];
 
-  const model = google("gemini-2.5-pro");
+  if (lastUserText.length > SPLITTER_MIN_CHARS) {
+    try {
+      const existingPreview = existingMatches.length
+        ? JSON.stringify(
+            existingMatches.map((n) => ({ id: n.id, assertionEn: n.assertionEn.slice(0, 150) }))
+          )
+        : "[]";
+      const splitResult = await generateObject({
+        model: google("gemini-2.5-flash"),
+        schema: z.object({
+          newClaims: z.array(z.string()).describe("Only distinct new claims not addressed by existing nodes."),
+        }),
+        system: SPLITTER_SYSTEM,
+        prompt: `USER TEXT:\n${lastUserText}\n\nEXISTING DB MATCHES (preview):\n${existingPreview}\n\nTASK: Return ONLY the array of new, unaddressed claims.`,
+      });
+      newClaimsToDraft = splitResult.object.newClaims ?? [];
+    } catch (err) {
+      if (architectMode) telemetry.splitterError = err instanceof Error ? err.message : String(err);
+      newClaimsToDraft = [lastUserText];
+    }
+  } else {
+    newClaimsToDraft = lastUserText ? [lastUserText] : [];
+  }
+
+  telemetry.splitterClaims = newClaimsToDraft.length;
+
+  // ========== 3. THE DRAFTER SWARM (parallel per-claim drafting + quality gate) ==========
+  if (newClaimsToDraft.length > 0) {
+    const drafterPromises = newClaimsToDraft.map((claim) =>
+      generateObject({
+        model: google("gemini-2.5-flash"),
+        schema: DraftEpistemicNodeSchema,
+        prompt: `You are a Logician Drafter. Evaluate this single claim for logical coherence and produce a draft epistemic node.
+Claim: "${claim}"
+Existing context (for relationshipToContext): ${JSON.stringify(existingMatches.slice(0, 3))}
+Output: assertionEn (sharp premise), assertionHe (Hebrew if you can), logicalCoherenceScore (0-100), reasoningEn/He, hiddenAssumptionsEn/He, challengePromptEn/He, thematicTags.`,
+      })
+    );
+
+    const results = await Promise.allSettled(drafterPromises);
+    const errors: string[] = [];
+    const drafts: DraftEpistemicNode[] = [];
+
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (r.status === "rejected") {
+        errors.push(`claim ${i + 1}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`);
+        continue;
+      }
+      const parsed = r.value.object as unknown;
+      const validated = DraftEpistemicNodeSchema.safeParse(parsed);
+      if (!validated.success) {
+        errors.push(`claim ${i + 1}: invalid schema`);
+        continue;
+      }
+      const d = validated.data;
+      telemetry.drafterProcessed += 1;
+      if (d.logicalCoherenceScore >= DRAFTER_QUALITY_GATE) {
+        drafts.push(d);
+        telemetry.drafterPassed += 1;
+      }
+    }
+
+    if (errors.length > 0 && architectMode) telemetry.drafterErrors = errors;
+    preComputedDrafts = drafts;
+  }
+
+  // ========== 4. THE HANDOFF → Socrates system prompt ==========
+  const rejectedCount = newClaimsToDraft.length - preComputedDrafts.length;
+  const rejectionNotice =
+    rejectedCount > 0
+      ? `\n\n[CRITICAL BACKEND NOTICE]: The Swarm evaluated ${rejectedCount} of the user's claims and REJECTED them for scoring below ${DRAFTER_QUALITY_GATE}/100. You MUST politely inform the user that their claim lacks the necessary physical mechanism, observation, or logical structure to be anchored as a draft, and ask Socratic questions to help them build it.`
+      : "";
+
+  const handoffBlock = `
+=========================================
+CRITICAL: PRE-COMPUTED SWARM OUTPUT (Do not regenerate this data)
+=========================================
+The backend Epistemic Assembly Line has already:
+- Found existing nodes (RAG).
+- Extracted and evaluated new claims. Only drafts with logicalCoherenceScore >= ${DRAFTER_QUALITY_GATE} are included.
+${rejectionNotice}
+
+EXISTING NODES TO DISPLAY (pass exactly to epistemic_triage.existingNodesToDisplay):
+${JSON.stringify(existingMatches)}
+
+NEW APPROVED DRAFTS (pass exactly to epistemic_triage.newDrafts):
+${JSON.stringify(preComputedDrafts)}
+
+STAGE 2: YOU MUST NOT LEAVE \`newDrafts\` EMPTY if the Splitter Agent provided new claims! You MUST output the drafts alongside the existing nodes in the same tool call.
+
+YOUR TASK:
+1. Write a beautiful, warm Socratic response in the user's language in the \`socraticMessage\` field. Discuss both the existing nodes and the new drafts where relevant. You MUST populate \`socraticMessage\`—this is your only voice to the user; do not leave it empty.
+2. Call the \`epistemic_triage\` tool EXACTLY ONCE: set \`socraticMessage\` to your full reply, and pass the EXACT \`existingNodesToDisplay\` and \`newDrafts\` arrays above so the UI can render them.
+`;
+
+  const SOCRATES_SYSTEM = `You are Socrates, the Village Elder. A Socratic, pure logician guiding a human. Converse in the user's language (Hebrew or English). Never leave the user with a blank message.
+
+You have ONE tool: \`epistemic_triage\`. The backend Swarm has already processed the physics and logic of the user's input. Your job is ONLY to:
+1. Write your full conversational reply in \`socraticMessage\` (MANDATORY—this is the only text the user sees from you; never leave it empty).
+2. Call \`epistemic_triage\` exactly once, passing \`socraticMessage\` plus the EXACT \`existingNodesToDisplay\` and \`newDrafts\` arrays that were prepared for you—do not generate or alter the arrays.
+
+Rules: Neutrality—treat the user as a peer. First principles—analyze by logic and constraints, not by appeals to institutions.`;
+
+  const systemPrompt = `${SOCRATES_SYSTEM}${contextBlock}\n\n${handoffBlock}`;
 
   const epistemicTriageTool = {
     description:
-      "MANDATORY TOOL: You MUST call this tool to render the UI. Use \`existingNodesToDisplay\` to show RAG-matched nodes as portals. Use \`newDrafts\` to generate draft cards for NEW arguments. Call exactly once per response when the user provides structured arguments.",
+      "MANDATORY: Call this once to render the UI. Populate socraticMessage with your full conversational response (never leave empty). Pass the exact existingNodesToDisplay and newDrafts arrays provided in the system context.",
     inputSchema: EpistemicTriageSchema,
     execute: async (args: z.infer<typeof EpistemicTriageSchema>) => ({ ok: true, triage: args }),
   };
 
-  const forgeTools = {
-    epistemic_triage: epistemicTriageTool,
-  };
+  const forgeTools = { epistemic_triage: epistemicTriageTool };
 
   try {
     const result = streamText({
-      model,
+      model: google("gemini-2.5-pro"),
       system: systemPrompt,
       messages: await convertToModelMessages(messages, { tools: forgeTools }),
       tools: forgeTools,
-      toolChoice: "auto",
+      toolChoice: "required",
       temperature: 0.45,
-      maxSteps: 5,
+      providerOptions: { google: { maxOutputTokens: 8192 } },
     });
 
     const response = result.toUIMessageStreamResponse({
       originalMessages: messages,
-      onError: (err) => console.error("[Oracle Forge stream]", err),
+      onError: (err) => {
+        console.error("[Oracle Forge stream]", err);
+        return err instanceof Error ? err.message : String(err);
+      },
     });
 
-    if (!architectMode || !ragTelemetry) {
-      return response;
-    }
+    if (!architectMode) return response;
 
-    const telemetryPrefix = `[SWARM_TELEMETRY]:${JSON.stringify(ragTelemetry)}\n\n`;
-    let prepended = false;
-    let buffer = "";
+    const TELEMETRY_STREAM_ID = "swarm-telemetry";
+    const telemetryPayload = `[SWARM_TELEMETRY]:${JSON.stringify(telemetry)}\n\n`;
+    let telemetryInjected = false;
+    const encoder = new TextEncoder();
+    const toSseChunk = (obj: object) => encoder.encode(`data: ${JSON.stringify(obj)}\n\n`);
 
     const transform = new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, controller) {
-        buffer += new TextDecoder().decode(chunk, { stream: true });
-        const lines = buffer.split(/\r?\n/);
-        buffer = lines.pop() ?? "";
-
-        for (let i = 0; i < lines.length; i++) {
-          let line = lines[i];
-          if (!prepended && line.startsWith("data: ")) {
-            try {
-              const payload = line.slice(6).trim();
-              if (payload !== "[DONE]") {
-                const json = JSON.parse(payload);
-                if (json.type === "text-delta" && "delta" in json) {
-                  json.delta = telemetryPrefix + json.delta;
-                  line = "data: " + JSON.stringify(json);
-                  prepended = true;
-                }
-              }
-            } catch {}
-          }
-          controller.enqueue(new TextEncoder().encode(line + "\n"));
+        if (!telemetryInjected) {
+          telemetryInjected = true;
+          controller.enqueue(toSseChunk({ type: "text-start", id: TELEMETRY_STREAM_ID }));
+          controller.enqueue(toSseChunk({ type: "text-delta", id: TELEMETRY_STREAM_ID, delta: telemetryPayload }));
+          controller.enqueue(toSseChunk({ type: "text-end", id: TELEMETRY_STREAM_ID }));
         }
+        controller.enqueue(chunk);
       },
-      flush(controller) {
-        if (buffer.length > 0) controller.enqueue(new TextEncoder().encode(buffer + "\n"));
-      }
     });
 
     return new Response(response.body?.pipeThrough(transform) ?? null, {
       status: response.status,
       headers: response.headers,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[Oracle Forge API]", err);
-    return NextResponse.json({ error: "Epistemic Forge failed", detail: err.message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Epistemic Forge failed", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
   }
 }
