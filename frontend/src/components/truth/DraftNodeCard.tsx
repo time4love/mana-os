@@ -35,6 +35,16 @@ const REVIEW_EXISTING = { he: "עיין או הדהד בשורש הקיים", en
 /** Bilingual Forge draft (Rosetta): display uses locale; vector uses assertionEn. */
 export type ForgeDraft = ForgeDraftBilingual;
 
+const PORTAL_EXISTING_CTA = {
+  he: "👉 הטיעון קיים במארג - צלול לדיון",
+  en: "This claim exists in the Weave — dive into discussion",
+};
+
+const BELOW_THRESHOLD_BADGE = {
+  he: "⚠️ הטיעון דורש ליטוש לוגי ואינו עומד ברף העגינה",
+  en: "Claim requires logical refinement and does not meet the anchoring bar",
+};
+
 interface DraftNodeCardProps {
   draft: ForgeDraft;
   onAnchor: () => void;
@@ -42,6 +52,8 @@ interface DraftNodeCardProps {
   authorWallet: string;
   parentId?: string;
   relationship?: "supports" | "challenges" | "ai_analysis";
+  /** When set (Epistemic Triage): this claim matches an existing node; show portal link and hide Anchor. */
+  matchedExistingNodeId?: string | null;
   /** When set, anchor was blocked by semantic dedup; show warning + links and force-plant option. */
   semanticDuplicates?: MatchTruthNodeResult[] | null;
   /** Call to anchor with forceBypass (plant new seed despite similar existing nodes). */
@@ -56,6 +68,7 @@ export function DraftNodeCard({
   draft,
   onAnchor,
   isAnchoring = false,
+  matchedExistingNodeId = null,
   semanticDuplicates = null,
   onForcePlant,
   writeTelemetry = null,
@@ -88,6 +101,9 @@ export function DraftNodeCard({
   const scoutLabel = locale === "he" ? SCOUT_LABEL.he : SCOUT_LABEL.en;
 
   const pulse = Math.min(100, Math.max(0, draft.logicalCoherenceScore));
+  const isBelowAnchoringThreshold = pulse < 40;
+  const portalLabel = locale === "he" ? PORTAL_EXISTING_CTA.he : PORTAL_EXISTING_CTA.en;
+  const belowThresholdLabel = locale === "he" ? BELOW_THRESHOLD_BADGE.he : BELOW_THRESHOLD_BADGE.en;
 
   const rel = draft.relationshipToContext;
   const supportsLabel = locale === "he" ? BADGE_SUPPORTS.he : BADGE_SUPPORTS.en;
@@ -179,7 +195,14 @@ export function DraftNodeCard({
             )}
           </motion.div>
         )}
-        {showSemanticBlock ? (
+        {matchedExistingNodeId ? (
+          <Link
+            href={`/truth/node/${matchedExistingNodeId}`}
+            className="inline-flex items-center justify-center w-full sm:w-auto px-4 py-2 rounded-lg border border-primary/40 bg-primary/10 text-primary font-medium text-sm hover:bg-primary/20 transition-all no-underline shadow-soft"
+          >
+            {portalLabel}
+          </Link>
+        ) : showSemanticBlock ? (
           <div className="space-y-3 rounded-lg border border-amber-200/70 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-3">
             <p className="text-sm text-amber-900 dark:text-amber-100 font-medium text-start">
               {semanticWarningText}
@@ -215,6 +238,15 @@ export function DraftNodeCard({
                 {isAnchoring ? (locale === "he" ? "עוגן…" : "Anchoring…") : forcePlantLabel}
               </Button>
             )}
+          </div>
+        ) : isBelowAnchoringThreshold ? (
+          <div
+            className="rounded-lg border border-amber-300/70 bg-amber-50/80 dark:bg-amber-950/30 px-3 py-2.5 text-start"
+            role="status"
+          >
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+              {belowThresholdLabel}
+            </p>
           </div>
         ) : (
           <Button
