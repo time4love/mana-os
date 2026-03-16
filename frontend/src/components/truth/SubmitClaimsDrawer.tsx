@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Loader2, Anchor, Sparkles, Filter } from "lucide-react";
 import { useAccount } from "wagmi";
@@ -78,6 +79,7 @@ export function SubmitClaimsDrawer({
   theoryBEn,
   theoryBHe,
 }: SubmitClaimsDrawerProps) {
+  const router = useRouter();
   const { locale } = useLocale();
   const { address } = useAccount();
   const isRtl = locale === "he";
@@ -157,6 +159,7 @@ export function SubmitClaimsDrawer({
         return;
       }
       setAnchorStatus("done");
+      router.refresh();
       handleOpenChange(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
