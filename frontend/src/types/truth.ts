@@ -160,6 +160,12 @@ export interface EpistemicPrismResult {
 // Forge draft — bilingual tool output (Universal English + Hebrew)
 // ---------------------------------------------------------------------------
 
+/** Competing theory for Macro-Arena (Theory A / Theory B). */
+export interface CompetingTheory {
+  assertionEn: string;
+  assertionHe: string;
+}
+
 export interface ForgeDraftBilingual {
   assertionEn: string;
   assertionHe: string;
@@ -172,6 +178,8 @@ export interface ForgeDraftBilingual {
   logicalCoherenceScore: number;
   relationshipToContext?: "supports" | "challenges";
   thematicTags?: string[];
+  /** For macro-arena: exactly 2 competing theories (Theory A vs Theory B). */
+  competingTheories?: CompetingTheory[];
 }
 
 // ---------------------------------------------------------------------------

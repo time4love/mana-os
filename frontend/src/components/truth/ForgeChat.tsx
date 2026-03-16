@@ -37,7 +37,7 @@ const PORTAL_LINK_CLASS =
 
 /** Extract markdown links to /truth/node/* so we can always render them as buttons (never truncated). */
 function extractTruthNodeLinks(text: string): { label: string; href: string }[] {
-  const links: { label: string; href: string }[] =[];
+  const links: { label: string; href: string }[] = [];
   const re = /\[([^\]]*)\]\((\/truth\/node\/[^)]*)\)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
@@ -57,7 +57,7 @@ function SimpleMarkdown({ text, className = "" }: { text: string; className?: st
   return (
     <div className={`space-y-2 whitespace-pre-wrap text-start leading-relaxed break-words ${className}`}>
       {parts.map((line, i) => {
-        const tokens: React.ReactNode[] =[];
+        const tokens: React.ReactNode[] = [];
         let rest = line;
         let key = 0;
         while (rest.length > 0) {
@@ -191,14 +191,14 @@ function FluidForgeInput({
     el.style.height = "auto";
     const newHeight = Math.min(Math.max(el.scrollHeight, MIN_TEXTAREA_PX), MAX_TEXTAREA_PX);
     el.style.height = `${newHeight}px`;
-  },[]);
+  }, []);
 
   useEffect(() => {
     adjustHeight();
   }, [value, adjustHeight]);
 
   return (
-    <form onSubmit={onSubmit} className="flex-none sticky bottom-0 border-t border-border bg-background/95 backdrop-blur py-4 px-4">
+    <form onSubmit={onSubmit} className="border-0 bg-transparent py-4 px-4">
       <div className="flex gap-2 items-end">
         <textarea
           ref={textareaRef}
@@ -248,18 +248,38 @@ const FORGE_TRIAGING_LABEL = {
 };
 const FORGE_PROCESSING_LABEL = { he: "הכבשן מעבד…", en: "The Forge is processing…" };
 const ERROR_PREFIX_LABEL = { he: "שגיאה: ", en: "Error: " };
+const PORTALS_HEADING = { he: "שערים לצמתים חופפים (Portals to Existing Nodes):", en: "Portals to Existing Nodes:" };
+const DIVE_TO_NODE_CTA = { he: "צלול לצומת זה 🌊", en: "Dive into this node 🌊" };
 const ORACLE_CONTEMPLATING_LABEL = {
   he: "האורקל מתבונן",
   en: "The Oracle is contemplating",
 };
+
+/** Configuration that drives ForgeChat behavior (API, labels, visibility). Inversion of Control: the component is "dumb" and driven by config. */
+export interface ForgeChatConfig {
+  apiEndpoint: string;
+  placeholder: string;
+  submitLabel: string;
+  showTriageMappingLabel: boolean;
+}
+
+/** Build config for Macro-Arena initiation (root topic; tag 'macro-arena'). Use when mounting ForgeChat for "Initiate Debate Arena" flows. */
+export function createArenaConfig(locale: "he" | "en"): ForgeChatConfig {
+  return {
+    apiEndpoint: "/api/oracle/arena",
+    placeholder: getLocalized(FORGE_PLACEHOLDER_ARENA, locale),
+    submitLabel: getLocalized(FORGE_SEND, locale),
+    showTriageMappingLabel: false,
+  };
+}
 
 interface ForgeChatProps {
   authorWallet: string;
   parentId?: string;
   relationship?: EdgeRelationship;
   targetNodeContext?: string | null;
-  /** When true, guides the user to create a Macro-Arena (root topic); draft will be tagged 'macro-arena'. */
-  isArenaMode?: boolean;
+  /** Drives API endpoint, placeholder, submit label, and whether to show "Claim mapping below". Omit for default Forge behavior. */
+  config?: ForgeChatConfig;
   onAnchored?: (nodeId: string) => void;
   onEdgeAttached?: (edgeId: string) => void;
   className?: string;
@@ -270,7 +290,7 @@ export function ForgeChat({
   parentId,
   relationship,
   targetNodeContext,
-  isArenaMode = false,
+  config,
   onAnchored,
   className = "",
 }: ForgeChatProps) {
@@ -282,18 +302,26 @@ export function ForgeChat({
   const [anchorError, setAnchorError] = useState<string | null>(null);
   const [lastWriteTelemetry, setLastWriteTelemetry] = useState<string[] | null>(null);
 
+  const defaultConfig: ForgeChatConfig = {
+    apiEndpoint: "/api/oracle/forge",
+    placeholder: getLocalized(FORGE_PLACEHOLDER, locale),
+    submitLabel: getLocalized(FORGE_SEND, locale),
+    showTriageMappingLabel: true,
+  };
+  const activeConfig = config ?? defaultConfig;
+
   const cacheKey = getForgeCacheKey(parentId);
 
   const initialMessages = useMemo((): UIMessage[] => {
-    if (typeof sessionStorage === "undefined") return[];
+    if (typeof sessionStorage === "undefined") return [];
     try {
       const raw = sessionStorage.getItem(cacheKey);
-      if (!raw) return[];
+      if (!raw) return [];
       const parsed = JSON.parse(raw) as { messages?: unknown[] };
       if (!Array.isArray(parsed?.messages)) return [];
       return parsed.messages as UIMessage[];
     } catch {
-      return[];
+      return [];
     }
   }, [cacheKey]);
 
@@ -301,7 +329,7 @@ export function ForgeChat({
     id: cacheKey,
     messages: initialMessages,
     transport: new DefaultChatTransport({
-      api: isArenaMode ? "/api/oracle/arena" : "/api/oracle/forge",
+      api: activeConfig.apiEndpoint,
       body: {
         locale,
         targetNodeContext: targetNodeContext ?? undefined,
@@ -404,8 +432,9 @@ export function ForgeChat({
   const releaseTooltip = getLocalized(RELEASE_THOUGHT_TOOLTIP, locale);
 
   return (
-    <div className={`flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-soft ${className}`} dir={isRtl ? "rtl" : "ltr"}>
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 min-h-0 relative">
+    <div className={`grid h-full min-h-0 grid-rows-[1fr_auto] overflow-hidden rounded-xl border border-border bg-card shadow-soft ${className}`} dir={isRtl ? "rtl" : "ltr"}>
+      <div className="min-h-0 overflow-y-auto overflow-x-hidden p-4">
+        <div className="flex flex-col gap-4">
         {messages.length > 0 && (
           <div className="flex justify-end mb-1">
             <Button
@@ -423,7 +452,7 @@ export function ForgeChat({
         )}
         {messages.length === 0 && (
           <p className="text-muted-foreground text-sm text-start py-8">
-            {getLocalized(isArenaMode ? FORGE_PLACEHOLDER_ARENA : FORGE_PLACEHOLDER, locale)}
+            {activeConfig.placeholder}
           </p>
         )}
 
@@ -438,7 +467,7 @@ export function ForgeChat({
               <div className={`max-w-[90%] text-start overflow-visible ${message.role === "user" ? "self-end bg-primary/15 text-foreground border border-primary/20 rounded-2xl rounded-se-none px-4 py-3" : "self-start bg-muted/60 text-foreground border border-border rounded-2xl rounded-ss-none px-4 py-3"}`}>
                 <div className="space-y-2 text-sm text-start overflow-visible">
                   {(() => {
-                    const parts = message.parts ??[];
+                    const parts = message.parts ?? [];
                     let hasVisible = false;
                     const rendered = parts.map((part, partIndex) => {
                       const p = part as {
@@ -513,7 +542,7 @@ export function ForgeChat({
                           {hasPortals ? (
                             <div className="w-full max-w-full overflow-hidden flex flex-col gap-3 p-4 bg-primary/5 border border-primary/20 rounded-xl mt-2 box-border">
                               <p className="text-sm font-semibold text-primary mb-1 break-words">
-                                שערים לצמתים חופפים (Portals to Existing Nodes):
+                                {getLocalized(PORTALS_HEADING, locale)}
                               </p>
                               {existingNodes.map((node) => (
                                 <div
@@ -527,13 +556,13 @@ export function ForgeChat({
                                     href={`/truth/node/${node.id}`}
                                     className="self-end text-xs font-medium px-4 py-1.5 rounded-full transition-all no-underline bg-primary text-primary-foreground hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                                   >
-                                    צלול לצומת זה 🌊
+                                    {getLocalized(DIVE_TO_NODE_CTA, locale)}
                                   </Link>
                                 </div>
                               ))}
                             </div>
                           ) : null}
-                          {hasDrafts ? (
+                          {hasDrafts && activeConfig.showTriageMappingLabel ? (
                             <p className="mt-3 text-muted-foreground italic text-start text-xs">
                               {getLocalized(TRIAGE_MAPPING_LABEL, locale)}
                             </p>
@@ -632,17 +661,20 @@ export function ForgeChat({
         {anchorError && (
           <p className="text-sm text-destructive text-start" role="alert">{anchorError}</p>
         )}
+        </div>
       </div>
 
-      <FluidForgeInput
-        value={input}
-        onChange={setInput}
-        placeholder={getLocalized(isArenaMode ? FORGE_PLACEHOLDER_ARENA : FORGE_PLACEHOLDER, locale)}
-        disabled={isLoading}
-        onSubmit={handleSubmit}
-        submitLabel={getLocalized(FORGE_SEND, locale)}
-        isSubmitting={isLoading}
-      />
+      <div className="shrink-0 border-t border-border bg-background/95 backdrop-blur">
+        <FluidForgeInput
+          value={input}
+          onChange={setInput}
+          placeholder={activeConfig.placeholder}
+          disabled={isLoading}
+          onSubmit={handleSubmit}
+          submitLabel={activeConfig.submitLabel}
+          isSubmitting={isLoading}
+        />
+      </div>
     </div>
   );
 }

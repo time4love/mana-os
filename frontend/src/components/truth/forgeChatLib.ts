@@ -156,6 +156,16 @@ export function parseTelemetryFromText(text: string): {
   return { telemetry, visibleText: visibleText.trim() };
 }
 
+/** Index of the character after the telemetry JSON block (after next \n\n or end of string). */
+function getTelemetryBlockEnd(text: string, jsonIdx: number): number {
+  const payloadStart = jsonIdx + SWARM_TELEMETRY_PREFIX.length;
+  const after = text.slice(payloadStart);
+  const endMatch = after.match(/\n\n/);
+  return endMatch
+    ? jsonIdx + SWARM_TELEMETRY_PREFIX.length + (endMatch.index ?? 0) + (endMatch[0].length ?? 0)
+    : text.length;
+}
+
 function stripTelemetryBlockFromText(
   text: string,
   headerIdx: number,
@@ -163,24 +173,14 @@ function stripTelemetryBlockFromText(
 ): string {
   if (headerIdx !== -1) {
     if (jsonIdx !== -1) {
-      const payloadStart = jsonIdx + SWARM_TELEMETRY_PREFIX.length;
-      const after = text.slice(payloadStart);
-      const endMatch = after.match(/\n\n/);
-      const endCut = endMatch
-        ? jsonIdx + SWARM_TELEMETRY_PREFIX.length + (endMatch.index ?? 0) + (endMatch[0].length ?? 0)
-        : text.length;
+      const endCut = getTelemetryBlockEnd(text, jsonIdx);
       return text.slice(0, headerIdx) + text.slice(endCut);
     }
     const nextDoubleNewline = text.indexOf("\n\n", headerIdx);
     return text.slice(0, headerIdx) + (nextDoubleNewline !== -1 ? text.slice(nextDoubleNewline + 2) : "");
   }
   if (jsonIdx !== -1) {
-    const payloadStart = jsonIdx + SWARM_TELEMETRY_PREFIX.length;
-    const after = text.slice(payloadStart);
-    const endMatch = after.match(/\n\n/);
-    const endCut = endMatch
-      ? jsonIdx + SWARM_TELEMETRY_PREFIX.length + (endMatch.index ?? 0) + (endMatch[0].length ?? 0)
-      : text.length;
+    const endCut = getTelemetryBlockEnd(text, jsonIdx);
     return text.slice(0, jsonIdx) + text.slice(endCut);
   }
   return text;
@@ -189,6 +189,12 @@ function stripTelemetryBlockFromText(
 /** Pick localized label from { he, en }. */
 export function getLocalized<T extends { he: string; en: string }>(labels: T, locale: "he" | "en"): string {
   return locale === "he" ? labels.he : labels.en;
+}
+
+/** Competing theory pair for Macro-Arena (Question + Theory A vs Theory B). */
+export interface CompetingTheory {
+  assertionEn: string;
+  assertionHe: string;
 }
 
 /** Normalized draft shape for UI (matches ForgeDraft + matchedExistingNodeId). */
@@ -205,6 +211,19 @@ export interface NormalizedForgeDraft {
   relationshipToContext: "supports" | "challenges";
   thematicTags: string[];
   matchedExistingNodeId: string | null;
+  /** For macro-arena: exactly 2 competing theories (Theory A vs Theory B). */
+  competingTheories?: CompetingTheory[];
+}
+
+function normalizeCompetingTheories(raw: unknown): CompetingTheory[] | undefined {
+  if (!Array.isArray(raw) || raw.length !== 2) return undefined;
+  const a = raw[0] as Record<string, unknown> | undefined;
+  const b = raw[1] as Record<string, unknown> | undefined;
+  if (!a || !b || typeof a.assertionEn !== "string" || typeof b.assertionEn !== "string") return undefined;
+  return [
+    { assertionEn: a.assertionEn as string, assertionHe: (a.assertionHe as string) ?? "" },
+    { assertionEn: b.assertionEn as string, assertionHe: (b.assertionHe as string) ?? "" },
+  ];
 }
 
 /** Normalize raw draft from triage.newDrafts for UI (exported for inline part rendering). */
@@ -222,6 +241,7 @@ export function normalizeRawDraft(c: Record<string, unknown>): NormalizedForgeDr
     relationshipToContext: (c.relationshipToContext as "supports" | "challenges") ?? "supports",
     thematicTags: Array.isArray(c.thematicTags) ? (c.thematicTags as string[]) : [],
     matchedExistingNodeId: typeof c.matchedExistingNodeId === "string" ? c.matchedExistingNodeId : null,
+    competingTheories: normalizeCompetingTheories(c.competingTheories),
   };
 }
 

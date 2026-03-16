@@ -8,6 +8,11 @@ import { z } from "zod";
 // Schemas (Arena: single draft card, score 50, macro-arena tag)
 // ---------------------------------------------------------------------------
 
+const CompetingTheorySchema = z.object({
+  assertionEn: z.string().min(1),
+  assertionHe: z.string().optional().catch(""),
+});
+
 const DraftEpistemicNodeSchema = z.object({
   assertionEn: z.string().min(1).catch("Assertion unavailable"),
   assertionHe: z.string().optional().catch(""),
@@ -21,6 +26,7 @@ const DraftEpistemicNodeSchema = z.object({
   matchedExistingNodeId: z.string().nullable().optional().catch(null),
   relationshipToContext: z.enum(["supports", "challenges"]).optional().catch("supports"),
   thematicTags: z.array(z.string()).max(10).optional().catch([]),
+  competingTheories: z.array(CompetingTheorySchema).max(2).optional(),
 });
 
 const EpistemicTriageSchema = z.object({
@@ -39,15 +45,28 @@ type DraftEpistemicNode = z.infer<typeof DraftEpistemicNodeSchema>;
 // Arena Drafter: neutral root title only (no RAG, no intent router)
 // ---------------------------------------------------------------------------
 
-const ARENA_DRAFTER_PROMPT = (topic: string) => `You are an Arena Architect. Formulate a Macro-Arena (Root Node) title for this topic: "${topic}"
+const ARENA_DRAFTER_PROMPT = (topic: string) => `You are the Arena Architect of Mana OS. The user wants to establish a new Macro-Arena for debate.
+
+Your task is to extract THREE things from their request:
+1. The neutral Root Question of the arena (e.g. "What is the shape of the Earth?").
+2. Theory A: The first main competing theory/answer.
+3. Theory B: The second main competing theory/answer.
+
+Topic or request: "${topic}"
 
 Output requirements:
-- assertionEn: A broad, neutral English question or title for the debate (e.g. "What is the shape of the Earth?").
-- assertionHe: The Hebrew translation.
-- logicalCoherenceScore: MUST be exactly 50 (neutral starting ground).
+- assertionEn & assertionHe: The neutral root question only (no theory text here).
 - thematicTags: MUST include "macro-arena". Add 1–2 other broad themes if relevant (e.g. Cosmology, Education).
+- logicalCoherenceScore: 50 (system placeholder; the Arena is an open question and has no logical score).
+- competingTheories: An array of EXACTLY 2 objects representing the opposing theories. Example:
+  [
+    { assertionEn: "The Earth is a spherical globe.", assertionHe: "הארץ היא כדור." },
+    { assertionEn: "The Earth is a flat plane.", assertionHe: "הארץ היא מישור שטוח." }
+  ]
 - relationshipToContext: "supports".
-- reasoningEn, reasoningHe, hiddenAssumptionsEn/He, challengePromptEn/He: empty or one-line.`;
+- reasoningEn, reasoningHe, hiddenAssumptionsEn/He, challengePromptEn/He: empty or one-line.
+
+Do not ask for permission. Output the JSON so the UI can render the complete Arena card with the question and the two theories.`;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -113,13 +132,16 @@ export async function POST(request: Request) {
         prompt: ARENA_DRAFTER_PROMPT(topic),
       });
       const draft = DraftEpistemicNodeSchema.parse(result.object);
-      newDraftsForTriage = TriageResultNewDraftsSchema.parse([
-        {
-          ...draft,
-          logicalCoherenceScore: 50,
-          thematicTags: [...new Set([...(draft.thematicTags ?? []), "macro-arena"])],
-        },
-      ]);
+      const normalized = {
+        ...draft,
+        logicalCoherenceScore: 50,
+        thematicTags: [...new Set([...(draft.thematicTags ?? []), "macro-arena"])],
+        competingTheories:
+          Array.isArray(draft.competingTheories) && draft.competingTheories.length === 2
+            ? draft.competingTheories
+            : undefined,
+      };
+      newDraftsForTriage = TriageResultNewDraftsSchema.parse([normalized]);
     } catch {
       newDraftsForTriage = [];
     }
@@ -137,11 +159,11 @@ Rules: Always output a short, warm Socratic message. Do NOT ask for permission�
 =========================================
 ARENA CREATION (GENERATIVE UI)
 =========================================
-The backend has formulated a proposed neutral title for the new Macro-Arena.
+The backend has formulated the full Arena package: the neutral root question AND the two competing theories (Theory A vs Theory B).
 APPROVED DRAFT JSON: ${JSON.stringify(newDraftsForTriage)}
 
 YOUR TASK:
-1. Write a short, warm Socratic response in the user's language. Tell them: "Here is a proposed neutral title for our new arena. If it accurately captures the foundation of our debate, click to anchor it. If not, tell me how to refine it."
+1. Write a short, warm Socratic response in the user's language. Say that you formulated the neutral root question and extracted the two main competing theories for the debate; if it accurately captures the arena, they can click to anchor.
 2. Call \`epistemic_triage\` EXACTLY ONCE.
 3. Pass your text to \`socraticMessage\`.
 4. The server will inject the APPROVED DRAFT into the tool result. You do not pass newDrafts; the server attaches it.

@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/i18n/context";
+import { getLocalized } from "@/components/truth/forgeChatLib";
 import { getDisplayAssertion } from "@/lib/utils/truthParser";
 import type { MatchTruthNodeResult } from "@/types/truth";
 import type { ForgeDraftBilingual } from "@/types/truth";
@@ -42,6 +43,8 @@ const FORCE_PLANT_CTA = {
 };
 
 const REVIEW_EXISTING = { he: "עיין או הדהד בשורש הקיים", en: "Review or resonate with existing node" };
+const DETAILS_LABEL = { he: "פרטים", en: "Details" };
+const ANCHORING_LABEL = { he: "עוגן…", en: "Anchoring…" };
 
 /** Bilingual Forge draft (Rosetta): display uses locale; vector uses assertionEn. */
 export type ForgeDraft = ForgeDraftBilingual;
@@ -109,26 +112,26 @@ export function DraftNodeCard({
   const challengePrompt = (locale === "he" && (draft.challengePromptHe ?? "").trim()) ? (draft.challengePromptHe ?? "").trim() : (draft.challengePromptEn ?? "").trim();
   const hasDetails = reasoning || (hiddenAssumptions?.length ?? 0) > 0 || challengePrompt;
 
-  const anchorLabel = isMacroArena
-    ? (locale === "he" ? ARENA_CTA.he : ARENA_CTA.en)
-    : (locale === "he" ? ANCHOR_CTA.he : ANCHOR_CTA.en);
-  const macroArenaBadgeLabel = locale === "he" ? MACRO_ARENA_BADGE.he : MACRO_ARENA_BADGE.en;
-  const rationaleLabel = locale === "he" ? RATIONALE_LABEL.he : RATIONALE_LABEL.en;
-  const scoutLabel = locale === "he" ? SCOUT_LABEL.he : SCOUT_LABEL.en;
+  const anchorLabel = isMacroArena ? getLocalized(ARENA_CTA, locale) : getLocalized(ANCHOR_CTA, locale);
+  const macroArenaBadgeLabel = getLocalized(MACRO_ARENA_BADGE, locale);
+  const rationaleLabel = getLocalized(RATIONALE_LABEL, locale);
+  const scoutLabel = getLocalized(SCOUT_LABEL, locale);
 
   const pulse = Math.min(100, Math.max(0, draft.logicalCoherenceScore));
   const isBelowAnchoringThreshold = pulse < 40;
-  const portalLabel = locale === "he" ? PORTAL_EXISTING_CTA.he : PORTAL_EXISTING_CTA.en;
-  const sovereignWarningLabel = locale === "he" ? SOVEREIGN_LOW_SCORE_WARNING.he : SOVEREIGN_LOW_SCORE_WARNING.en;
+  const portalLabel = getLocalized(PORTAL_EXISTING_CTA, locale);
+  const sovereignWarningLabel = getLocalized(SOVEREIGN_LOW_SCORE_WARNING, locale);
 
   const rel = draft.relationshipToContext;
-  const supportsLabel = locale === "he" ? BADGE_SUPPORTS.he : BADGE_SUPPORTS.en;
-  const challengesLabel = locale === "he" ? BADGE_CHALLENGES.he : BADGE_CHALLENGES.en;
+  const supportsLabel = getLocalized(BADGE_SUPPORTS, locale);
+  const challengesLabel = getLocalized(BADGE_CHALLENGES, locale);
 
   const showSemanticBlock = resonanceBlock.isBlocked && resonanceBlock.duplicates.length > 0;
-  const semanticWarningText = locale === "he" ? SEMANTIC_WARNING.he : SEMANTIC_WARNING.en;
-  const forcePlantLabel = locale === "he" ? FORCE_PLANT_CTA.he : FORCE_PLANT_CTA.en;
-  const reviewLabel = locale === "he" ? REVIEW_EXISTING.he : REVIEW_EXISTING.en;
+  const semanticWarningText = getLocalized(SEMANTIC_WARNING, locale);
+  const forcePlantLabel = getLocalized(FORCE_PLANT_CTA, locale);
+  const reviewLabel = getLocalized(REVIEW_EXISTING, locale);
+  const detailsLabel = getLocalized(DETAILS_LABEL, locale);
+  const anchoringLabel = getLocalized(ANCHORING_LABEL, locale);
 
   return (
     <motion.div
@@ -182,7 +185,7 @@ export function DraftNodeCard({
               onClick={() => setDetailsOpen((o) => !o)}
               className="text-xs text-muted-foreground hover:text-foreground"
             >
-              {detailsOpen ? "−" : "+"} {locale === "he" ? "פרטים" : "Details"}
+              {detailsOpen ? "−" : "+"} {detailsLabel}
             </button>
           )}
         </div>
@@ -221,6 +224,29 @@ export function DraftNodeCard({
             )}
           </motion.div>
         )}
+        {isMacroArena && draft.competingTheories && draft.competingTheories.length === 2 && (
+          <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border/50 pt-4 relative">
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full bg-background border border-border text-[10px] font-bold text-muted-foreground z-10 shadow-sm">
+              VS
+            </div>
+            <div className="rounded-md border border-border bg-muted/40 p-3 ring-1 ring-inset ring-border/30 text-center shadow-soft">
+              <span className="text-xs font-medium text-muted-foreground block mb-1">
+                {locale === "he" ? "תיאוריה א'" : "Theory A"}
+              </span>
+              <p className="text-sm font-medium text-foreground">
+                {locale === "he" ? draft.competingTheories[0].assertionHe : draft.competingTheories[0].assertionEn}
+              </p>
+            </div>
+            <div className="rounded-md border border-border bg-muted/40 p-3 ring-1 ring-inset ring-border/30 text-center shadow-soft">
+              <span className="text-xs font-medium text-muted-foreground block mb-1">
+                {locale === "he" ? "תיאוריה ב'" : "Theory B"}
+              </span>
+              <p className="text-sm font-medium text-foreground">
+                {locale === "he" ? draft.competingTheories[1].assertionHe : draft.competingTheories[1].assertionEn}
+              </p>
+            </div>
+          </div>
+        )}
         {matchedExistingNodeId ? (
           <Link
             href={`/truth/node/${matchedExistingNodeId}`}
@@ -237,18 +263,18 @@ export function DraftNodeCard({
               {resonanceBlock.duplicates.map((dup) => {
                 const display = getDisplayAssertion(dup.content, locale);
                 return (
-                <li key={dup.id}>
-                  <Link
-                    href={`/truth/node/${dup.id}`}
-                    className="text-sm text-primary hover:underline font-medium block"
-                  >
-                    {display.slice(0, 120)}
-                    {display.length > 120 ? "…" : ""}
-                  </Link>
-                  <span className="text-xs text-muted-foreground ms-1" title={reviewLabel}>
-                    → /truth/node/{dup.id.slice(0, 8)}…
-                  </span>
-                </li>
+                  <li key={dup.id}>
+                    <Link
+                      href={`/truth/node/${dup.id}`}
+                      className="text-sm text-primary hover:underline font-medium block"
+                    >
+                      {display.slice(0, 120)}
+                      {display.length > 120 ? "…" : ""}
+                    </Link>
+                    <span className="text-xs text-muted-foreground ms-1" title={reviewLabel}>
+                      → /truth/node/{dup.id.slice(0, 8)}…
+                    </span>
+                  </li>
                 );
               })}
             </ul>
@@ -261,7 +287,7 @@ export function DraftNodeCard({
                 disabled={isAnchoring}
                 className="w-full sm:w-auto border-amber-400/60 text-amber-900 dark:text-amber-100 hover:bg-amber-100/80 dark:hover:bg-amber-900/30"
               >
-                {isAnchoring ? (locale === "he" ? "עוגן…" : "Anchoring…") : forcePlantLabel}
+                {isAnchoring ? anchoringLabel : forcePlantLabel}
               </Button>
             )}
           </div>
@@ -283,7 +309,7 @@ export function DraftNodeCard({
               disabled={isAnchoring}
               className="w-full sm:w-auto bg-primary text-primary-foreground shadow-soft hover:opacity-90"
             >
-              {isAnchoring ? (locale === "he" ? "עוגן…" : "Anchoring…") : anchorLabel}
+              {isAnchoring ? anchoringLabel : anchorLabel}
             </Button>
           </div>
         )}
@@ -292,22 +318,22 @@ export function DraftNodeCard({
             <button
               type="button"
               onClick={() => setTelemetryOpen((o) => !o)}
-              className="w-full flex items-center justify-between px-3 py-2 bg-zinc-900/90 text-zinc-400 font-mono text-xs text-start hover:bg-zinc-800/90"
+              className="w-full flex items-center justify-between px-3 py-2 bg-muted text-muted-foreground font-mono text-xs text-start hover:bg-muted/80"
               aria-expanded={telemetryOpen}
             >
-              <span className="text-emerald-400/90 font-semibold">
+              <span className="text-primary font-semibold">
                 [Write Telemetry] {writeTelemetry.length} line(s)
               </span>
               <span aria-hidden>{telemetryOpen ? "−" : "+"}</span>
             </button>
             {telemetryOpen && (
               <pre
-                className="p-3 bg-black text-emerald-400 font-mono text-xs leading-relaxed overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-words"
+                className="p-3 bg-background text-primary font-mono text-xs leading-relaxed overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-words border-t border-border"
                 role="log"
                 aria-label="Backend anchor pipeline telemetry"
               >
                 {writeTelemetry.map((line, i) => (
-                  <span key={i} className={line.startsWith("[CRITICAL]") ? "text-red-400" : undefined}>
+                  <span key={i} className={line.startsWith("[CRITICAL]") ? "text-destructive" : undefined}>
                     {line}
                     {"\n"}
                   </span>

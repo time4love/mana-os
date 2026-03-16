@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useAccount } from "wagmi";
 import { ArrowRight } from "lucide-react";
 import { useLocale } from "@/lib/i18n/context";
+import { createArenaConfig } from "@/components/truth/ForgeChat";
 import { ForgeSheet } from "@/components/truth/ForgeSheet";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const HEADING = {
   he: "יזום זירת דיון חדשה",
@@ -42,6 +43,7 @@ export default function NewArenaPage() {
     router.push("/truth");
   };
 
+  const arenaConfig = useMemo(() => createArenaConfig(locale), [locale]);
   const isRtl = locale === "he";
 
   return (
@@ -81,7 +83,7 @@ export default function NewArenaPage() {
             onOpenChange={handleOpenChange}
             targetNodeContext={null}
             mode="root"
-            isArenaMode
+            config={arenaConfig}
             authorWallet={address}
             onAnchored={handleAnchored}
           />

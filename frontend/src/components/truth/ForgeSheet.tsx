@@ -9,7 +9,7 @@ import {
   SheetBody,
   SheetClose,
 } from "@/components/ui/sheet";
-import { ForgeChat } from "@/components/truth/ForgeChat";
+import { ForgeChat, type ForgeChatConfig } from "@/components/truth/ForgeChat";
 import type { EdgeRelationship } from "@/types/truth";
 import { X } from "lucide-react";
 
@@ -53,8 +53,8 @@ interface ForgeSheetProps {
   targetNodeContext: string | null;
   mode: ForgeSheetMode;
   authorWallet: string;
-  /** When true, Forge runs in Macro-Arena initiation mode (root topic; tag 'macro-arena'). */
-  isArenaMode?: boolean;
+  /** Optional chat config (e.g. arena). Omit for default Forge behavior. */
+  config?: ForgeChatConfig;
   parentId?: string;
   relationship?: EdgeRelationship;
   onAnchored?: (nodeId: string) => void;
@@ -73,7 +73,7 @@ export function ForgeSheet({
   targetNodeContext,
   mode,
   authorWallet,
-  isArenaMode = false,
+  config,
   parentId,
   relationship,
   onAnchored,
@@ -101,7 +101,7 @@ export function ForgeSheet({
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent
         side={sheetSide}
-        className="flex h-full max-h-full flex-col max-w-md w-full p-0 gap-0"
+        className="flex !h-dvh max-h-dvh flex-col max-w-md w-full p-0 gap-0 overflow-hidden"
         preventBackdropClose
         onInteractOutside={(e) => e.preventDefault()}
       >
@@ -168,14 +168,14 @@ export function ForgeSheet({
           </SheetClose>
         </SheetHeader>
         {/* Scrollable middle + fixed bottom live inside ForgeChat */}
-        <SheetBody className="flex flex-1 flex-col min-h-0 px-0 overflow-hidden">
-          <div className="flex h-full flex-col min-h-0">
+        <SheetBody className="flex min-h-0 flex-1 flex-col overflow-hidden px-0">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <ForgeChat
               authorWallet={authorWallet}
               parentId={parentId}
               relationship={relationship}
               targetNodeContext={targetNodeContext ?? undefined}
-              isArenaMode={isArenaMode}
+              config={config}
               onAnchored={handleAnchored}
               onEdgeAttached={onEdgeAttached}
               className="flex-1 min-h-0 border-0 shadow-none rounded-none"
