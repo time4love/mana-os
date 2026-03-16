@@ -20,7 +20,6 @@ import {
   getToolPartState,
   getLocalized,
   extractDraftsFromMessages,
-  normalizeRawDraft,
   type RagTelemetryPayload,
   type MessagePartLike,
 } from "@/components/truth/forgeChatLib";
@@ -230,6 +229,11 @@ const FORGE_PLACEHOLDER = {
   en: "State a thesis or logical challenge… The Forge will guide you.",
 };
 
+const FORGE_PLACEHOLDER_ARENA = {
+  he: "הגדר את שאלת השורש של זירת הדיון החדשה…",
+  en: "Define the root question of the new debate arena…",
+};
+
 const FORGE_SEND = { he: "שלח", en: "Send" };
 
 const RELEASE_THOUGHT_LABEL = { he: "שחרר קו מחשבה", en: "Release thought trace" };
@@ -254,6 +258,8 @@ interface ForgeChatProps {
   parentId?: string;
   relationship?: EdgeRelationship;
   targetNodeContext?: string | null;
+  /** When true, guides the user to create a Macro-Arena (root topic); draft will be tagged 'macro-arena'. */
+  isArenaMode?: boolean;
   onAnchored?: (nodeId: string) => void;
   onEdgeAttached?: (edgeId: string) => void;
   className?: string;
@@ -264,6 +270,7 @@ export function ForgeChat({
   parentId,
   relationship,
   targetNodeContext,
+  isArenaMode = false,
   onAnchored,
   className = "",
 }: ForgeChatProps) {
@@ -294,7 +301,7 @@ export function ForgeChat({
     id: cacheKey,
     messages: initialMessages,
     transport: new DefaultChatTransport({
-      api: "/api/oracle/forge",
+      api: isArenaMode ? "/api/oracle/arena" : "/api/oracle/forge",
       body: {
         locale,
         targetNodeContext: targetNodeContext ?? undefined,
@@ -416,7 +423,7 @@ export function ForgeChat({
         )}
         {messages.length === 0 && (
           <p className="text-muted-foreground text-sm text-start py-8">
-            {getLocalized(FORGE_PLACEHOLDER, locale)}
+            {getLocalized(isArenaMode ? FORGE_PLACEHOLDER_ARENA : FORGE_PLACEHOLDER, locale)}
           </p>
         )}
 
@@ -527,32 +534,9 @@ export function ForgeChat({
                             </div>
                           ) : null}
                           {hasDrafts ? (
-                            <div className="mt-3 w-full max-w-full overflow-hidden flex flex-col gap-4 box-border">
-                              <p className="text-muted-foreground italic text-start text-xs">
-                                {getLocalized(TRIAGE_MAPPING_LABEL, locale)}
-                              </p>
-                              {(triageNewDrafts as Array<Record<string, unknown>>)
-                                .filter((d) => d && typeof d.assertionEn === "string" && (d.assertionEn as string).trim())
-                                .map((raw, idx) => {
-                                  const draft = normalizeRawDraft(raw) as ForgeDraft;
-                                  return (
-                                    <DraftNodeCard
-                                      key={`inline-${idx}-${draft.assertionEn.slice(0, 30)}`}
-                                      draft={draft}
-                                      onAnchor={() => handleAnchor(draft, false)}
-                                      isAnchoring={isAnchoring}
-                                      authorWallet={authorWallet}
-                                      parentId={parentId}
-                                      relationship={relationship}
-                                      matchedExistingNodeId={"matchedExistingNodeId" in raw ? (raw.matchedExistingNodeId as string | null) ?? null : null}
-                                      semanticDuplicates={duplicateDraft?.assertionEn === draft.assertionEn ? semanticDuplicates : null}
-                                      onForcePlant={duplicateDraft?.assertionEn === draft.assertionEn ? () => handleAnchor(draft, true) : undefined}
-                                      writeTelemetry={lastWriteTelemetry}
-                                      isArchitectMode={isArchitectMode}
-                                    />
-                                  );
-                                })}
-                            </div>
+                            <p className="mt-3 text-muted-foreground italic text-start text-xs">
+                              {getLocalized(TRIAGE_MAPPING_LABEL, locale)}
+                            </p>
                           ) : null}
                           {isPending && !hasDrafts ? (
                             <p className="text-muted-foreground italic text-xs text-start mt-4 mb-2 animate-pulse">
@@ -653,7 +637,7 @@ export function ForgeChat({
       <FluidForgeInput
         value={input}
         onChange={setInput}
-        placeholder={getLocalized(FORGE_PLACEHOLDER, locale)}
+        placeholder={getLocalized(isArenaMode ? FORGE_PLACEHOLDER_ARENA : FORGE_PLACEHOLDER, locale)}
         disabled={isLoading}
         onSubmit={handleSubmit}
         submitLabel={getLocalized(FORGE_SEND, locale)}

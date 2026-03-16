@@ -53,6 +53,8 @@ interface ForgeSheetProps {
   targetNodeContext: string | null;
   mode: ForgeSheetMode;
   authorWallet: string;
+  /** When true, Forge runs in Macro-Arena initiation mode (root topic; tag 'macro-arena'). */
+  isArenaMode?: boolean;
   parentId?: string;
   relationship?: EdgeRelationship;
   onAnchored?: (nodeId: string) => void;
@@ -71,6 +73,7 @@ export function ForgeSheet({
   targetNodeContext,
   mode,
   authorWallet,
+  isArenaMode = false,
   parentId,
   relationship,
   onAnchored,
@@ -172,6 +175,7 @@ export function ForgeSheet({
               parentId={parentId}
               relationship={relationship}
               targetNodeContext={targetNodeContext ?? undefined}
+              isArenaMode={isArenaMode}
               onAnchored={handleAnchored}
               onEdgeAttached={onEdgeAttached}
               className="flex-1 min-h-0 border-0 shadow-none rounded-none"

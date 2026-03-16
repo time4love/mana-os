@@ -58,6 +58,8 @@ Once the Oracle formulates the resource plan, it is hashed on-chain. Every commu
 We reject corporate fact-checkers and authority bias. Deep controversies are mapped in a semantic Directed Acyclic Graph (DAG).
 The AI acts as a blind, objective referee of formal logic. Community members ingest transcripts of videos or articles, which the AI breaks down into individual logical claims. Users then debate the AI, providing counter-evidence. If a sub-claim successfully defeats its parent claim logically, the score dynamically "bubbles up," altering the credibility of the entire macro-topic. Truth is determined by structural integrity, not popularity.
 
+**Web3 integration:** The Truth Engine is backed by an **Immutable Epistemic Ledger** on the blockchain. Once a node or score is finalized, its hash is stored on-chain—it cannot be silently altered or censored. Participation is **Sybil-resistant**: only humans holding a **Genesis Anchor SBT** (Soulbound Token) can contribute to Macro-Arenas, upload transcripts, or resonate on score changes—zero bots. When the community fundamentally disagrees with an AI ruling, they do not delete; they **fork** the logic branch on-chain, preserving both realities immutably, like open-source code. Controversial truth is never erased; it is branched, and the weave remains a Trust Machine for objective reality.
+
 ### 4. Mana Cycles & Realms of Mastery (Soulbound Tokens)
 We do not track hours. We track **Mana Cycles** (Resolutions).
 Contributions are divided into energetic **Realms**:

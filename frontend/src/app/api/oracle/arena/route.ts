@@ -1,0 +1,205 @@
+import { convertToModelMessages, streamText, generateObject } from "ai";
+import type { UIMessage } from "ai";
+import { google } from "@ai-sdk/google";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+// ---------------------------------------------------------------------------
+// Schemas (Arena: single draft card, score 50, macro-arena tag)
+// ---------------------------------------------------------------------------
+
+const DraftEpistemicNodeSchema = z.object({
+  assertionEn: z.string().min(1).catch("Assertion unavailable"),
+  assertionHe: z.string().optional().catch(""),
+  logicalCoherenceScore: z.number().min(0).max(100).catch(50),
+  reasoningEn: z.string().optional().catch(""),
+  reasoningHe: z.string().optional().catch(""),
+  hiddenAssumptionsEn: z.array(z.string()).optional().catch([]),
+  hiddenAssumptionsHe: z.array(z.string()).optional().catch([]),
+  challengePromptEn: z.string().optional().catch(""),
+  challengePromptHe: z.string().optional().catch(""),
+  matchedExistingNodeId: z.string().nullable().optional().catch(null),
+  relationshipToContext: z.enum(["supports", "challenges"]).optional().catch("supports"),
+  thematicTags: z.array(z.string()).max(10).optional().catch([]),
+});
+
+const EpistemicTriageSchema = z.object({
+  socraticMessage: z
+    .string()
+    .describe(
+      "MANDATORY: Your warm, Socratic conversational response. Write your analysis and greeting here. Never leave empty."
+    ),
+});
+
+const TriageResultNewDraftsSchema = z.array(DraftEpistemicNodeSchema).max(1);
+
+type DraftEpistemicNode = z.infer<typeof DraftEpistemicNodeSchema>;
+
+// ---------------------------------------------------------------------------
+// Arena Drafter: neutral root title only (no RAG, no intent router)
+// ---------------------------------------------------------------------------
+
+const ARENA_DRAFTER_PROMPT = (topic: string) => `You are an Arena Architect. Formulate a Macro-Arena (Root Node) title for this topic: "${topic}"
+
+Output requirements:
+- assertionEn: A broad, neutral English question or title for the debate (e.g. "What is the shape of the Earth?").
+- assertionHe: The Hebrew translation.
+- logicalCoherenceScore: MUST be exactly 50 (neutral starting ground).
+- thematicTags: MUST include "macro-arena". Add 1–2 other broad themes if relevant (e.g. Cosmology, Education).
+- relationshipToContext: "supports".
+- reasoningEn, reasoningHe, hiddenAssumptionsEn/He, challengePromptEn/He: empty or one-line.`;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const MAX_MESSAGE_TEXT_LENGTH = 8000;
+
+function getMessageText(msg: { parts?: Array<{ type: string; text?: string }>; content?: string }): string {
+  if (!msg) return "";
+  const parts = (msg.parts ?? [])
+    .filter((p: { type: string }) => p.type === "text")
+    .map((p: { text?: string }) => p.text ?? "")
+    .join(" ")
+    .trim();
+  return (parts || (msg as { content?: string }).content || "").trim().slice(0, MAX_MESSAGE_TEXT_LENGTH);
+}
+
+export const maxDuration = 30;
+
+/**
+ * Arena Initiator API — dedicated to Macro-Arena creation only.
+ * No Scout (RAG). No Intent Router. Always extract neutral formulation and produce one draft card.
+ */
+export async function POST(request: Request) {
+  const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (!key) {
+    return NextResponse.json({ error: "GOOGLE_GENERATIVE_AI_API_KEY is not configured" }, { status: 503 });
+  }
+
+  let body: {
+    messages?: UIMessage[];
+    architectMode?: boolean;
+    targetNodeContext?: string;
+    locale?: string;
+  };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const architectMode = body.architectMode === true;
+  const messages = Array.isArray(body.messages) ? body.messages : [];
+  const targetNodeContext = typeof body.targetNodeContext === "string" ? body.targetNodeContext.trim() : null;
+  const locale = body.locale === "he" ? "he" : "en";
+
+  const contextBlock = targetNodeContext
+    ? `\n\nContext (optional):\n---\n${targetNodeContext.slice(0, 2000)}\n---`
+    : "";
+
+  const userMessages = messages.filter((m: UIMessage) => m.role === "user");
+  const lastUserMessage = userMessages[userMessages.length - 1];
+  const lastUserText = lastUserMessage ? getMessageText(lastUserMessage as Parameters<typeof getMessageText>[0]) : "";
+
+  // Always produce one Arena draft from the user's input (or empty if no input)
+  let newDraftsForTriage: DraftEpistemicNode[] = [];
+  const topic = lastUserText.trim();
+  if (topic.length > 0) {
+    try {
+      const result = await generateObject({
+        model: google("gemini-2.5-flash"),
+        schema: DraftEpistemicNodeSchema,
+        prompt: ARENA_DRAFTER_PROMPT(topic),
+      });
+      const draft = DraftEpistemicNodeSchema.parse(result.object);
+      newDraftsForTriage = TriageResultNewDraftsSchema.parse([
+        {
+          ...draft,
+          logicalCoherenceScore: 50,
+          thematicTags: [...new Set([...(draft.thematicTags ?? []), "macro-arena"])],
+        },
+      ]);
+    } catch {
+      newDraftsForTriage = [];
+    }
+  }
+
+  const ARENA_SYSTEM = `You are the Arena Architect. The user is establishing a new Root Node for debate. Converse in their language (Hebrew or English). Never leave the user with a blank message.
+
+You have ONE tool: \`epistemic_triage\`. Call it exactly once per turn. Output ONLY \`socraticMessage\` (your conversational reply). The server injects the Arena draft card into the tool result—do not stream JSON.
+
+Rules: Always output a short, warm Socratic message. Do NOT ask for permission—present the proposed Arena card for them to Anchor. If they sent a topic, acknowledge it and present the card. If they sent a refinement, acknowledge and present the updated card.`;
+
+  const handoffBlock =
+    newDraftsForTriage.length > 0
+      ? `
+=========================================
+ARENA CREATION (GENERATIVE UI)
+=========================================
+The backend has formulated a proposed neutral title for the new Macro-Arena.
+APPROVED DRAFT JSON: ${JSON.stringify(newDraftsForTriage)}
+
+YOUR TASK:
+1. Write a short, warm Socratic response in the user's language. Tell them: "Here is a proposed neutral title for our new arena. If it accurately captures the foundation of our debate, click to anchor it. If not, tell me how to refine it."
+2. Call \`epistemic_triage\` EXACTLY ONCE.
+3. Pass your text to \`socraticMessage\`.
+4. The server will inject the APPROVED DRAFT into the tool result. You do not pass newDrafts; the server attaches it.
+`
+      : `
+=========================================
+ARENA — AWAITING TOPIC
+=========================================
+The user has not yet sent a topic (or the message was empty).
+
+YOUR TASK:
+1. Write a short, warm prompt in the user's language asking what topic they would like to open for debate (e.g. "What arena would you like to open? Name the root question or theme.").
+2. Call \`epistemic_triage\` EXACTLY ONCE. Pass your text to \`socraticMessage\`. The server will attach empty newDrafts.
+`;
+
+  const systemPrompt = `${ARENA_SYSTEM}${contextBlock}\n\n${handoffBlock}`;
+
+  const epistemicTriageTool = {
+    description:
+      "MANDATORY: Call this once to render the UI. Populate socraticMessage only. The server injects the Arena draft card into the result.",
+    inputSchema: EpistemicTriageSchema,
+    execute: async (args: z.infer<typeof EpistemicTriageSchema>) => ({
+      ok: true,
+      triage: {
+        socraticMessage: args.socraticMessage,
+        existingNodesToDisplay: [] as Array<{ id: string; assertionEn: string; assertionHe?: string }>,
+        newDrafts: newDraftsForTriage,
+      },
+    }),
+  };
+
+  const arenaTools = { epistemic_triage: epistemicTriageTool };
+
+  try {
+    const result = streamText({
+      model: google("gemini-2.5-pro"),
+      system: systemPrompt,
+      messages: await convertToModelMessages(messages, { tools: arenaTools }),
+      tools: arenaTools,
+      toolChoice: "required",
+      temperature: 0.45,
+      providerOptions: { google: { maxOutputTokens: 8192 } },
+    });
+
+    const response = result.toUIMessageStreamResponse({
+      originalMessages: messages,
+      onError: (err) => {
+        console.error("[Oracle Arena stream]", err);
+        return err instanceof Error ? err.message : String(err);
+      },
+    });
+
+    return response;
+  } catch (err) {
+    console.error("[Oracle Arena API]", err);
+    return NextResponse.json(
+      { error: "Arena Initiator failed", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
+  }
+}

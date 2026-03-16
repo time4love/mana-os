@@ -9,6 +9,9 @@ import { getDisplayAssertion } from "@/lib/utils/truthParser";
 const RAG_MATCH_THRESHOLD = 0.5;
 const RAG_MATCH_COUNT = 5;
 
+/** Minimum length of user message to run Scout (RAG). Avoids embedding short conversational replies. */
+const MIN_MESSAGE_LENGTH_FOR_SCOUT = 20;
+
 // ---------------------------------------------------------------------------
 // Schemas (single source of truth)
 // ---------------------------------------------------------------------------
@@ -116,7 +119,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "GOOGLE_GENERATIVE_AI_API_KEY is not configured" }, { status: 503 });
   }
 
-  let body: { messages?: UIMessage[]; architectMode?: boolean; targetNodeContext?: string; locale?: string };
+  let body: {
+    messages?: UIMessage[];
+    architectMode?: boolean;
+    targetNodeContext?: string;
+    locale?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -180,8 +188,10 @@ export async function POST(request: Request) {
     }
   }
 
-  // ========== 1. SCOUT (RAG Portals) — run for both EXPLORE and CHAT ==========
-  if (userIntent !== "DRAFT_REQUEST" && lastUserText.length > 10) {
+  // ========== 1. SCOUT (RAG Portals) — EXPLORE/CHAT only ==========
+  const shouldRunScout =
+    userIntent !== "DRAFT_REQUEST" && lastUserText.length >= MIN_MESSAGE_LENGTH_FOR_SCOUT;
+  if (shouldRunScout) {
     let expandedQueryEn = "";
     let textToEmbed = textToEmbedBase;
     try {
@@ -224,7 +234,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // ========== 2. DRAFTER SWARM: Run when we have claims to draft (DRAFT_REQUEST or future EXPLORE claims) ==========
+  // ========== 2. DRAFTER SWARM: Logician (claim drafting only) ==========
   if (newClaimsToDraft.length > 0) {
     const drafterPromises = newClaimsToDraft.map((claim) =>
       generateObject({

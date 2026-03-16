@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/i18n/context";
 import { getDisplayAssertion } from "@/lib/utils/truthParser";
@@ -11,7 +12,17 @@ import type { ForgeDraftBilingual } from "@/types/truth";
 
 const ANCHOR_CTA = {
   he: "עגן טיעון למארג",
-  en: "Anchor Premise to Weave",
+  en: "Anchor Claim to Weave",
+};
+
+const ARENA_CTA = {
+  he: "ייסד זירת דיון",
+  en: "Initiate Debate Arena",
+};
+
+const MACRO_ARENA_BADGE = {
+  he: "הצעת זירת-על (Root Topic)",
+  en: "Macro-Arena Proposal",
 };
 
 const RATIONALE_LABEL = { he: "נימוק", en: "Rationale" };
@@ -90,13 +101,18 @@ export function DraftNodeCard({
     });
   }, [semanticDuplicates]);
 
+  const isMacroArena = draft.thematicTags?.includes("macro-arena");
+
   const assertion = (locale === "he" && (draft.assertionHe ?? "").trim()) ? (draft.assertionHe ?? "").trim() : (draft.assertionEn ?? "").trim();
   const reasoning = (locale === "he" && (draft.reasoningHe ?? "").trim()) ? (draft.reasoningHe ?? "").trim() : (draft.reasoningEn ?? "").trim();
   const hiddenAssumptions = (locale === "he" && (draft.hiddenAssumptionsHe ?? []).length > 0) ? (draft.hiddenAssumptionsHe ?? []) : (draft.hiddenAssumptionsEn ?? []);
   const challengePrompt = (locale === "he" && (draft.challengePromptHe ?? "").trim()) ? (draft.challengePromptHe ?? "").trim() : (draft.challengePromptEn ?? "").trim();
   const hasDetails = reasoning || (hiddenAssumptions?.length ?? 0) > 0 || challengePrompt;
 
-  const anchorLabel = locale === "he" ? ANCHOR_CTA.he : ANCHOR_CTA.en;
+  const anchorLabel = isMacroArena
+    ? (locale === "he" ? ARENA_CTA.he : ARENA_CTA.en)
+    : (locale === "he" ? ANCHOR_CTA.he : ANCHOR_CTA.en);
+  const macroArenaBadgeLabel = locale === "he" ? MACRO_ARENA_BADGE.he : MACRO_ARENA_BADGE.en;
   const rationaleLabel = locale === "he" ? RATIONALE_LABEL.he : RATIONALE_LABEL.en;
   const scoutLabel = locale === "he" ? SCOUT_LABEL.he : SCOUT_LABEL.en;
 
@@ -121,7 +137,15 @@ export function DraftNodeCard({
       className="rounded-xl border-2 border-primary/30 bg-card shadow-soft-md overflow-hidden"
     >
       <div className="p-5 space-y-4">
-        {rel && (
+        {isMacroArena ? (
+          <div
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-1 ring-inset ring-primary/20"
+            role="status"
+          >
+            <Sparkles className="size-3" />
+            {macroArenaBadgeLabel}
+          </div>
+        ) : rel ? (
           <div className="flex flex-wrap gap-2">
             {rel === "supports" ? (
               <span
@@ -139,17 +163,19 @@ export function DraftNodeCard({
               </span>
             )}
           </div>
-        )}
+        ) : null}
         <p className="text-lg font-medium text-foreground leading-relaxed">
           {assertion}
         </p>
         <div className="flex items-center gap-2">
-          <span
-            className="font-mono text-sm text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded"
-            aria-label={`Coherence ${pulse}`}
-          >
-            {pulse}/100
-          </span>
+          {!isMacroArena && (
+            <span
+              className="font-mono text-sm text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded"
+              aria-label={`Coherence ${pulse}`}
+            >
+              {pulse}/100
+            </span>
+          )}
           {hasDetails && (
             <button
               type="button"
