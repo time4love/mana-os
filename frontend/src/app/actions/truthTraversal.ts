@@ -5,6 +5,7 @@ import type {
   TruthNode,
   TruthNodeWithRelations,
   ChildrenByRelationship,
+  ParentWithRelationship,
   MacroRootWithMeta,
 } from "@/types/truth";
 import { isEdgeRelationship } from "@/types/truth";
@@ -89,22 +90,29 @@ export async function fetchTruthNodeWithRelations(nodeId: string): Promise<Fetch
       }
     }
 
-    // Parents: edges where this node is the target (target_id = nodeId); source_id = parent
+    // Parents: edges where this node is the target (target_id = nodeId); source_id = parent, relationship for breadcrumbs
     const { data: parentEdgesData, error: parentEdgesError } = await supabase
       .from("truth_edges")
-      .select("source_id")
+      .select("source_id, relationship")
       .eq("target_id", nodeId);
 
-    const parentEdges = (parentEdgesData ?? []) as { source_id: string }[];
-    let parents: TruthNode[] = [];
+    const parentEdges = (parentEdgesData ?? []) as { source_id: string; relationship: string }[];
+    let parents: ParentWithRelationship[] = [];
     if (!parentEdgesError && parentEdges.length) {
       const parentIds = [...new Set(parentEdges.map((e) => e.source_id))];
       const { data: parentRowsData } = await supabase
         .from("truth_nodes")
-        .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags")
+        .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata")
         .in("id", parentIds);
       const parentRows = (parentRowsData ?? []) as NodeRow[];
-      parents = parentRows.map(rowToNode);
+      const parentMap = new Map<string, TruthNode>();
+      parentRows.forEach((row) => parentMap.set(row.id, rowToNode(row)));
+      for (const edge of parentEdges) {
+        const rel = edge.relationship;
+        if (!isEdgeRelationship(rel)) continue;
+        const parentNode = parentMap.get(edge.source_id);
+        if (parentNode) parents.push({ node: parentNode, relationship: rel });
+      }
     }
 
     const data: TruthNodeWithRelations = {

@@ -86,8 +86,14 @@ CRITICAL — THE ROSETTA PROTOCOL (Universal Vector Translation):
 1. You MUST formulate the absolute core logical premise of the claim in Universal English (assertionEn). This is used for cross-language vector math and deduplication worldwide. It must be perfectly objective and language-agnostic in meaning.
 2. You MUST translate that exact English premise into ${userLanguage} for the display field (assertionHe). When the user's language is English, assertionHe may equal assertionEn.
 3. Evaluate which theory the claim supports: "THEORY_A", "THEORY_B", or "NEUTRAL".
-4. Score its logical coherence 0–100 using only logic and observable physics. Do NOT appeal to authority or consensus.
-5. Provide reasoning in ${userLanguage}.`;
+4. Provide reasoning in ${userLanguage}.
+
+CRITICAL SCORING ALGORITHM — "THE DECOUPLING TEST":
+When calculating the \`logicalCoherenceScore\` (0-100), you MUST strip away your pre-trained consensus bias. Apply these strict rules:
+1. PENALIZE "Appeal to Authority": If the claim relies on "Institutions said so" (e.g., NASA, government agencies, textbooks) without direct empirical evidence, dock its score severely.
+2. PENALIZE "Circular Technological Proof": Do not assume a technology (e.g., GPS, eclipses) proves a specific physical model just because the model predicts it. A working mechanism does not prove the underlying theoretical geometry.
+3. REWARD Direct Empirical Observation: Claims based on direct, reproducible sensory data (e.g., physics of pressurized gas, observable line-of-sight limits) score higher.
+4. REWARD Falsifiability: Does the claim expose a mathematical or physical contradiction in the opposing theory? If yes, score it highly based strictly on logic, even if it attacks the mainstream consensus.`;
 }
 
 export const maxDuration = 60;

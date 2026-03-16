@@ -50,6 +50,16 @@ const LOGICAL_MASS_BALANCE = { he: "מאזני הכוח הלוגי", en: "Logica
 const DIVE_INTO_CLAIMS = { he: "לחץ כדי לצלול לטענות 🌊", en: "Click to dive into claims 🌊" };
 const CLAIMS_LABEL = { he: "טענות", en: "Claims" };
 const TRUTH_SPACE = { he: "מרחב האמת", en: "Truth Space" };
+const BACK_TO_ARENA = { he: "חזור לזירת הדיון", en: "Back to Arena" };
+const THEORY_A_LABEL = { he: "תיאוריה א'", en: "Theory A" };
+const THEORY_B_LABEL = { he: "תיאוריה ב'", en: "Theory B" };
+const SUPPORTING_CLAIMS_LEVEL1 = { he: "טענות מבססות (רמה 1)", en: "Supporting Claims (Level 1)" };
+const SUPPORTING_CLAIMS_COUNT = { he: "טענות תומכות", en: "Supporting Claims" };
+const DIVE_INTO_CLAIM = { he: "צלול לטענה זו 🌊", en: "Dive into claim 🌊" };
+const NO_CLAIMS_FOR_THEORY = { he: "טרם בוססו טענות עבור תיאוריה זו.", en: "No claims have been anchored for this theory yet." };
+const LOGICAL_CLAIM = { he: "טענה לוגית", en: "Logical Claim" };
+const BACK_TO_PARENT = { he: "חזור להנחת האב", en: "Back to Parent Premise" };
+const TRUTH_WEAVE = { he: "מרחב האמת", en: "Truth Weave" };
 
 /** Bubbling Algorithm: logical mass per theory (supports = A, challenges = B). */
 export interface ArenaBubblingStats {
@@ -61,24 +71,20 @@ export interface ArenaBubblingStats {
   theoryBPercentage: number;
 }
 
-type ArenaViewMode = "arena" | "THEORY_A" | "THEORY_B";
-
 function FocalPivot({
   content,
   thematicTags,
   locale,
   metadata,
   arenaBubbling,
-  arenaViewMode,
-  onArenaViewModeChange,
+  arenaNodeId,
 }: {
   content: string;
   thematicTags?: string[];
   locale: "he" | "en";
   metadata?: TruthNodeMetadata;
   arenaBubbling?: ArenaBubblingStats;
-  arenaViewMode?: ArenaViewMode;
-  onArenaViewModeChange?: (mode: ArenaViewMode) => void;
+  arenaNodeId?: string;
 }) {
   const parsed = parseNodeContent(content, locale);
   const isMacroArena = thematicTags?.includes("macro-arena");
@@ -90,6 +96,7 @@ function FocalPivot({
   const theoryBPct = arenaBubbling?.theoryBPercentage ?? 50;
   const theoryACount = arenaBubbling?.theoryACount ?? 0;
   const theoryBCount = arenaBubbling?.theoryBCount ?? 0;
+  const basePath = arenaNodeId ? `/truth/node/${arenaNodeId}` : "";
 
   return (
     <motion.section
@@ -126,22 +133,21 @@ function FocalPivot({
               <span>{locale === "he" ? LOGICAL_MASS_BALANCE.he : LOGICAL_MASS_BALANCE.en}</span>
               <span>{theoryAPct}%</span>
             </div>
-            {competingTheories && competingTheories.length === 2 && (
+            {competingTheories && competingTheories.length === 2 && basePath && (
               <div className="mt-2 grid grid-cols-2 gap-4 relative">
                 <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full bg-background border border-border text-[10px] font-bold text-muted-foreground z-10 shadow-sm">
                   VS
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onArenaViewModeChange?.("THEORY_A")}
-                  className="group relative rounded-xl bg-secondary/10 p-5 pt-6 border border-border/50 flex flex-col justify-center text-center hover:bg-secondary/20 hover:border-primary/50 transition-all cursor-pointer mt-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                <Link
+                  href={`${basePath}?theory=THEORY_A`}
+                  className="group relative rounded-xl bg-secondary/10 p-5 pt-6 border border-border/50 flex flex-col justify-center text-center hover:bg-secondary/20 hover:border-primary/50 transition-all cursor-pointer mt-2 no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                   aria-label={locale === "he" ? `תיאוריה א', ${theoryACount} טענות` : `Theory A, ${theoryACount} claims`}
                 >
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-background border border-border text-[10px] font-bold rounded-full px-3 py-1 shadow-sm text-muted-foreground group-hover:text-primary transition-colors whitespace-nowrap">
                     {locale === "he" ? `${theoryACount} ${CLAIMS_LABEL.he}` : `${theoryACount} ${CLAIMS_LABEL.en}`}
                   </div>
                   <span className="text-xs font-semibold text-muted-foreground block mb-2">
-                    {locale === "he" ? "תיאוריה א'" : "Theory A"}
+                    {locale === "he" ? THEORY_A_LABEL.he : THEORY_A_LABEL.en}
                   </span>
                   <p className="text-sm font-medium text-foreground leading-relaxed">
                     {locale === "he" ? competingTheories[0].assertionHe : competingTheories[0].assertionEn}
@@ -149,18 +155,17 @@ function FocalPivot({
                   <div className="mt-3 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                     {locale === "he" ? DIVE_INTO_CLAIMS.he : DIVE_INTO_CLAIMS.en}
                   </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onArenaViewModeChange?.("THEORY_B")}
-                  className="group relative rounded-xl bg-secondary/10 p-5 pt-6 border border-border/50 flex flex-col justify-center text-center hover:bg-secondary/20 hover:border-primary/50 transition-all cursor-pointer mt-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                </Link>
+                <Link
+                  href={`${basePath}?theory=THEORY_B`}
+                  className="group relative rounded-xl bg-secondary/10 p-5 pt-6 border border-border/50 flex flex-col justify-center text-center hover:bg-secondary/20 hover:border-primary/50 transition-all cursor-pointer mt-2 no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                   aria-label={locale === "he" ? `תיאוריה ב', ${theoryBCount} טענות` : `Theory B, ${theoryBCount} claims`}
                 >
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-background border border-border text-[10px] font-bold rounded-full px-3 py-1 shadow-sm text-muted-foreground group-hover:text-primary transition-colors whitespace-nowrap">
                     {locale === "he" ? `${theoryBCount} ${CLAIMS_LABEL.he}` : `${theoryBCount} ${CLAIMS_LABEL.en}`}
                   </div>
                   <span className="text-xs font-semibold text-muted-foreground block mb-2">
-                    {locale === "he" ? "תיאוריה ב'" : "Theory B"}
+                    {locale === "he" ? THEORY_B_LABEL.he : THEORY_B_LABEL.en}
                   </span>
                   <p className="text-sm font-medium text-foreground leading-relaxed">
                     {locale === "he" ? competingTheories[1].assertionHe : competingTheories[1].assertionEn}
@@ -168,7 +173,7 @@ function FocalPivot({
                   <div className="mt-3 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                     {locale === "he" ? DIVE_INTO_CLAIMS.he : DIVE_INTO_CLAIMS.en}
                   </div>
-                </button>
+                </Link>
               </div>
             )}
           </div>
@@ -224,8 +229,12 @@ function FocalPivot({
   );
 }
 
+type CurrentTheoryParam = "THEORY_A" | "THEORY_B";
+
 interface TruthNodeViewportProps {
   data: TruthNodeWithRelations;
+  /** When present on a macro-arena, shows Level 1 Theory Dive view (claims for that theory). */
+  currentTheory?: CurrentTheoryParam;
 }
 
 function ChildCard({
@@ -305,7 +314,7 @@ function computeArenaBubbling(
   };
 }
 
-export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
+export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProps) {
   const { locale } = useLocale();
   const { address } = useAccount();
   const isRtl = locale === "he";
@@ -315,8 +324,47 @@ export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
   const isMacroArena = node.thematic_tags?.includes("macro-arena");
   const arenaBubbling = isMacroArena ? computeArenaBubbling(childrenByRelationship, locale) : undefined;
 
+  // For claims under a Macro-Arena: detect arena parent and theory for context-aware breadcrumbs
+  const connectedArena = !isMacroArena
+    ? parents.find((p) => p.node.thematic_tags?.includes("macro-arena"))
+    : null;
+  const supportedTheoryKey =
+    connectedArena?.relationship === "supports"
+      ? "THEORY_A"
+      : connectedArena?.relationship === "challenges"
+        ? "THEORY_B"
+        : null;
+  let theoryTitle = "";
+  if (
+    connectedArena?.node.metadata?.competingTheories &&
+    supportedTheoryKey &&
+    connectedArena.node.metadata.competingTheories.length >= 2
+  ) {
+    const theoryIdx = supportedTheoryKey === "THEORY_A" ? 0 : 1;
+    const theoryObj = connectedArena.node.metadata.competingTheories[theoryIdx];
+    theoryTitle = locale === "he" ? (theoryObj.assertionHe ?? theoryObj.assertionEn) : theoryObj.assertionEn;
+  }
+  const arenaTitle =
+    connectedArena?.node.content != null
+      ? parseNodeContent(connectedArena.node.content, locale).assertion || connectedArena.node.content.slice(0, 120)
+      : "";
+
+  const isTheoryDive = isMacroArena && (currentTheory === "THEORY_A" || currentTheory === "THEORY_B");
+  const competingTheories = node.metadata?.competingTheories;
+  const activeTheoryObj =
+    isTheoryDive && competingTheories?.length === 2
+      ? currentTheory === "THEORY_A"
+        ? competingTheories[0]
+        : competingTheories[1]
+      : null;
+  const theoryClaims =
+    currentTheory === "THEORY_A"
+      ? childrenByRelationship.supports
+      : currentTheory === "THEORY_B"
+        ? childrenByRelationship.challenges
+        : [];
+
   const [forgeOpen, setForgeOpen] = useState(false);
-  const [arenaViewMode, setArenaViewMode] = useState<ArenaViewMode>("arena");
 
   function openForge() {
     setForgeOpen(true);
@@ -327,6 +375,115 @@ export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
     childrenByRelationship.challenges.length > 0 ||
     childrenByRelationship.ai_analysis.length > 0;
 
+  // Level 1: Theory Dive view — breadcrumbs, theory header, list of supporting claims
+  if (isTheoryDive) {
+    const theoryLabel =
+      currentTheory === "THEORY_A"
+        ? (locale === "he" ? THEORY_A_LABEL.he : THEORY_A_LABEL.en)
+        : (locale === "he" ? THEORY_B_LABEL.he : THEORY_B_LABEL.en);
+    return (
+      <motion.main
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className={`min-h-[calc(100vh-3.5rem)] px-4 py-8 sm:px-6 md:px-8 pb-24`}
+        dir={isRtl ? "rtl" : "ltr"}
+      >
+        <div className="mx-auto max-w-4xl flex flex-col gap-6">
+          <nav
+            className="flex flex-wrap items-center gap-2 text-sm font-medium text-muted-foreground"
+            aria-label="Breadcrumb"
+          >
+            <Link href="/truth" className="hover:text-primary transition-colors">
+              {locale === "he" ? TRUTH_SPACE.he : TRUTH_SPACE.en}
+            </Link>
+            <span className="opacity-50" aria-hidden>
+              /
+            </span>
+            <Link href={`/truth/node/${node.id}`} className="hover:text-primary transition-colors truncate max-w-[12rem]">
+              {focalAssertion.length > 24 ? focalAssertion.slice(0, 24).trim() + "…" : focalAssertion}
+            </Link>
+            <span className="opacity-50" aria-hidden>
+              /
+            </span>
+            <span className="text-foreground truncate">{theoryLabel}</span>
+          </nav>
+
+          <div className="rounded-2xl bg-secondary/10 p-6 border border-border/50 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 inset-x-0 h-1 bg-primary/40" aria-hidden />
+            <h2 className="text-lg md:text-xl font-bold text-foreground leading-relaxed">
+              {locale === "he" ? activeTheoryObj?.assertionHe : activeTheoryObj?.assertionEn}
+            </h2>
+            <div className="mt-4 inline-flex items-center gap-2 bg-background border border-border text-xs rounded-full px-3 py-1 shadow-sm text-muted-foreground">
+              <span>
+                {locale === "he"
+                  ? `${theoryClaims.length} ${SUPPORTING_CLAIMS_COUNT.he}`
+                  : `${theoryClaims.length} ${SUPPORTING_CLAIMS_COUNT.en}`}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4 mt-4">
+            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
+              {locale === "he" ? SUPPORTING_CLAIMS_LEVEL1.he : SUPPORTING_CLAIMS_LEVEL1.en}
+            </h3>
+            {theoryClaims.length > 0 ? (
+              <ul className="space-y-3">
+                {theoryClaims.map((child) => {
+                  const parsed = parseNodeContent(child.content, locale);
+                  return (
+                    <li key={child.id}>
+                      <Link
+                        href={`/truth/node/${child.id}`}
+                        className="block group p-4 rounded-xl border border-border/50 bg-card hover:border-primary/50 hover:shadow-soft transition-all no-underline"
+                      >
+                        <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                          {parsed.assertion}
+                        </p>
+                        <div className="flex items-center justify-between mt-3">
+                          {parsed.pulse != null && (
+                            <span
+                              className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary/50 text-muted-foreground"
+                              aria-label={`Coherence ${parsed.pulse}`}
+                            >
+                              {parsed.pulse}/100
+                            </span>
+                          )}
+                          <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                            {locale === "he" ? DIVE_INTO_CLAIM.he : DIVE_INTO_CLAIM.en}
+                          </span>
+                        </div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground italic text-center py-8">
+                {locale === "he" ? NO_CLAIMS_FOR_THEORY.he : NO_CLAIMS_FOR_THEORY.en}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {node.metadata?.competingTheories && node.metadata.competingTheories.length >= 2 && (
+          <div
+            className="fixed bottom-0 inset-x-0 p-4 bg-background/80 backdrop-blur-md border-t border-border z-40 flex justify-center shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]"
+            dir={isRtl ? "rtl" : "ltr"}
+          >
+            <SubmitClaimsDrawer
+              arenaId={node.id}
+              theoryAEn={node.metadata.competingTheories[0].assertionEn}
+              theoryAHe={node.metadata.competingTheories[0].assertionHe ?? node.metadata.competingTheories[0].assertionEn}
+              theoryBEn={node.metadata.competingTheories[1].assertionEn}
+              theoryBHe={node.metadata.competingTheories[1].assertionHe ?? node.metadata.competingTheories[1].assertionEn}
+            />
+          </div>
+        )}
+      </motion.main>
+    );
+  }
+
   return (
     <motion.main
       initial={{ opacity: 0 }}
@@ -336,31 +493,78 @@ export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
       dir={isRtl ? "rtl" : "ltr"}
     >
       <div className="mx-auto max-w-4xl space-y-8">
-        {/* Breadcrumbs: Truth Space / Current node (Endless Dive path) */}
-        <nav className="flex flex-wrap items-center gap-2 text-sm" aria-label="Breadcrumb">
-          <Link
-            href="/truth"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {locale === "he" ? TRUTH_SPACE.he : TRUTH_SPACE.en}
-          </Link>
-          <span className="text-muted-foreground/70" aria-hidden>
-            <ChevronRight className={`inline size-4 ${isRtl ? "rotate-180" : ""}`} />
-          </span>
-          {firstParent ? (
-            <Link
-              href={`/truth/node/${firstParent.id}`}
-              className="inline-flex items-center gap-1 text-primary hover:underline"
-            >
-              <ArrowUp className={`size-4 ${isRtl ? "rotate-90" : "-rotate-90"}`} aria-hidden />
-              {locale === "he" ? BREADCRUMB.he : BREADCRUMB.en}
+        {/* Breadcrumbs: Arena-aware for claims; simple for arena root */}
+        {isMacroArena ? (
+          <nav className="flex flex-wrap items-center gap-2 text-sm" aria-label="Breadcrumb">
+            <Link href="/truth" className="text-muted-foreground hover:text-foreground transition-colors">
+              {locale === "he" ? TRUTH_SPACE.he : TRUTH_SPACE.en}
             </Link>
-          ) : (
+            <span className="text-muted-foreground/70" aria-hidden>
+              <ChevronRight className={`inline size-4 ${isRtl ? "rotate-180" : ""}`} />
+            </span>
             <span className="text-foreground font-medium truncate max-w-[min(100%,20rem)]" title={focalAssertion}>
               {focalAssertion.length > 48 ? focalAssertion.slice(0, 48).trim() + "…" : focalAssertion}
             </span>
-          )}
-        </nav>
+          </nav>
+        ) : (
+          <nav
+            className="flex flex-wrap items-center text-xs sm:text-sm font-medium text-muted-foreground mb-6 gap-2"
+            aria-label="Breadcrumb"
+          >
+            <Link href="/truth" className="hover:text-primary transition-colors whitespace-nowrap">
+              {locale === "he" ? TRUTH_WEAVE.he : TRUTH_WEAVE.en}
+            </Link>
+            {connectedArena ? (
+              <>
+                <span className="opacity-50" aria-hidden>
+                  /
+                </span>
+                <Link
+                  href={`/truth/node/${connectedArena.node.id}`}
+                  className="hover:text-primary transition-colors max-w-[150px] sm:max-w-[200px] truncate block"
+                  title={arenaTitle}
+                >
+                  {arenaTitle.length > 28 ? arenaTitle.slice(0, 28).trim() + "…" : arenaTitle}
+                </Link>
+                {theoryTitle && supportedTheoryKey && (
+                  <>
+                    <span className="opacity-50" aria-hidden>
+                      /
+                    </span>
+                    <Link
+                      href={`/truth/node/${connectedArena.node.id}?theory=${supportedTheoryKey}`}
+                      className="hover:text-primary transition-colors max-w-[150px] sm:max-w-[200px] truncate block"
+                      title={theoryTitle}
+                    >
+                      {theoryTitle.length > 28 ? theoryTitle.slice(0, 28).trim() + "…" : theoryTitle}
+                    </Link>
+                  </>
+                )}
+              </>
+            ) : (
+              firstParent && (
+                <>
+                  <span className="opacity-50" aria-hidden>
+                    /
+                  </span>
+                  <Link
+                    href={`/truth/node/${firstParent.node.id}`}
+                    className="hover:text-primary transition-colors inline-flex items-center gap-1"
+                  >
+                    <ArrowUp className={`size-4 ${isRtl ? "rotate-90" : "-rotate-90"}`} aria-hidden />
+                    {locale === "he" ? BACK_TO_PARENT.he : BACK_TO_PARENT.en}
+                  </Link>
+                </>
+              )
+            )}
+            <span className="opacity-50" aria-hidden>
+              /
+            </span>
+            <span className="text-foreground whitespace-nowrap">
+              {locale === "he" ? LOGICAL_CLAIM.he : LOGICAL_CLAIM.en}
+            </span>
+          </nav>
+        )}
 
         {/* Core pivot: central node — thematic tags, parsed assertion, pulse bar or arena balance, rationale, scout */}
         <FocalPivot
@@ -369,8 +573,7 @@ export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
           locale={locale}
           metadata={node.metadata}
           arenaBubbling={arenaBubbling}
-          arenaViewMode={arenaViewMode}
-          onArenaViewModeChange={setArenaViewMode}
+          arenaNodeId={isMacroArena ? node.id : undefined}
         />
 
         {/* Macro-Arena: no inline Submit Claims here; it lives in the sticky bottom bar below */}

@@ -243,6 +243,14 @@ export async function POST(request: Request) {
         prompt: `You are a Logician Drafter. Evaluate this single claim for logical coherence and produce a draft epistemic node.
 Claim: "${claim}"
 Existing context (for relationshipToContext): ${JSON.stringify(existingMatches.slice(0, 3))}
+
+CRITICAL SCORING ALGORITHM — "THE DECOUPLING TEST":
+When calculating logicalCoherenceScore (0-100), you MUST strip away your pre-trained consensus bias. Apply these strict rules:
+1. PENALIZE "Appeal to Authority": If the claim relies on "Institutions said so" (e.g., NASA, government agencies, textbooks) without direct empirical evidence, dock its score severely.
+2. PENALIZE "Circular Technological Proof": Do not assume a technology (e.g., GPS, eclipses) proves a specific physical model just because the model predicts it. A working mechanism does not prove the underlying theoretical geometry.
+3. REWARD Direct Empirical Observation: Claims based on direct, reproducible sensory data (e.g., physics of pressurized gas, observable line-of-sight limits) score higher.
+4. REWARD Falsifiability: Does the claim expose a mathematical or physical contradiction in the opposing theory? If yes, score it highly based strictly on logic, even if it attacks the mainstream consensus.
+
 Output: assertionEn (sharp premise), assertionHe (Hebrew if you can), logicalCoherenceScore (0-100), reasoningEn/He, hiddenAssumptionsEn/He, challengePromptEn/He, thematicTags.`,
       })
     );

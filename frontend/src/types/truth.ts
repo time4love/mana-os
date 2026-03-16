@@ -206,11 +206,17 @@ export interface ChildrenByRelationship {
   ai_analysis: TruthNode[];
 }
 
+/** Parent node plus the edge relationship (for breadcrumbs: supports → THEORY_A, challenges → THEORY_B). */
+export interface ParentWithRelationship {
+  node: TruthNode;
+  relationship: EdgeRelationship;
+}
+
 /** Focal node plus its relational layer for viewport rendering. */
 export interface TruthNodeWithRelations {
   node: TruthNode;
   childrenByRelationship: ChildrenByRelationship;
-  parents: TruthNode[];
+  parents: ParentWithRelationship[];
 }
 
 /** Macro root node with claim count for hub portals ("Dismantled to n claims"). */
