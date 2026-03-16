@@ -9,6 +9,7 @@ import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent, truncateAssertion } from "@/lib/utils/truthParser";
 import { Button } from "@/components/ui/button";
 import { ForgeSheet } from "@/components/truth/ForgeSheet";
+import { SubmitClaimsDrawer } from "@/components/truth/SubmitClaimsDrawer";
 import type { TruthNodeWithRelations, TruthNode, TruthNodeMetadata } from "@/types/truth";
 
 const FORGE_ENTRY = {
@@ -274,6 +275,26 @@ export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
 
         {/* Core pivot: central node — thematic tags, parsed assertion, pulse bar or arena balance, rationale, scout */}
         <FocalPivot content={node.content} thematicTags={node.thematic_tags} locale={locale} metadata={node.metadata} />
+
+        {/* Submit Claims / Transcript: dedicated drawer for bulk ingestion (Phase 10 - Step 3) */}
+        {node.thematic_tags?.includes("macro-arena") &&
+          node.metadata?.competingTheories &&
+          node.metadata.competingTheories.length >= 2 && (
+            <motion.section
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.12 }}
+              className="flex justify-center"
+            >
+              <SubmitClaimsDrawer
+                arenaId={node.id}
+                theoryAEn={node.metadata.competingTheories[0].assertionEn}
+                theoryAHe={node.metadata.competingTheories[0].assertionHe ?? node.metadata.competingTheories[0].assertionEn}
+                theoryBEn={node.metadata.competingTheories[1].assertionEn}
+                theoryBHe={node.metadata.competingTheories[1].assertionHe ?? node.metadata.competingTheories[1].assertionEn}
+              />
+            </motion.section>
+          )}
 
         {/* Epistemic Forge: single exploratory entry — relationship emerges from the Socratic process */}
         {address && (

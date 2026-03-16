@@ -10,18 +10,22 @@ import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 
+const MAX_MACRO_CLAIMS = 8;
+
 const CLAIMS_SCHEMA = z.object({
-  claims: z.array(z.string()).describe("List of distinct core logical propositions or factual assertions"),
+  claims: z.array(z.string()).max(MAX_MACRO_CLAIMS).describe("List of 3 to 8 core logical arguments only. Each item must be a full argument (premise + conclusion), not a micro-fact."),
 });
 
-const SIEVE_SYSTEM = `You are The Sieve. Your only job is to extract the distinct, core logical propositions or factual assertions an author is making.
+const SIEVE_SYSTEM = `You are The Sieve. Your job is to extract the CORE LOGICAL ARGUMENTS from a transcript as a cohesive rhetorical whole.
 
 RULES:
-- Ignore philosophical flair, rhetoric, and framing. Extract ONLY the discrete claims.
-- Each item must be a single, testable proposition or factual assertion.
-- Deduplicate: if the same claim appears in different words, output it once.
+- DO NOT atomize the text into trivial micro-facts or background data (e.g., "the plane flies at 2200 mph", "the transmitter was 60 feet high"). These are not epistemic claims.
+- Extract only MACRO-ARGUMENTS: combine premises with their conclusions into robust, standalone claims. Example: "Because microwave transmissions require line of sight and reached 830 miles, the Earth cannot be a curved globe."
+- Each claim must be a complete argument (reasoning + conclusion) that can be evaluated for which theory it supports or undermines.
+- Target 3 to 8 high-quality, comprehensive arguments. Prefer fewer strong arguments over many weak fragments.
+- Deduplicate: if the same argument appears in different words, output it once.
 - Output in the same language as the source text when possible.
-- Return an empty array only if the text contains no identifiable claims.`;
+- Return an empty array only if the text contains no identifiable arguments.`;
 
 /**
  * Extracts an array of distinct core logical propositions from document text.
@@ -43,13 +47,24 @@ export async function extractClaims(documentText: string): Promise<string[]> {
     model,
     schema: CLAIMS_SCHEMA,
     schemaName: "SieveClaims",
-    schemaDescription: "Distinct logical propositions extracted from the document",
+    schemaDescription: "Three to eight macro-arguments (premise + conclusion each). No micro-facts.",
     system: SIEVE_SYSTEM,
-    prompt: `Extract every distinct, core logical proposition or factual assertion from the following text. Output only the list of claims, no commentary.\n\n---\n${trimmed.slice(0, 500_000)}`,
+    prompt: `Analyze this transcript as a cohesive rhetorical argument.
+DO NOT atomize the text into trivial micro-facts or background data (e.g., "the plane flies at 2200 mph").
+Extract only the CORE LOGICAL ARGUMENTS. Combine premises with their conclusions into robust, standalone claims (e.g., "Because microwave transmissions require line of sight and reached 830 miles, the Earth cannot be a curved globe").
+Target 3 to 8 high-quality, comprehensive arguments.
+Output only the list of claims, no commentary.
+
+Transcript:
+---
+${trimmed.slice(0, 500_000)}`,
   });
 
   const list = Array.isArray((object as { claims?: string[] })?.claims)
     ? (object as { claims: string[] }).claims
     : [];
-  return list.map((c) => (typeof c === "string" ? c : String(c)).trim()).filter(Boolean);
+  return list
+    .map((c) => (typeof c === "string" ? c : String(c)).trim())
+    .filter(Boolean)
+    .slice(0, MAX_MACRO_CLAIMS);
 }

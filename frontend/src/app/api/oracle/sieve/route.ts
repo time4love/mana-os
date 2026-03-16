@@ -1,0 +1,182 @@
+/**
+ * POST /api/oracle/sieve
+ *
+ * Transcript Sieve (Bulk Ingestion & Theory Alignment).
+ * Agentic Swarm: Extractor → Logician & Aligner (per claim in parallel).
+ * Does NOT write to DB; returns processed claims for the Harvest Dashboard.
+ *
+ * Body: { transcript, arenaId, theoryA, theoryB, locale? }
+ * Rosetta Protocol: assertionEn = Universal English (vector math); assertionHe = display in user language.
+ */
+
+import { NextResponse } from "next/server";
+import { generateObject } from "ai";
+import { google } from "@ai-sdk/google";
+import { z } from "zod";
+import type { SieveProcessedClaim, SieveSupportedTheory } from "@/types/truth";
+
+const MAX_TRANSCRIPT_LENGTH = 500_000;
+const MAX_CLAIMS_TO_PROCESS = 10;
+
+/** Agent 1: Context-aware extractor output (arena theories injected into prompt). */
+const ExtractorClaimsSchema = z.object({
+  claims: z.array(z.string()).max(MAX_CLAIMS_TO_PROCESS).describe("Core logical arguments that directly support, attack, or relate to Theory A or Theory B"),
+});
+
+function buildExtractorPrompt(transcript: string, theoryA: string, theoryB: string): string {
+  return `You are the Epistemic Extractor for a specific debate arena.
+
+THEORY A: "${theoryA}"
+THEORY B: "${theoryB}"
+
+Analyze the following transcript strictly through the lens of this debate.
+Extract ONLY the core logical arguments that directly support, attack, or actively relate to Theory A or Theory B.
+DO NOT atomize the text into trivial micro-facts, background stories, or conversational filler.
+If the speaker is using rhetorical sarcasm (e.g., "The plane WOULD need to dip, but it doesn't"), extract the actual underlying argument ("The lack of a 9.5-mile dip proves the Earth is not a curved globe").
+Combine premises with their conclusions into robust, standalone claims.
+Target 3 to 8 high-quality, comprehensive arguments.
+
+TRANSCRIPT:
+"${transcript.slice(0, 500_000)}"`;
+}
+
+const BodySchema = z.object({
+  transcript: z.string().min(1).max(MAX_TRANSCRIPT_LENGTH),
+  arenaId: z.string().uuid(),
+  theoryA: z.string().min(1),
+  theoryB: z.string().min(1),
+  locale: z.enum(["he", "en"]).optional().default("en"),
+});
+
+/** Map request locale to language name for prompts (expandable: fr → French, etc.). */
+function localeToUserLanguage(locale: string): string {
+  switch (locale) {
+    case "he":
+      return "Hebrew";
+    case "en":
+    default:
+      return "English";
+  }
+}
+
+const LogicianAlignerSchema = z.object({
+  assertionEn: z.string().describe("Universal English: the core logical premise for vector math and cross-language deduplication"),
+  assertionHe: z.string().describe("Exact translation of assertionEn into the user's display language (Hebrew, English, etc.)"),
+  logicalCoherenceScore: z.number().min(0).max(100),
+  supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]),
+  reasoning: z.string(),
+});
+
+function buildLogicianAlignerPrompt(
+  claim: string,
+  theoryA: string,
+  theoryB: string,
+  userLanguage: string
+): string {
+  return `You are the Epistemic Logician. Evaluate this extracted claim against the Arena's competing theories.
+
+Theory A: "${theoryA}"
+Theory B: "${theoryB}"
+Extracted Claim: "${claim}"
+
+CRITICAL — RHETORICAL CONTEXT (Speaker's Intent):
+Do NOT evaluate this claim in a vacuum. Evaluate it based on the SPEAKER'S ULTIMATE INTENT. If the speaker cites a premise or fact that belongs to Theory A merely to attack or debunk it (e.g., "under the globe model, X would have to happen—but it doesn't"), then this claim SUPPORTS Theory B, not Theory A. Only assign THEORY_A when the claim genuinely argues for or defends that theory.
+
+CRITICAL — THE ROSETTA PROTOCOL (Universal Vector Translation):
+1. You MUST formulate the absolute core logical premise of the claim in Universal English (assertionEn). This is used for cross-language vector math and deduplication worldwide. It must be perfectly objective and language-agnostic in meaning.
+2. You MUST translate that exact English premise into ${userLanguage} for the display field (assertionHe). When the user's language is English, assertionHe may equal assertionEn.
+3. Evaluate which theory the claim supports: "THEORY_A", "THEORY_B", or "NEUTRAL".
+4. Score its logical coherence 0–100 using only logic and observable physics. Do NOT appeal to authority or consensus.
+5. Provide reasoning in ${userLanguage}.`;
+}
+
+export const maxDuration = 60;
+
+export async function POST(request: Request) {
+  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "GOOGLE_GENERATIVE_AI_API_KEY is not configured" },
+      { status: 503 }
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const parsed = BodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid body", details: parsed.error.flatten() },
+      { status: 400 }
+    );
+  }
+
+  const { transcript, theoryA, theoryB, locale } = parsed.data;
+  const userLanguage = localeToUserLanguage(locale);
+  const trimmedTranscript = transcript.trim().slice(0, MAX_TRANSCRIPT_LENGTH);
+
+  if (trimmedTranscript.length < 50) {
+    return NextResponse.json(
+      { error: "Transcript too short to analyze" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    // Agent 1: The Extractor (context-aware: receives Theory A & B so it filters for relevant arguments only)
+    const extractorModel = google("gemini-2.5-flash");
+    const { object: extractorResult } = await generateObject({
+      model: extractorModel,
+      schema: ExtractorClaimsSchema,
+      schemaName: "ExtractorClaims",
+      schemaDescription: "Core logical arguments relevant to the arena's two theories",
+      prompt: buildExtractorPrompt(trimmedTranscript, theoryA, theoryB),
+    });
+    const rawClaims = Array.isArray((extractorResult as { claims?: string[] })?.claims)
+      ? (extractorResult as { claims: string[] }).claims.map((c) => (typeof c === "string" ? c : String(c)).trim()).filter(Boolean)
+      : [];
+    const claimsToProcess = rawClaims.slice(0, MAX_CLAIMS_TO_PROCESS);
+    if (claimsToProcess.length === 0) {
+      return NextResponse.json({ processedClaims: [] });
+    }
+
+    // Agent 2: The Logician & Aligner (parallel per claim)
+    const model = google("gemini-2.5-flash");
+    const results = await Promise.all(
+      claimsToProcess.map(async (claim): Promise<SieveProcessedClaim> => {
+        const { object } = await generateObject({
+          model,
+          schema: LogicianAlignerSchema,
+          schemaName: "LogicianAligner",
+          schemaDescription: "Claim normalized, scored, and aligned to Theory A or B",
+          prompt: buildLogicianAlignerPrompt(claim, theoryA, theoryB, userLanguage),
+        });
+
+        const o = object as z.infer<typeof LogicianAlignerSchema>;
+        return {
+          assertionEn: (o.assertionEn ?? claim).trim().slice(0, 4000),
+          assertionHe: (o.assertionHe ?? o.assertionEn ?? claim).trim().slice(0, 4000),
+          logicalCoherenceScore: typeof o.logicalCoherenceScore === "number"
+            ? Math.max(0, Math.min(100, o.logicalCoherenceScore))
+            : 50,
+          supportedTheory: (o.supportedTheory ?? "NEUTRAL") as SieveSupportedTheory,
+          reasoning: (o.reasoning ?? "").trim().slice(0, 2000),
+        };
+      })
+    );
+
+    return NextResponse.json({ processedClaims: results });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[Sieve API]", err);
+    return NextResponse.json(
+      { error: "Sieve processing failed", detail: message },
+      { status: 500 }
+    );
+  }
+}

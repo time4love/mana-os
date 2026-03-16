@@ -227,3 +227,24 @@ export interface AgentTraceEntry {
   found?: number;
   status?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Transcript Sieve (Bulk Ingestion & Theory Alignment)
+// ---------------------------------------------------------------------------
+
+/** Which competing theory a claim supports (or neutral). */
+export type SieveSupportedTheory = "THEORY_A" | "THEORY_B" | "NEUTRAL";
+
+/** Single claim after Extractor + Logician & Aligner (Harvest Dashboard item). */
+export interface SieveProcessedClaim {
+  assertionEn: string;
+  assertionHe: string;
+  logicalCoherenceScore: number;
+  supportedTheory: SieveSupportedTheory;
+  reasoning: string;
+}
+
+/** Response from POST /api/oracle/sieve (run sieve only; no DB write). */
+export interface SieveRunResult {
+  processedClaims: SieveProcessedClaim[];
+}
