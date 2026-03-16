@@ -12,11 +12,6 @@ const ENTER_ARENA = {
   en: "Enter Arena",
 };
 
-const ARENA_BASELINE = {
-  he: "קו בסיס זירה",
-  en: "Arena Baseline",
-};
-
 const SUB_CLAIMS = {
   he: (n: number) => `${n} תת־טענות`,
   en: (n: number) => `${n} sub-claims`,
@@ -29,12 +24,17 @@ interface ArenaCardProps {
   index?: number;
 }
 
+const BALANCED_ARENA = {
+  he: "זירת דיון מאוזנת",
+  en: "Balanced Debate Arena",
+};
+
 export function ArenaCard({ arena, index = 0 }: ArenaCardProps) {
   const { locale } = useLocale();
   const { node, claimsCount } = arena;
   const parsed = parseNodeContent(node.content, locale);
   const title = truncateAssertion(parsed.assertion, TITLE_MAX_LEN);
-  const baseline = parsed.pulse ?? null;
+  const competingTheories = node.metadata?.competingTheories;
   const tags =
     node.thematic_tags?.filter((t): t is string => typeof t === "string" && t.trim().length > 0) ??
     [];
@@ -74,16 +74,33 @@ export function ArenaCard({ arena, index = 0 }: ArenaCardProps) {
           {title}
         </h3>
 
-        {/* Arena Baseline (Logical Coherence Score) */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {baseline != null && (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400"
-              aria-label={locale === "he" ? ARENA_BASELINE.he : ARENA_BASELINE.en}
-            >
-              <Scale className="size-3.5 shrink-0" aria-hidden />
-              {baseline}/100
-            </span>
+        {/* Neutral balance badge + competing theories preview (no logic score) */}
+        <div className="mt-4 flex flex-col gap-3">
+          <div
+            className="inline-flex items-center gap-1.5 self-start rounded-full bg-secondary/40 px-3 py-1 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border/50"
+            aria-label={locale === "he" ? BALANCED_ARENA.he : BALANCED_ARENA.en}
+          >
+            <Scale className="size-3.5 shrink-0" aria-hidden />
+            {locale === "he" ? BALANCED_ARENA.he : BALANCED_ARENA.en}
+          </div>
+          {competingTheories && competingTheories.length === 2 && (
+            <div className="flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground bg-background/50 rounded-md p-2.5 border border-border/40 shadow-sm">
+              <span
+                className="truncate flex-1 text-start"
+                title={locale === "he" ? competingTheories[0].assertionHe : competingTheories[0].assertionEn}
+              >
+                {locale === "he" ? competingTheories[0].assertionHe : competingTheories[0].assertionEn}
+              </span>
+              <span className="shrink-0 px-1.5 py-0.5 rounded bg-secondary/60 text-[9px] font-bold text-foreground">
+                VS
+              </span>
+              <span
+                className="truncate flex-1 text-end"
+                title={locale === "he" ? competingTheories[1].assertionHe : competingTheories[1].assertionEn}
+              >
+                {locale === "he" ? competingTheories[1].assertionHe : competingTheories[1].assertionEn}
+              </span>
+            </div>
           )}
           {claimsCount > 0 && (
             <span className="text-xs text-muted-foreground">

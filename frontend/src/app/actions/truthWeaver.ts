@@ -569,6 +569,11 @@ export async function anchorPrismDraft(
 // Epistemic Forge — single draft anchor (from Socratic chat)
 // ---------------------------------------------------------------------------
 
+const CompetingTheorySchema = z.object({
+  assertionEn: z.string().min(1),
+  assertionHe: z.string().optional().default(""),
+});
+
 /** Bilingual Forge draft (Rosetta Protocol): en = vector/algorithm, he = display (optional fallback to en). */
 const ForgeDraftSchema = z.object({
   assertionEn: z.string().min(1),
@@ -582,6 +587,7 @@ const ForgeDraftSchema = z.object({
   challengePromptHe: z.string().optional().default(""),
   relationshipToContext: z.enum(["supports", "challenges"]).optional(),
   thematicTags: z.array(z.string()).max(3).optional().default([]),
+  competingTheories: z.array(CompetingTheorySchema).max(2).optional(),
 });
 
 export type AnchorForgeDraftResult =
@@ -674,12 +680,17 @@ export async function anchorForgeDraft(
       : [];
 
     writeTelemetry.push("[5] Executing Supabase Insert...");
+    const metadata =
+      Array.isArray(parsed.data.competingTheories) && parsed.data.competingTheories.length === 2
+        ? { competingTheories: parsed.data.competingTheories }
+        : {};
     const nodePayload = {
       author_wallet: wallet,
       content,
       embedding,
       is_macro_root: !parentId,
       thematic_tags: thematicTags.length > 0 ? thematicTags : undefined,
+      metadata,
     };
     const { data: rowData, error: insertError } = await supabase
       .from("truth_nodes")

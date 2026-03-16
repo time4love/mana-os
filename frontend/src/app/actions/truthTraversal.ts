@@ -20,7 +20,9 @@ function rowToNode(row: {
   created_at: string;
   is_macro_root?: boolean;
   thematic_tags?: string[] | null;
+  metadata?: Record<string, unknown> | null;
 }): TruthNode {
+  const meta = row.metadata as TruthNode["metadata"] | undefined;
   return {
     id: row.id,
     author_wallet: row.author_wallet,
@@ -29,6 +31,7 @@ function rowToNode(row: {
     created_at: row.created_at,
     is_macro_root: row.is_macro_root ?? false,
     thematic_tags: Array.isArray(row.thematic_tags) ? row.thematic_tags : undefined,
+    metadata: meta ?? undefined,
   };
 }
 
@@ -43,7 +46,7 @@ export async function fetchTruthNodeWithRelations(nodeId: string): Promise<Fetch
 
     const { data: nodeRow, error: nodeError } = await supabase
       .from("truth_nodes")
-      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags")
+      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata")
       .eq("id", nodeId)
       .single();
 
@@ -51,7 +54,7 @@ export async function fetchTruthNodeWithRelations(nodeId: string): Promise<Fetch
       return { success: false, error: nodeError?.message ?? "Node not found" };
     }
 
-    type NodeRow = { id: string; author_wallet: string | null; content: string; created_at: string; is_macro_root: boolean; thematic_tags?: string[] | null };
+    type NodeRow = { id: string; author_wallet: string | null; content: string; created_at: string; is_macro_root: boolean; thematic_tags?: string[] | null; metadata?: Record<string, unknown> | null };
     const node = rowToNode(nodeRow as NodeRow);
 
     // Children: edges where this node is the source (source_id = nodeId); target_id = child
@@ -130,13 +133,13 @@ export async function fetchMacroRoots(): Promise<MacroRootWithMeta[]> {
 
     const { data: rowsData, error } = await supabase
       .from("truth_nodes")
-      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags")
+      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata")
       .eq("is_macro_root", true)
       .order("created_at", { ascending: false })
       .limit(MACRO_ROOTS_LIMIT);
 
     if (error) return [];
-    type NodeRow = { id: string; author_wallet: string | null; content: string; created_at: string; is_macro_root: boolean; thematic_tags?: string[] | null };
+    type NodeRow = { id: string; author_wallet: string | null; content: string; created_at: string; is_macro_root: boolean; thematic_tags?: string[] | null; metadata?: Record<string, unknown> | null };
     const rows = (rowsData ?? []) as NodeRow[];
     if (!rows.length) return [];
 

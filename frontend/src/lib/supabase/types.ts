@@ -271,6 +271,7 @@ export interface Database {
           created_at: string;
           is_macro_root: boolean;
           thematic_tags: string[];
+          metadata: Record<string, unknown>;
         };
         Insert: {
           id?: string;
@@ -280,6 +281,7 @@ export interface Database {
           created_at?: string;
           is_macro_root?: boolean;
           thematic_tags?: string[];
+          metadata?: Record<string, unknown>;
         };
         Update: {
           id?: string;
@@ -289,6 +291,7 @@ export interface Database {
           created_at?: string;
           is_macro_root?: boolean;
           thematic_tags?: string[];
+          metadata?: Record<string, unknown>;
         };
         Relationships: TableRelationships;
       };

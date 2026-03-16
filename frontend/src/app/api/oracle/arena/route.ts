@@ -1,8 +1,10 @@
-import { convertToModelMessages, streamText, generateObject } from "ai";
+import { convertToModelMessages, streamText, generateObject, embed } from "ai";
 import type { UIMessage } from "ai";
 import { google } from "@ai-sdk/google";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { createServerSupabase } from "@/lib/supabase/server";
+import { getDisplayAssertion } from "@/lib/utils/truthParser";
 
 // ---------------------------------------------------------------------------
 // Schemas (Arena: single draft card, score 50, macro-arena tag)
@@ -84,6 +86,10 @@ function getMessageText(msg: { parts?: Array<{ type: string; text?: string }>; c
   return (parts || (msg as { content?: string }).content || "").trim().slice(0, MAX_MESSAGE_TEXT_LENGTH);
 }
 
+/** High threshold for Arena deduplication: only catch actual overlaps. */
+const ARENA_SCOUT_THRESHOLD = 0.75;
+const ARENA_SCOUT_MATCH_COUNT = 3;
+
 export const maxDuration = 30;
 
 /**
@@ -120,11 +126,58 @@ export async function POST(request: Request) {
   const userMessages = messages.filter((m: UIMessage) => m.role === "user");
   const lastUserMessage = userMessages[userMessages.length - 1];
   const lastUserText = lastUserMessage ? getMessageText(lastUserMessage as Parameters<typeof getMessageText>[0]) : "";
-
-  // Always produce one Arena draft from the user's input (or empty if no input)
-  let newDraftsForTriage: DraftEpistemicNode[] = [];
   const topic = lastUserText.trim();
+
+  // ---------------------------------------------------------------------------
+  // Arena Scout (RAG): deduplication — only macro roots (existing arenas)
+  // ---------------------------------------------------------------------------
+  type ExistingNodeDisplay = Array<{ id: string; assertionEn: string; assertionHe?: string }>;
+  let existingMatches: ExistingNodeDisplay = [];
+
   if (topic.length > 0) {
+    try {
+      const embeddingResult = await embed({
+        model: google.textEmbeddingModel("gemini-embedding-001"),
+        value: topic,
+        providerOptions: { google: { outputDimensionality: 768 } },
+      });
+
+      if (embeddingResult.embedding.length > 0) {
+        const supabase = createServerSupabase();
+        const { data: matches } = await supabase.rpc("match_truth_nodes", {
+          query_embedding: Array.from(embeddingResult.embedding),
+          match_threshold: ARENA_SCOUT_THRESHOLD,
+          match_count: ARENA_SCOUT_MATCH_COUNT,
+        } as never);
+
+        const matchList = (matches ?? []) as Array<{ id: string; content?: string }>;
+        if (matchList.length > 0) {
+          const { data: macroRows } = await supabase
+            .from("truth_nodes")
+            .select("id")
+            .in("id", matchList.map((m) => m.id))
+            .eq("is_macro_root", true);
+
+          const macroIds = new Set((macroRows ?? []).map((r) => r.id));
+          const arenaMatches = matchList.filter((m) => macroIds.has(m.id));
+          existingMatches = arenaMatches.map((m) => ({
+            id: m.id,
+            assertionEn: getDisplayAssertion(m.content ?? "", "en"),
+            assertionHe: getDisplayAssertion(m.content ?? "", "he"),
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("[Arena Scout Error]", err);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Draft generation only when NO similar arena exists
+  // ---------------------------------------------------------------------------
+  let newDraftsForTriage: DraftEpistemicNode[] = [];
+
+  if (topic.length > 0 && existingMatches.length === 0) {
     try {
       const result = await generateObject({
         model: google("gemini-2.5-flash"),
@@ -147,28 +200,40 @@ export async function POST(request: Request) {
     }
   }
 
-  const ARENA_SYSTEM = `You are the Arena Architect. The user is establishing a new Root Node for debate. Converse in their language (Hebrew or English). Never leave the user with a blank message.
+  const ARENA_SYSTEM = `You are the Arena Architect. Converse in the user's language (Hebrew or English). Never leave the user with a blank message.
 
-You have ONE tool: \`epistemic_triage\`. Call it exactly once per turn. Output ONLY \`socraticMessage\` (your conversational reply). The server injects the Arena draft card into the tool result—do not stream JSON.
+You have ONE tool: \`epistemic_triage\`. Call it exactly once per turn. Output ONLY \`socraticMessage\` (your conversational reply). The server injects draft cards or existing-arena portals into the tool result—do not stream JSON.`;
 
-Rules: Always output a short, warm Socratic message. Do NOT ask for permission—present the proposed Arena card for them to Anchor. If they sent a topic, acknowledge it and present the card. If they sent a refinement, acknowledge and present the updated card.`;
+  let handoffBlock: string;
+  if (existingMatches.length > 0) {
+    handoffBlock = `
+=========================================
+ARENA DEDUPLICATION — SIMILAR ARENA(S) EXIST
+=========================================
+The user asked to create a new debate arena, but highly similar arena(s) already exist in the weave. Display them as Portals so they enter the existing arena instead of fragmenting the community.
 
-  const handoffBlock =
-    newDraftsForTriage.length > 0
-      ? `
+EXISTING ARENAS TO DISPLAY (pass these as existingNodesToDisplay; leave newDrafts EMPTY):
+${JSON.stringify(existingMatches)}
+
+YOUR TASK:
+1. Write a warm Socratic message in the user's language. Explain that a very similar debate arena already exists in the weave and invite them to enter it instead of creating a duplicate.
+2. Call \`epistemic_triage\` EXACTLY ONCE. Pass your text to \`socraticMessage\`.
+3. The server will inject the existing arenas into \`existingNodesToDisplay\` and leave \`newDrafts\` empty. Do not generate a new arena card.`;
+  } else if (newDraftsForTriage.length > 0) {
+    handoffBlock = `
 =========================================
 ARENA CREATION (GENERATIVE UI)
 =========================================
-The backend has formulated the full Arena package: the neutral root question AND the two competing theories (Theory A vs Theory B).
+No duplicate arena was found. The backend has formulated the full Arena package: the neutral root question AND the two competing theories (Theory A vs Theory B).
 APPROVED DRAFT JSON: ${JSON.stringify(newDraftsForTriage)}
 
 YOUR TASK:
 1. Write a short, warm Socratic response in the user's language. Say that you formulated the neutral root question and extracted the two main competing theories for the debate; if it accurately captures the arena, they can click to anchor.
 2. Call \`epistemic_triage\` EXACTLY ONCE.
 3. Pass your text to \`socraticMessage\`.
-4. The server will inject the APPROVED DRAFT into the tool result. You do not pass newDrafts; the server attaches it.
-`
-      : `
+4. The server will inject the APPROVED DRAFT into the tool result. You do not pass newDrafts; the server attaches it.`;
+  } else {
+    handoffBlock = `
 =========================================
 ARENA — AWAITING TOPIC
 =========================================
@@ -178,18 +243,19 @@ YOUR TASK:
 1. Write a short, warm prompt in the user's language asking what topic they would like to open for debate (e.g. "What arena would you like to open? Name the root question or theme.").
 2. Call \`epistemic_triage\` EXACTLY ONCE. Pass your text to \`socraticMessage\`. The server will attach empty newDrafts.
 `;
+  }
 
   const systemPrompt = `${ARENA_SYSTEM}${contextBlock}\n\n${handoffBlock}`;
 
   const epistemicTriageTool = {
     description:
-      "MANDATORY: Call this once to render the UI. Populate socraticMessage only. The server injects the Arena draft card into the result.",
+      "MANDATORY: Call this once to render the UI. Populate socraticMessage only. The server injects the Arena draft card or existing-arena portals into the result.",
     inputSchema: EpistemicTriageSchema,
     execute: async (args: z.infer<typeof EpistemicTriageSchema>) => ({
       ok: true,
       triage: {
         socraticMessage: args.socraticMessage,
-        existingNodesToDisplay: [] as Array<{ id: string; assertionEn: string; assertionHe?: string }>,
+        existingNodesToDisplay: existingMatches,
         newDrafts: newDraftsForTriage,
       },
     }),

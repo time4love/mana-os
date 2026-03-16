@@ -9,7 +9,7 @@ import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent, truncateAssertion } from "@/lib/utils/truthParser";
 import { Button } from "@/components/ui/button";
 import { ForgeSheet } from "@/components/truth/ForgeSheet";
-import type { TruthNodeWithRelations, TruthNode } from "@/types/truth";
+import type { TruthNodeWithRelations, TruthNode, TruthNodeMetadata } from "@/types/truth";
 
 const FORGE_ENTRY = {
   he: "לטש תובנה במארג…",
@@ -43,9 +43,23 @@ const BACK_TO_ENGINE = {
   en: "Back to Truth Engine",
 };
 
-function FocalPivot({ content, thematicTags, locale }: { content: string; thematicTags?: string[]; locale: "he" | "en" }) {
+const EVIDENCE_BALANCE_TIE = { he: "איזון ראיות: תיקו", en: "Evidence Balance: Tie" };
+
+function FocalPivot({
+  content,
+  thematicTags,
+  locale,
+  metadata,
+}: {
+  content: string;
+  thematicTags?: string[];
+  locale: "he" | "en";
+  metadata?: TruthNodeMetadata;
+}) {
   const parsed = parseNodeContent(content, locale);
-  const hasPulse = parsed.pulse != null;
+  const isMacroArena = thematicTags?.includes("macro-arena");
+  const competingTheories = metadata?.competingTheories;
+  const hasPulse = !isMacroArena && parsed.pulse != null;
   const tags = thematicTags?.filter((t): t is string => typeof t === "string" && t.trim().length > 0) ?? [];
 
   return (
@@ -71,26 +85,62 @@ function FocalPivot({ content, thematicTags, locale }: { content: string; themat
         <p className="text-lg sm:text-xl text-foreground leading-relaxed font-medium">
           {parsed.assertion}
         </p>
-        {hasPulse && (
-          <div className="space-y-1.5">
-            <div
-              role="progressbar"
-              aria-valuenow={parsed.pulse ?? 0}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              className="h-2 w-full overflow-hidden rounded-full bg-muted"
-            >
-              <motion.div
-                initial={{ inlineSize: 0 }}
-                animate={{ inlineSize: `${parsed.pulse ?? 0}%` }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="h-full rounded-full bg-emerald-500"
-              />
+        {isMacroArena ? (
+          <div className="mt-6 flex flex-col gap-4">
+            <div className="relative w-full h-3 rounded-full overflow-hidden bg-secondary/30 flex" role="img" aria-label={locale === "he" ? EVIDENCE_BALANCE_TIE.he : EVIDENCE_BALANCE_TIE.en}>
+              <div className="h-full bg-secondary/60 w-1/2 transition-all duration-1000" />
+              <div className="h-full bg-secondary/40 w-1/2 transition-all duration-1000" />
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-5 bg-border rounded-full z-10" aria-hidden />
             </div>
-            <p className="text-xs text-muted-foreground font-mono">
-              Logician&apos;s Pulse: {parsed.pulse}/100
+            <p className="text-xs font-medium text-muted-foreground text-center">
+              {locale === "he" ? EVIDENCE_BALANCE_TIE.he : EVIDENCE_BALANCE_TIE.en}
             </p>
+            {competingTheories && competingTheories.length === 2 && (
+              <div className="mt-2 grid grid-cols-2 gap-4 relative">
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full bg-background border border-border text-[10px] font-bold text-muted-foreground z-10 shadow-sm">
+                  VS
+                </div>
+                <div className="rounded-xl bg-secondary/20 p-4 border border-border/50 flex flex-col justify-center text-center">
+                  <span className="text-xs font-semibold text-muted-foreground block mb-2">
+                    {locale === "he" ? "תיאוריה א'" : "Theory A"}
+                  </span>
+                  <p className="text-sm font-medium text-foreground leading-relaxed">
+                    {locale === "he" ? competingTheories[0].assertionHe : competingTheories[0].assertionEn}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-secondary/20 p-4 border border-border/50 flex flex-col justify-center text-center">
+                  <span className="text-xs font-semibold text-muted-foreground block mb-2">
+                    {locale === "he" ? "תיאוריה ב'" : "Theory B"}
+                  </span>
+                  <p className="text-sm font-medium text-foreground leading-relaxed">
+                    {locale === "he" ? competingTheories[1].assertionHe : competingTheories[1].assertionEn}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
+        ) : (
+          hasPulse && (
+            <div className="space-y-1.5">
+              <div
+                role="progressbar"
+                aria-valuenow={parsed.pulse ?? 0}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                className="h-2 w-full overflow-hidden rounded-full bg-muted"
+              >
+                <motion.div
+                  initial={{ inlineSize: 0 }}
+                  animate={{ inlineSize: `${parsed.pulse ?? 0}%` }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                  className="h-full rounded-full bg-emerald-500"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground font-mono">
+                Logician&apos;s Pulse: {parsed.pulse}/100
+              </p>
+            </div>
+          )
         )}
         {parsed.rationale && (
           <div>
@@ -222,8 +272,8 @@ export function TruthNodeViewport({ data }: TruthNodeViewportProps) {
           )}
         </nav>
 
-        {/* Core pivot: central node — thematic tags, parsed assertion, pulse bar, rationale, scout */}
-        <FocalPivot content={node.content} thematicTags={node.thematic_tags} locale={locale} />
+        {/* Core pivot: central node — thematic tags, parsed assertion, pulse bar or arena balance, rationale, scout */}
+        <FocalPivot content={node.content} thematicTags={node.thematic_tags} locale={locale} metadata={node.metadata} />
 
         {/* Epistemic Forge: single exploratory entry — relationship emerges from the Socratic process */}
         {address && (

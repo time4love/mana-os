@@ -38,6 +38,17 @@ export type TruthEmbedding = number[];
 // TruthNode — core concept/argument (table: public.truth_nodes)
 // ---------------------------------------------------------------------------
 
+/** Competing theories for a Macro-Arena (stored in node.metadata). */
+export interface CompetingTheory {
+  assertionEn: string;
+  assertionHe: string;
+}
+
+/** Node metadata (e.g. competingTheories for macro-arenas). */
+export interface TruthNodeMetadata {
+  competingTheories?: CompetingTheory[];
+}
+
 export interface TruthNode {
   /** Primary key (UUID). */
   id: string;
@@ -53,6 +64,8 @@ export interface TruthNode {
   is_macro_root?: boolean;
   /** Macro-themes for constellation grouping (e.g. Cosmology, Space Hoax, Finance). */
   thematic_tags?: string[];
+  /** Extensible metadata (e.g. competingTheories for macro-arenas). */
+  metadata?: TruthNodeMetadata;
 }
 
 /** Input shape when inserting a node (id and created_at are generated). */
