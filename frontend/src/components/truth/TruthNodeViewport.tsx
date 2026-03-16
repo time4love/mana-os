@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, ArrowUp, Feather } from "lucide-react";
+import { ChevronRight, ArrowUp, Feather, Shield, Swords } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent, truncateAssertion } from "@/lib/utils/truthParser";
 import { Button } from "@/components/ui/button";
 import { ForgeSheet } from "@/components/truth/ForgeSheet";
+import { ForgeChat } from "@/components/truth/ForgeChat";
 import { SubmitClaimsDrawer } from "@/components/truth/SubmitClaimsDrawer";
 import type { TruthNodeWithRelations, TruthNode, TruthNodeMetadata, ChildrenByRelationship } from "@/types/truth";
 
@@ -71,6 +73,14 @@ export interface ArenaBubblingStats {
   theoryBPercentage: number;
 }
 
+/** Dynamic validity bar for standard claims (Bubbling Algorithm). */
+export interface ValidityBarData {
+  baseScore: number;
+  supportMass: number;
+  challengeMass: number;
+  currentValidity: number;
+}
+
 function FocalPivot({
   content,
   thematicTags,
@@ -78,6 +88,7 @@ function FocalPivot({
   metadata,
   arenaBubbling,
   arenaNodeId,
+  validityBar,
 }: {
   content: string;
   thematicTags?: string[];
@@ -85,11 +96,13 @@ function FocalPivot({
   metadata?: TruthNodeMetadata;
   arenaBubbling?: ArenaBubblingStats;
   arenaNodeId?: string;
+  /** When set, standard claim shows dynamic Validity Health Bar instead of static pulse. */
+  validityBar?: ValidityBarData;
 }) {
   const parsed = parseNodeContent(content, locale);
   const isMacroArena = thematicTags?.includes("macro-arena");
   const competingTheories = metadata?.competingTheories;
-  const hasPulse = !isMacroArena && parsed.pulse != null;
+  const hasPulse = !isMacroArena && parsed.pulse != null && validityBar == null;
   const tags = thematicTags?.filter((t): t is string => typeof t === "string" && t.trim().length > 0) ?? [];
 
   const theoryAPct = arenaBubbling?.theoryAPercentage ?? 50;
@@ -176,6 +189,42 @@ function FocalPivot({
                 </Link>
               </div>
             )}
+          </div>
+        ) : validityBar ? (
+          <div className="mt-6 flex flex-col gap-2">
+            <div className="flex justify-between items-end mb-1">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                {locale === "he" ? "תוקף לוגי נוכחי" : "Current Validity"}
+              </span>
+              <div className="flex items-center gap-3 text-xs font-medium">
+                <span className="text-muted-foreground" title="Base Score">
+                  {locale === "he" ? "בסיס" : "Base"}: {validityBar.baseScore}
+                </span>
+                {validityBar.supportMass > 0 && (
+                  <span className="text-emerald-600 dark:text-emerald-400">+{validityBar.supportMass}</span>
+                )}
+                {validityBar.challengeMass > 0 && (
+                  <span className="text-amber-600 dark:text-amber-400">-{validityBar.challengeMass}</span>
+                )}
+                <span className="text-lg font-black text-foreground ms-2">
+                  {validityBar.currentValidity}/100
+                </span>
+              </div>
+            </div>
+            <div
+              role="progressbar"
+              aria-valuenow={validityBar.currentValidity}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              className="h-3 w-full bg-secondary/30 rounded-full overflow-hidden flex"
+            >
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${validityBar.currentValidity}%` }}
+                transition={{ duration: 1, ease: "easeOut" }}
+                className="h-full bg-primary rounded-full"
+              />
+            </div>
           </div>
         ) : (
           hasPulse && (
@@ -324,6 +373,29 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
   const isMacroArena = node.thematic_tags?.includes("macro-arena");
   const arenaBubbling = isMacroArena ? computeArenaBubbling(childrenByRelationship, locale) : undefined;
 
+  // Bubbling Algorithm: dynamic validity for standard claims (Mini-Arena)
+  const supportingChildren = childrenByRelationship.supports;
+  const challengingChildren = childrenByRelationship.challenges;
+  const baseScore = !isMacroArena
+    ? parseNodeContent(node.content, locale).pulse ?? 0
+    : 0;
+  const supportMass = supportingChildren.reduce(
+    (sum, child) => sum + (parseNodeContent(child.content, locale).pulse ?? 0),
+    0
+  );
+  const challengeMass = challengingChildren.reduce(
+    (sum, child) => sum + (parseNodeContent(child.content, locale).pulse ?? 0),
+    0
+  );
+  const currentValidity = Math.max(
+    0,
+    Math.min(100, baseScore + supportMass - challengeMass)
+  );
+  const validityBar: ValidityBarData | undefined =
+    !isMacroArena
+      ? { baseScore, supportMass, challengeMass, currentValidity }
+      : undefined;
+
   // For claims under a Macro-Arena: detect arena parent and theory for context-aware breadcrumbs
   const connectedArena = !isMacroArena
     ? parents.find((p) => p.node.thematic_tags?.includes("macro-arena"))
@@ -365,15 +437,17 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
         : [];
 
   const [forgeOpen, setForgeOpen] = useState(false);
+  const [forgeRelationship, setForgeRelationship] = useState<"supports" | "challenges" | null>(null);
+  const router = useRouter();
 
   function openForge() {
     setForgeOpen(true);
   }
 
-  const hasChildren =
-    childrenByRelationship.supports.length > 0 ||
-    childrenByRelationship.challenges.length > 0 ||
-    childrenByRelationship.ai_analysis.length > 0;
+  function handleAnchoredFromMiniArena() {
+    setForgeRelationship(null);
+    router.refresh();
+  }
 
   // Level 1: Theory Dive view — breadcrumbs, theory header, list of supporting claims
   if (isTheoryDive) {
@@ -574,103 +648,147 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
           metadata={node.metadata}
           arenaBubbling={arenaBubbling}
           arenaNodeId={isMacroArena ? node.id : undefined}
+          validityBar={validityBar}
         />
 
         {/* Macro-Arena: no inline Submit Claims here; it lives in the sticky bottom bar below */}
 
-        {/* Epistemic Forge + flat child list: only for non-Arena nodes (micro-claims) */}
+        {/* Mini-Arena: tactical Support / Challenge + two-column debate layout (standard claims only) */}
         {!isMacroArena && (
           <div className="flex flex-col gap-6 mt-8">
             {address && (
-              <motion.section
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-                className="rounded-xl border border-border bg-card/60 p-4 shadow-soft"
-              >
-                <div className="flex justify-center">
+              <>
+                <div className="flex flex-wrap items-center gap-3 mt-8 border-t border-border/50 pt-6">
                   <Button
                     type="button"
-                    variant="outline"
+                    variant={forgeRelationship === "supports" ? "default" : "outline"}
+                    onClick={() =>
+                      setForgeRelationship(forgeRelationship === "supports" ? null : "supports")
+                    }
+                    className="gap-2 rounded-full border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                  >
+                    <Shield className="size-4" aria-hidden />
+                    {locale === "he" ? "בסס טענה זו" : "Support Claim"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={forgeRelationship === "challenges" ? "default" : "outline"}
+                    onClick={() =>
+                      setForgeRelationship(forgeRelationship === "challenges" ? null : "challenges")
+                    }
+                    className="gap-2 rounded-full border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                  >
+                    <Swords className="size-4" aria-hidden />
+                    {locale === "he" ? "הפרך טענה זו" : "Challenge Claim"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={openForge}
-                    className="border-primary/40 text-primary hover:bg-primary/10 focus-visible:ring-primary/40"
+                    className="gap-2 rounded-full text-muted-foreground hover:text-foreground"
                     aria-label={locale === "he" ? FORGE_ENTRY.he : FORGE_ENTRY.en}
                   >
-                    <Feather className="size-4 me-2 shrink-0 opacity-90" aria-hidden />
+                    <Feather className="size-4" aria-hidden />
                     {locale === "he" ? FORGE_ENTRY.he : FORGE_ENTRY.en}
                   </Button>
                 </div>
-              </motion.section>
+
+                {forgeRelationship && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="animate-in slide-in-from-top-4 duration-300"
+                  >
+                    <ForgeChat
+                      authorWallet={address}
+                      parentId={node.id}
+                      relationship={forgeRelationship}
+                      targetNodeContext={focalAssertion}
+                      onAnchored={handleAnchoredFromMiniArena}
+                    />
+                  </motion.div>
+                )}
+
+                <ForgeSheet
+                  isOpen={forgeOpen}
+                  onOpenChange={setForgeOpen}
+                  targetNodeContext={focalAssertion}
+                  mode="branch"
+                  authorWallet={address}
+                  parentId={node.id}
+                  onAnchored={() => setForgeOpen(false)}
+                />
+              </>
             )}
 
-            {address && (
-              <ForgeSheet
-                isOpen={forgeOpen}
-                onOpenChange={setForgeOpen}
-                targetNodeContext={focalAssertion}
-                mode="branch"
-                authorWallet={address}
-                parentId={node.id}
-                onAnchored={() => setForgeOpen(false)}
-              />
-            )}
-
-            {/* Categorical horizons: pillars & frictions — hidden on Arena, shown when diving into theory later */}
-            {hasChildren && (
-              <motion.section
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.1 }}
-                className="grid gap-8 sm:grid-cols-1 md:grid-cols-3"
-              >
-                <div className="space-y-3">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200">
-                    {locale === "he" ? SUPPORTING_LABEL.he : SUPPORTING_LABEL.en}
-                  </h2>
+            {/* Two-column tactical debate: Supports vs Challenges */}
+            <motion.section
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12"
+            >
+              <div className="flex flex-col gap-4">
+                <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2 border-b border-border/50 pb-2">
+                  <Shield className="size-4" aria-hidden />
+                  {locale === "he"
+                    ? `מבססים (${supportingChildren.length})`
+                    : `Supports (${supportingChildren.length})`}
+                </h3>
+                {supportingChildren.length > 0 ? (
                   <ul className="space-y-3">
-                    {childrenByRelationship.supports.map((child) => (
+                    {supportingChildren.map((child) => (
                       <li key={child.id}>
                         <ChildCard node={child} relationship="supports" locale={locale} />
                       </li>
                     ))}
                   </ul>
-                </div>
-                <div className="space-y-3">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-700 dark:text-stone-300">
-                    {locale === "he" ? CHALLENGES_LABEL.he : CHALLENGES_LABEL.en}
-                  </h2>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic py-4">
+                    {locale === "he" ? "אין טענות מבססות עדיין." : "No supporting claims yet."}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-4">
+                <h3 className="text-sm font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2 border-b border-border/50 pb-2">
+                  <Swords className="size-4" aria-hidden />
+                  {locale === "he"
+                    ? `מפריכים (${challengingChildren.length})`
+                    : `Challenges (${challengingChildren.length})`}
+                </h3>
+                {challengingChildren.length > 0 ? (
                   <ul className="space-y-3">
-                    {childrenByRelationship.challenges.map((child) => (
+                    {challengingChildren.map((child) => (
                       <li key={child.id}>
                         <ChildCard node={child} relationship="challenges" locale={locale} />
                       </li>
                     ))}
                   </ul>
-                </div>
-                <div className="space-y-3">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                    {locale === "he" ? OBSERVATIONS_LABEL.he : OBSERVATIONS_LABEL.en}
-                  </h2>
-                  <ul className="space-y-3">
-                    {childrenByRelationship.ai_analysis.map((child) => (
-                      <li key={child.id}>
-                        <ChildCard node={child} relationship="ai_analysis" locale={locale} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </motion.section>
-            )}
+                ) : (
+                  <p className="text-sm text-muted-foreground italic py-4">
+                    {locale === "he" ? "אין טענות מפריכות עדיין." : "No challenging claims yet."}
+                  </p>
+                )}
+              </div>
+            </motion.section>
 
-            {!hasChildren && (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="text-center text-sm text-muted-foreground"
-              >
-                {isRtl ? "אין צמתים מקושרים מתחת לצומת זה." : "No linked nodes below this node."}
-              </motion.p>
+            {/* Observations (ai_analysis) — compact row when present */}
+            {childrenByRelationship.ai_analysis.length > 0 && (
+              <div className="flex flex-col gap-3 mt-6 pt-6 border-t border-border/50">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                  {locale === "he" ? OBSERVATIONS_LABEL.he : OBSERVATIONS_LABEL.en}
+                </h3>
+                <ul className="space-y-3">
+                  {childrenByRelationship.ai_analysis.map((child) => (
+                    <li key={child.id}>
+                      <ChildCard node={child} relationship="ai_analysis" locale={locale} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         )}
