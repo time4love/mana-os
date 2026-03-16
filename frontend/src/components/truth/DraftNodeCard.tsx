@@ -40,9 +40,9 @@ const PORTAL_EXISTING_CTA = {
   en: "This claim exists in the Weave — dive into discussion",
 };
 
-const BELOW_THRESHOLD_BADGE = {
-  he: "⚠️ הטיעון דורש ליטוש לוגי ואינו עומד ברף העגינה",
-  en: "Claim requires logical refinement and does not meet the anchoring bar",
+const SOVEREIGN_LOW_SCORE_WARNING = {
+  he: "האורקל מצביע על פערים לוגיים מהותיים בטיוטה זו. זכותך הריבונית לעגן אותה כפי שהיא, אך מומלץ להיעזר בשאלות ההפרכה כדי ללטש אותה.",
+  en: "The Oracle indicates significant logical gaps in this draft. It is your sovereign right to anchor it as is, but refining it via the challenge prompts is recommended.",
 };
 
 interface DraftNodeCardProps {
@@ -103,7 +103,7 @@ export function DraftNodeCard({
   const pulse = Math.min(100, Math.max(0, draft.logicalCoherenceScore));
   const isBelowAnchoringThreshold = pulse < 40;
   const portalLabel = locale === "he" ? PORTAL_EXISTING_CTA.he : PORTAL_EXISTING_CTA.en;
-  const belowThresholdLabel = locale === "he" ? BELOW_THRESHOLD_BADGE.he : BELOW_THRESHOLD_BADGE.en;
+  const sovereignWarningLabel = locale === "he" ? SOVEREIGN_LOW_SCORE_WARNING.he : SOVEREIGN_LOW_SCORE_WARNING.en;
 
   const rel = draft.relationshipToContext;
   const supportsLabel = locale === "he" ? BADGE_SUPPORTS.he : BADGE_SUPPORTS.en;
@@ -239,24 +239,27 @@ export function DraftNodeCard({
               </Button>
             )}
           </div>
-        ) : isBelowAnchoringThreshold ? (
-          <div
-            className="rounded-lg border border-amber-300/70 bg-amber-50/80 dark:bg-amber-950/30 px-3 py-2.5 text-start"
-            role="status"
-          >
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-              {belowThresholdLabel}
-            </p>
-          </div>
         ) : (
-          <Button
-            type="button"
-            onClick={onAnchor}
-            disabled={isAnchoring}
-            className="w-full sm:w-auto bg-primary text-primary-foreground shadow-soft hover:opacity-90"
-          >
-            {isAnchoring ? (locale === "he" ? "עוגן…" : "Anchoring…") : anchorLabel}
-          </Button>
+          <div className="space-y-3">
+            {isBelowAnchoringThreshold && (
+              <div
+                className="rounded-lg border border-amber-300/70 bg-amber-50/80 dark:bg-amber-950/30 px-3 py-2.5 text-start"
+                role="status"
+              >
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  {sovereignWarningLabel}
+                </p>
+              </div>
+            )}
+            <Button
+              type="button"
+              onClick={onAnchor}
+              disabled={isAnchoring}
+              className="w-full sm:w-auto bg-primary text-primary-foreground shadow-soft hover:opacity-90"
+            >
+              {isAnchoring ? (locale === "he" ? "עוגן…" : "Anchoring…") : anchorLabel}
+            </Button>
+          </div>
         )}
         {Array.isArray(writeTelemetry) && writeTelemetry.length > 0 && (isArchitectMode || writeTelemetry.some((l) => l.startsWith("[CRITICAL]"))) && (
           <div className="rounded-lg border border-border overflow-hidden">

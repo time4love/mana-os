@@ -20,6 +20,7 @@ import {
   getToolPartState,
   getLocalized,
   extractDraftsFromMessages,
+  normalizeRawDraft,
   type RagTelemetryPayload,
   type MessagePartLike,
 } from "@/components/truth/forgeChatLib";
@@ -526,9 +527,32 @@ export function ForgeChat({
                             </div>
                           ) : null}
                           {hasDrafts ? (
-                            <p className="text-muted-foreground italic text-start text-xs mt-1">
-                              {getLocalized(TRIAGE_MAPPING_LABEL, locale)}
-                            </p>
+                            <div className="mt-3 w-full max-w-full overflow-hidden flex flex-col gap-4 box-border">
+                              <p className="text-muted-foreground italic text-start text-xs">
+                                {getLocalized(TRIAGE_MAPPING_LABEL, locale)}
+                              </p>
+                              {(triageNewDrafts as Array<Record<string, unknown>>)
+                                .filter((d) => d && typeof d.assertionEn === "string" && (d.assertionEn as string).trim())
+                                .map((raw, idx) => {
+                                  const draft = normalizeRawDraft(raw) as ForgeDraft;
+                                  return (
+                                    <DraftNodeCard
+                                      key={`inline-${idx}-${draft.assertionEn.slice(0, 30)}`}
+                                      draft={draft}
+                                      onAnchor={() => handleAnchor(draft, false)}
+                                      isAnchoring={isAnchoring}
+                                      authorWallet={authorWallet}
+                                      parentId={parentId}
+                                      relationship={relationship}
+                                      matchedExistingNodeId={"matchedExistingNodeId" in raw ? (raw.matchedExistingNodeId as string | null) ?? null : null}
+                                      semanticDuplicates={duplicateDraft?.assertionEn === draft.assertionEn ? semanticDuplicates : null}
+                                      onForcePlant={duplicateDraft?.assertionEn === draft.assertionEn ? () => handleAnchor(draft, true) : undefined}
+                                      writeTelemetry={lastWriteTelemetry}
+                                      isArchitectMode={isArchitectMode}
+                                    />
+                                  );
+                                })}
+                            </div>
                           ) : null}
                           {isPending && !hasDrafts ? (
                             <p className="text-muted-foreground italic text-xs text-start mt-4 mb-2 animate-pulse">
@@ -595,7 +619,7 @@ export function ForgeChat({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="pt-4 mt-2 w-full max-w-full overflow-hidden grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 box-border"
+              className="pt-4 mt-2 w-full max-w-full overflow-hidden flex flex-col gap-4 box-border"
             >
               {draftsToRender.map((claim, idx) => {
                 const draft = claim as ForgeDraft;

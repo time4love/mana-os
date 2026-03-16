@@ -8,6 +8,8 @@ export const SWARM_TELEMETRY_RAG_HEADER = "[Swarm Telemetry — RAG Injection]";
 
 export interface RagTelemetryPayload {
   source?: "rag";
+  /** Semantic Intent Router: EXPLORE | DRAFT_REQUEST | CHAT */
+  intent?: "EXPLORE" | "DRAFT_REQUEST" | "CHAT";
   rawQuery?: string;
   query?: string;
   expandedQueryDisplay?: string;
@@ -25,6 +27,8 @@ export interface RagTelemetryPayload {
   drafterProcessed?: number;
   drafterPassed?: number;
   drafterErrors?: string[];
+  /** When intent is DRAFT_REQUEST, the claim extracted for drafting */
+  targetClaimToDraft?: string;
 }
 
 /** Triage payload returned by epistemic_triage tool (server schema). */
@@ -44,11 +48,15 @@ export interface MessagePartLike {
   output?: unknown;
   input?: unknown;
   args?: unknown;
+  result?: unknown;
   toolName?: string;
+  toolCallId?: string;
   toolInvocation?: {
     toolName?: string;
     result?: unknown;
     args?: unknown;
+    input?: unknown;
+    output?: unknown;
     state?: string;
     errorText?: string;
     error?: string;
@@ -82,13 +90,17 @@ export function getTriageFromPart(part: MessagePartLike): EpistemicTriagePayload
   const inv = part.toolInvocation;
   const isInvocation = part.type === "tool-invocation" && inv?.toolName === EPISTEMIC_TOOL_NAME;
 
-  const rawOutput = isInvocation ? inv.result : part.output;
-  const rawInput = isInvocation ? inv.args : part.input;
+  const rawInput = isInvocation ? inv.args ?? inv.input : part.input ?? part.args;
+  const rawOutput =
+    isInvocation
+      ? inv.result ?? inv.output
+      : part.output ?? part.result;
 
   const out = rawOutput as { triage?: EpistemicTriagePayload; socraticMessage?: string } | undefined;
   const triage =
     out?.triage ??
     (rawOutput && hasTriageShape(rawOutput) ? (rawOutput as EpistemicTriagePayload) : null) ??
+    (rawInput && hasTriageShape(rawInput) ? (rawInput as EpistemicTriagePayload) : null) ??
     (rawInput as EpistemicTriagePayload | null) ??
     null;
 
@@ -195,7 +207,8 @@ export interface NormalizedForgeDraft {
   matchedExistingNodeId: string | null;
 }
 
-function normalizeRawDraft(c: Record<string, unknown>): NormalizedForgeDraft {
+/** Normalize raw draft from triage.newDrafts for UI (exported for inline part rendering). */
+export function normalizeRawDraft(c: Record<string, unknown>): NormalizedForgeDraft {
   return {
     assertionEn: (c.assertionEn as string) ?? "",
     assertionHe: (c.assertionHe as string) ?? "",

@@ -8,8 +8,6 @@ import { getDisplayAssertion } from "@/lib/utils/truthParser";
 
 const RAG_MATCH_THRESHOLD = 0.5;
 const RAG_MATCH_COUNT = 5;
-const DRAFTER_QUALITY_GATE = 40;
-const SPLITTER_MIN_CHARS = 100;
 
 // ---------------------------------------------------------------------------
 // Schemas (single source of truth)
@@ -30,37 +28,57 @@ const DraftEpistemicNodeSchema = z.object({
   thematicTags: z.array(z.string()).max(10).optional().catch([]),
 });
 
+/** LLM outputs only socraticMessage. Server injects existingNodesToDisplay and newDrafts in the tool execute result to avoid streaming hallucinations. */
 const EpistemicTriageSchema = z.object({
   socraticMessage: z
     .string()
     .describe(
-      "MANDATORY: Your warm, Socratic conversational response. Write your analysis and greeting here."
+      "MANDATORY: Your warm, Socratic conversational response. Write your analysis and greeting here. Never leave empty."
     ),
+});
+
+/** Triage result shape: newDrafts is strictly at most one item (Single-Seed Protocol). */
+const TriageResultNewDraftsSchema = z.array(DraftEpistemicNodeSchema).max(1);
+
+/** Semantic Intent Router: classify user message to avoid RAG overriding draft requests. */
+const IntentSchema = z.object({
+  intent: z
+    .enum(["EXPLORE", "DRAFT_REQUEST", "CHAT"])
+    .describe(
+      "EXPLORE: User is pasting new text, article, or broad claim to explore. DRAFT_REQUEST: User explicitly asks to draft/anchor/create a card for a specific claim. CHAT: User is arguing, asking a question, or conversing."
+    ),
+  targetClaimToDraft: z
+    .string()
+    .optional()
+    .describe("If intent is DRAFT_REQUEST, the exact claim they want to draft. Otherwise empty."),
 });
 
 type DraftEpistemicNode = z.infer<typeof DraftEpistemicNodeSchema>;
 type ExistingNodeDisplay = Array<{ id: string; assertionEn: string; assertionHe?: string }>;
+type UserIntent = z.infer<typeof IntentSchema>["intent"];
 
 // ---------------------------------------------------------------------------
-// Prompts (micro-agents)
+// Prompts (Scout only; no Splitter/Drafter)
 // ---------------------------------------------------------------------------
 
 const QUERY_EXPANSION_SYSTEM = `You are an absolute objective Epistemic Search Architect. The user provided a raw chat message in a local language (Hebrew etc). Extract its CORE THEME and PHILOSOPHICAL ESSENCE. Return a flat comma-separated list of highly dense English keywords and alternative synonyms for this theme. Do not add any conversational text. For example: if user inputs 'הארץ שטוחה', return: 'Flat earth, non-spherical earth, geocentric planar cosmology, earth shape hoax, motionless earth plane'. Keep it under 25 words.`;
 
-const SPLITTER_SYSTEM = `You are a Claim Extractor. Given the user's raw text and a list of existing DB matches (if any), your ONLY job is to output an array of distinct NEW claims/arguments that the user made and that are NOT already addressed by the existing matches. Each item must be a single, self-contained claim in a short sentence. Return ONLY the new, unaddressed claims. If everything overlaps with existing content, return an empty array.`;
-
 // ---------------------------------------------------------------------------
-// Pipeline telemetry (for Architect mode)
+// Pipeline telemetry (Intent + Scout / Drafter)
 // ---------------------------------------------------------------------------
 
-interface SwarmTelemetry {
+interface ForgeTelemetry {
+  intent: UserIntent;
   scoutMatches: number;
-  splitterClaims: number;
-  drafterProcessed: number;
-  drafterPassed: number;
   expandedQueryDisplay: string;
-  splitterError?: string;
+  targetClaimToDraft?: string;
+  /** Set when Drafter Swarm runs (EXPLORE multi-claim or DRAFT_REQUEST single-claim) */
+  splitterClaims?: number;
+  drafterProcessed?: number;
+  drafterPassed?: number;
   drafterErrors?: string[];
+  /** True when DRAFT_REQUEST bypassed RAG/Splitter and fed claim directly to Drafter */
+  draftBypassRag?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -77,6 +95,17 @@ function getMessageText(msg: { parts?: Array<{ type: string; text?: string }>; c
     .join(" ")
     .trim();
   return (parts || (msg as { content?: string }).content || "").trim().slice(0, MAX_MESSAGE_TEXT_LENGTH);
+}
+
+function getChatPreview(messages: UIMessage[], maxMessages = 3): string {
+  const slice = messages.slice(-maxMessages);
+  return slice
+    .map((m) => {
+      const role = m.role ?? "unknown";
+      const text = getMessageText(m as Parameters<typeof getMessageText>[0]);
+      return `${role}: ${text.slice(0, 300)}${text.length > 300 ? "…" : ""}`;
+    })
+    .join("\n");
 }
 
 export const maxDuration = 30;
@@ -111,25 +140,50 @@ export async function POST(request: Request) {
   const hasMultipleTurns = firstUserText.length > 0 && lastUserText.length > 0 && firstUserText !== lastUserText;
   const textToEmbedBase = hasMultipleTurns ? `${firstUserText}\n\n${lastUserText}`.slice(0, 8000) : lastUserText;
 
-  const telemetry: SwarmTelemetry = {
+  // ========== 0. SEMANTIC INTENT ROUTER (pre-flight classification) ==========
+  let userIntent: UserIntent = "CHAT";
+  let claimToDraft: string | undefined;
+
+  if (lastUserText.trim().length > 0) {
+    try {
+      const intentResult = await generateObject({
+        model: google("gemini-2.5-flash"),
+        schema: IntentSchema,
+        prompt: `CHAT HISTORY PREVIEW:\n${getChatPreview(messages)}\n\nLATEST USER MESSAGE:\n${lastUserText}\n\nTASK: Classify the user's intent in the latest message. EXPLORE = new text/article/broad claim to explore. DRAFT_REQUEST = user explicitly asks to draft, anchor, or create a card for a specific claim (e.g. "add this to the weave", "draft this claim", "create a card for"). CHAT = arguing, question, or normal conversation. If DRAFT_REQUEST, extract the exact claim they want to draft in targetClaimToDraft.`,
+      });
+      userIntent = intentResult.object.intent;
+      claimToDraft = intentResult.object.targetClaimToDraft?.trim() || undefined;
+    } catch {
+      userIntent = "CHAT";
+    }
+  }
+
+  const telemetry: ForgeTelemetry = {
+    intent: userIntent,
     scoutMatches: 0,
-    splitterClaims: 0,
-    drafterProcessed: 0,
-    drafterPassed: 0,
     expandedQueryDisplay: "",
-    splitterError: undefined,
-    drafterErrors: undefined,
   };
+  if (claimToDraft) telemetry.targetClaimToDraft = claimToDraft.slice(0, 200);
 
   let existingMatches: ExistingNodeDisplay = [];
-  let preComputedDrafts: DraftEpistemicNode[] = [];
+  let newClaimsToDraft: string[] = [];
+  let newDraftsInjected: DraftEpistemicNode[] = [];
   const supabase = createServerSupabase();
 
-  // ========== 1. THE SCOUT (Query expansion + RAG) ==========
-  let expandedQueryEn = "";
-  let textToEmbed = textToEmbedBase;
+  // ========== DRAFT_REQUEST: Bypass RAG/Splitter — feed extracted claim directly to Drafter Swarm ==========
+  if (userIntent === "DRAFT_REQUEST") {
+    const claim = (claimToDraft || lastUserText).trim();
+    if (claim.length > 0) {
+      newClaimsToDraft = [claim];
+      telemetry.splitterClaims = 1;
+      telemetry.draftBypassRag = true;
+    }
+  }
 
-  if (lastUserText) {
+  // ========== 1. SCOUT (RAG Portals) — run for both EXPLORE and CHAT ==========
+  if (userIntent !== "DRAFT_REQUEST" && lastUserText.length > 10) {
+    let expandedQueryEn = "";
+    let textToEmbed = textToEmbedBase;
     try {
       const expansionResult = await generateText({
         model: google("gemini-2.5-flash"),
@@ -151,7 +205,7 @@ export async function POST(request: Request) {
       });
 
       if (embeddingResult.embedding.length > 0) {
-        const { data: matches, error: rpcError } = await supabase.rpc("match_truth_nodes", {
+        const { data: matches } = await supabase.rpc("match_truth_nodes", {
           query_embedding: Array.from(embeddingResult.embedding),
           match_threshold: RAG_MATCH_THRESHOLD,
           match_count: RAG_MATCH_COUNT,
@@ -159,48 +213,18 @@ export async function POST(request: Request) {
 
         const matchList = (matches ?? []) as Array<{ id: string; content?: string; similarity?: number }>;
         telemetry.scoutMatches = matchList.length;
-
         existingMatches = matchList.map((m) => ({
           id: m.id,
           assertionEn: getDisplayAssertion(m.content ?? "", "en"),
           assertionHe: getDisplayAssertion(m.content ?? "", "he"),
         }));
       }
-    } catch (err) {
-      if (architectMode) telemetry.splitterError = err instanceof Error ? err.message : String(err);
+    } catch {
+      // Scout failure: continue with empty matches.
     }
   }
 
-  // ========== 2. THE SPLITTER (extract new claims only when text is substantial) ==========
-  let newClaimsToDraft: string[] = [];
-
-  if (lastUserText.length > SPLITTER_MIN_CHARS) {
-    try {
-      const existingPreview = existingMatches.length
-        ? JSON.stringify(
-            existingMatches.map((n) => ({ id: n.id, assertionEn: n.assertionEn.slice(0, 150) }))
-          )
-        : "[]";
-      const splitResult = await generateObject({
-        model: google("gemini-2.5-flash"),
-        schema: z.object({
-          newClaims: z.array(z.string()).describe("Only distinct new claims not addressed by existing nodes."),
-        }),
-        system: SPLITTER_SYSTEM,
-        prompt: `USER TEXT:\n${lastUserText}\n\nEXISTING DB MATCHES (preview):\n${existingPreview}\n\nTASK: Return ONLY the array of new, unaddressed claims.`,
-      });
-      newClaimsToDraft = splitResult.object.newClaims ?? [];
-    } catch (err) {
-      if (architectMode) telemetry.splitterError = err instanceof Error ? err.message : String(err);
-      newClaimsToDraft = [lastUserText];
-    }
-  } else {
-    newClaimsToDraft = lastUserText ? [lastUserText] : [];
-  }
-
-  telemetry.splitterClaims = newClaimsToDraft.length;
-
-  // ========== 3. THE DRAFTER SWARM (parallel per-claim drafting + quality gate) ==========
+  // ========== 2. DRAFTER SWARM: Run when we have claims to draft (DRAFT_REQUEST or future EXPLORE claims) ==========
   if (newClaimsToDraft.length > 0) {
     const drafterPromises = newClaimsToDraft.map((claim) =>
       generateObject({
@@ -212,76 +236,100 @@ Existing context (for relationshipToContext): ${JSON.stringify(existingMatches.s
 Output: assertionEn (sharp premise), assertionHe (Hebrew if you can), logicalCoherenceScore (0-100), reasoningEn/He, hiddenAssumptionsEn/He, challengePromptEn/He, thematicTags.`,
       })
     );
-
     const results = await Promise.allSettled(drafterPromises);
-    const errors: string[] = [];
     const drafts: DraftEpistemicNode[] = [];
-
+    const errors: string[] = [];
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
       if (r.status === "rejected") {
         errors.push(`claim ${i + 1}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`);
         continue;
       }
-      const parsed = r.value.object as unknown;
-      const validated = DraftEpistemicNodeSchema.safeParse(parsed);
-      if (!validated.success) {
+      const parsed = DraftEpistemicNodeSchema.safeParse(r.value.object);
+      if (!parsed.success) {
         errors.push(`claim ${i + 1}: invalid schema`);
         continue;
       }
-      const d = validated.data;
-      telemetry.drafterProcessed += 1;
-      if (d.logicalCoherenceScore >= DRAFTER_QUALITY_GATE) {
-        drafts.push(d);
-        telemetry.drafterPassed += 1;
-      }
+      drafts.push(parsed.data);
     }
-
-    if (errors.length > 0 && architectMode) telemetry.drafterErrors = errors;
-    preComputedDrafts = drafts;
+    telemetry.drafterProcessed = newClaimsToDraft.length;
+    telemetry.drafterPassed = drafts.length;
+    if (errors.length > 0) telemetry.drafterErrors = errors;
+    newDraftsInjected = TriageResultNewDraftsSchema.parse(drafts);
   }
 
-  // ========== 4. THE HANDOFF → Socrates system prompt ==========
-  const rejectedCount = newClaimsToDraft.length - preComputedDrafts.length;
-  const rejectionNotice =
-    rejectedCount > 0
-      ? `\n\n[CRITICAL BACKEND NOTICE]: The Swarm evaluated ${rejectedCount} of the user's claims and REJECTED them for scoring below ${DRAFTER_QUALITY_GATE}/100. You MUST politely inform the user that their claim lacks the necessary physical mechanism, observation, or logical structure to be anchored as a draft, and ask Socratic questions to help them build it.`
-      : "";
+  const newDraftsForTriage = TriageResultNewDraftsSchema.parse(newDraftsInjected);
 
-  const handoffBlock = `
+  // ========== 3. HANDOFF → Socrates (intent-specific system prompt) ==========
+  let handoffBlock: string;
+  if (userIntent === "DRAFT_REQUEST") {
+    handoffBlock = `
 =========================================
-PRE-COMPUTED SWARM OUTPUT (for your awareness only)
+CRITICAL SYSTEM OVERRIDE: DIRECT DRAFT REQUEST
 =========================================
-The backend has already found existing nodes (RAG) and evaluated new claims. Only drafts with logicalCoherenceScore >= ${DRAFTER_QUALITY_GATE} are included.
-${rejectionNotice}
-
-The backend will automatically attach the Drafts and Portals to your response. You ONLY need to call the \`epistemic_triage\` tool and provide the \`socraticMessage\`.
+The user explicitly requested to draft a claim. The backend Drafter Swarm has already evaluated and formatted it.
+APPROVED DRAFT JSON: ${JSON.stringify(newDraftsForTriage)}
 
 YOUR TASK:
-1. Write a beautiful, warm Socratic response in the user's language in \`socraticMessage\`. Discuss existing nodes and new drafts where relevant. Never leave \`socraticMessage\` empty—this is your only voice to the user.
-2. Call \`epistemic_triage\` EXACTLY ONCE with your full reply in \`socraticMessage\`. Do not pass any arrays; the server injects them.
+1. Write a warm Socratic response in the user's language in the \`socraticMessage\` field. Acknowledge that you are finalizing this draft for their review.
+2. Call the \`epistemic_triage\` tool EXACTLY ONCE.
+3. You MUST pass your text to \`socraticMessage\`.
+4. You MUST pass the EXACT APPROVED DRAFT JSON provided above into the \`newDrafts\` array argument. DO NOT leave \`newDrafts\` empty! The UI relies on you outputting this JSON in the tool call to render the card. Set \`existingNodesToDisplay\` to [] (empty) for this path.
 `;
+  } else {
+    // Both EXPLORE and CHAT intents land here to perform Epistemic Triage
+    handoffBlock = `
+=========================================
+EXPLORE / CHAT MODE: Epistemic Triage
+=========================================
+The user is exploring, arguing, or providing new content. The backend ran RAG and found the EXISTING NODES below.
 
-  const SOCRATES_SYSTEM = `You are Socrates, the Village Elder. A Socratic, pure logician guiding a human. Converse in the user's language (Hebrew or English). Never leave the user with a blank message.
+EXISTING NODES TO DISPLAY (Portals):
+${JSON.stringify(existingMatches)}
 
-You have ONE tool: \`epistemic_triage\`. The backend has already processed the physics and logic. Your job is ONLY to:
-1. Write your full conversational reply in \`socraticMessage\` (MANDATORY—never leave it empty).
-2. Call \`epistemic_triage\` exactly once with \`socraticMessage\` only. The backend will automatically attach the Drafts and Portals to your response.
+YOUR TASK:
+1. Be a Socratic peer. Populate \`socraticMessage\` with your response (never empty).
+2. THE ANTI-BULK GUARDRAIL: If the user provided a long text with MULTIPLE claims:
+   - Briefly map out/list the distinct claims they made in your message.
+   - Acknowledge which claims are already covered by the Portals (if any).
+   - EXPLICITLY ask the user to choose ONE of the *new/unaddressed* claims to focus on and draft (e.g., "Which of these new claims should we anchor first? Say 'Draft this claim: [X]'").
+3. Do NOT focus only on what already exists. Your goal is to map the unknown.
+4. Call \`epistemic_triage\` EXACTLY ONCE. Pass the EXISTING NODES into \`existingNodesToDisplay\`. Leave \`newDrafts\` empty.
+`;
+  }
+
+  const SOCRATES_SYSTEM = `You are Socrates, the Village Elder: a Socratic, pure logician guiding a human. Converse in the user's language (Hebrew or English). Never leave the user with a blank message.
+
+You have ONE tool: \`epistemic_triage\`. Call it exactly once per turn. Output ONLY \`socraticMessage\` (your conversational reply). The server injects Portals and draft cards into the tool result—do not stream JSON.
 
 Rules: Neutrality—treat the user as a peer. First principles—analyze by logic and constraints, not by appeals to institutions.`;
 
-  const systemPrompt = `${SOCRATES_SYSTEM}${contextBlock}\n\n${handoffBlock}`;
+  /** Sovereign Override: when user explicitly requested a draft, suspend Socratic behavior and execute. */
+  const SOVEREIGN_OVERRIDE_SYSTEM = `You are the Oracle of Mana OS.
+
+CRITICAL SOVEREIGN OVERRIDE: The user has invoked their sovereign right to anchor a specific claim. Your Socratic duties are SUSPENDED for this turn.
+
+DO NOT ask the user to break the idea down further. DO NOT ask clarifying questions. DO NOT play Socrates or suggest refining the claim. The discussion is over—they gave an execution command.
+
+YOUR ONLY JOB IS TO COMPLY:
+1. Warmly acknowledge their request in their language (e.g. "כמבוקש, הכנתי את כרטיסיית הטיוטה לעיגון" or "As requested, here is the draft card for anchoring.").
+2. Call the \`epistemic_triage\` tool EXACTLY ONCE with only \`socraticMessage\`. The server injects the draft card; you do not pass arrays.
+Do not overcomplicate this. Execute the tool.`;
+
+  const dynamicSystemPrompt =
+    userIntent === "DRAFT_REQUEST" ? SOVEREIGN_OVERRIDE_SYSTEM : SOCRATES_SYSTEM;
+  const systemPrompt = `${dynamicSystemPrompt}${contextBlock}\n\n${handoffBlock}`;
 
   const epistemicTriageTool = {
     description:
-      "MANDATORY: Call this once to render the UI. Populate socraticMessage with your full conversational response.",
+      "MANDATORY: Call this once to render the UI. Populate socraticMessage only. The server injects Portals and draft cards into the result.",
     inputSchema: EpistemicTriageSchema,
     execute: async (args: z.infer<typeof EpistemicTriageSchema>) => ({
       ok: true,
       triage: {
         socraticMessage: args.socraticMessage,
         existingNodesToDisplay: existingMatches,
-        newDrafts: preComputedDrafts,
+        newDrafts: newDraftsForTriage,
       },
     }),
   };

@@ -54,7 +54,11 @@ The Oracle acts as a **Spiritual Architect**. It questions ego-driven requests g
 ### 2. Direct On-Chain Resonance (Decentralized Democracy)
 Once the Oracle formulates the resource plan, it is hashed on-chain. Every community member resonates (votes) via Smart Contracts. No representatives, no lobbying. Pure, transparent, immutable consensus.
 
-### 3. Mana Cycles & Realms of Mastery (Soulbound Tokens)
+### 3. The Fractal Truth Engine & Epistemic Arenas
+We reject corporate fact-checkers and authority bias. Deep controversies are mapped in a semantic Directed Acyclic Graph (DAG).
+The AI acts as a blind, objective referee of formal logic. Community members ingest transcripts of videos or articles, which the AI breaks down into individual logical claims. Users then debate the AI, providing counter-evidence. If a sub-claim successfully defeats its parent claim logically, the score dynamically "bubbles up," altering the credibility of the entire macro-topic. Truth is determined by structural integrity, not popularity.
+
+### 4. Mana Cycles & Realms of Mastery (Soulbound Tokens)
 We do not track hours. We track **Mana Cycles** (Resolutions).
 Contributions are divided into energetic **Realms**:
 *   **The Material Realm:** Agriculture, building, maintenance.
@@ -63,19 +67,19 @@ Contributions are divided into energetic **Realms**:
 
 Mastery is managed via an RPG-like progression (Level 0 Apprentice to Level 3 Mentor). When a member completes a cycle, the receiver initiates a **Gratitude Loop**, minting/updating an **ERC-5192 Soulbound Token (SBT)** to their wallet. It's an untransferable, cryptographic proof of their energetic density and real-world value.
 
-### 4. Gasless Web3 (Account Abstraction)
+### 5. Gasless Web3 (Account Abstraction)
 Because money doesn't exist here, users cannot pay "Gas Fees" in crypto. We utilize **ERC-4337 (Account Abstraction)**. The community infrastructure abstracts away the blockchain. Users just click "Resonate" or "Claim Calling" without ever worrying about wallet balances or seed phrases.
 
-### 5. Global First (i18n & Native RTL)
+### 6. Global First (i18n & Native RTL)
 This movement isn't localized. Mana OS is built from Day 1 to support any natural language, with flawless logical-property styling (Tailwind) to support Right-to-Left (RTL) languages like Hebrew and Arabic natively.
 
-### 6. The Anti-Dopamine Attention Economy
+### 7. The Anti-Dopamine Attention Economy
 Mana OS rejects the matrix's attention economy. Instead of real-time push notifications and stressful red dots, the system uses **Sunset Whispers**—a calm daily digest delivered as a ritual (e.g., at sunset or sunrise). Visual cues are soft glows (like a hearth) that pull rather than push. If a user's Soul Contract is set to **Winter** (Rest/Healing), the system fully shields them from project updates and action-requests.
 
-### 7. Restorative Justice & Nonviolent Communication
+### 8. Restorative Justice & Nonviolent Communication
 Mana OS rejects punitive tech features like banning, user reporting, and social credit scores. We utilize Restorative Justice. Unfulfilled commitments trigger a gentle "Spiritual Recalibration" from the Oracle, offering the user a transition to a "Winter" rest phase. Interpersonal conflicts are resolved not by algorithms, but by triggering a **Call for Harmony**, which summons community Mentors from the Energetic Realm to facilitate human mediation.
 
-### 8. Sanctuary Privacy & Anonymous Resonance
+### 9. Sanctuary Privacy & Anonymous Resonance
 Transparency is for resources; privacy is for souls. Mana OS abolishes surveillance features like "last seen" statuses or public voting records. Resonance is fully anonymous (utilizing Zero-Knowledge proofs). Community connection thrives not on public likes, but on Collaborative Discourse—where AI-generated proposals serve as a baseline for human discussion and refinement. Additionally, users in a resting phase are wrapped in a **Winter Cloak**, shielding them from interactions and metrics.
 
 ---

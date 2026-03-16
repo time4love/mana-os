@@ -16,11 +16,19 @@ function PipelineTelemetryView({ t }: { t: RagTelemetryPayload }) {
     typeof t.splitterClaims === "number" ? t.splitterClaims : (t.splitterClaims?.length ?? 0);
   return (
     <>
-      <p className="text-zinc-400">1. Scout (RAG): Found {t.scoutMatches} matches.</p>
+      {t.intent && (
+        <p className="text-emerald-300 font-medium mb-1">Intent: {t.intent}</p>
+      )}
+      {t.targetClaimToDraft && (
+        <p className="text-zinc-500 text-xs mb-1" title={t.targetClaimToDraft}>
+          Claim to draft: {t.targetClaimToDraft.slice(0, 80)}
+          {t.targetClaimToDraft.length > 80 ? "…" : ""}
+        </p>
+      )}
+      <p className="text-zinc-400">1. Scout (RAG): Found {t.scoutMatches ?? 0} matches.</p>
       <p className="text-zinc-400">2. Splitter: Extracted {splitterCount} new raw claims.</p>
       <p className="text-zinc-400">
-        3. Drafter Swarm: Processed {t.drafterProcessed ?? 0} claims. {t.drafterPassed ?? 0} passed
-        the quality gate (&gt;40).
+        3. Drafter Swarm: Processed {t.drafterProcessed ?? 0} claims (scored but uncensored).
       </p>
       {t.expandedQueryDisplay && (
         <p className="text-zinc-500 mt-1">Expanded query: {t.expandedQueryDisplay}</p>
