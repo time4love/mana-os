@@ -34,26 +34,12 @@ const EpistemicTriageSchema = z.object({
   socraticMessage: z
     .string()
     .describe(
-      "MANDATORY: Your warm, Socratic conversational response. You MUST write your analysis, philosophical insights, and greeting here. DO NOT leave this empty."
+      "MANDATORY: Your warm, Socratic conversational response. Write your analysis and greeting here."
     ),
-  existingNodesToDisplay: z
-    .array(
-      z.object({
-        id: z.string(),
-        assertionEn: z.string(),
-        assertionHe: z.string().optional(),
-      })
-    )
-    .optional()
-    .describe("Pass the existing nodes here to show them as portals to the user."),
-  newDrafts: z
-    .array(DraftEpistemicNodeSchema)
-    .optional()
-    .describe("Pass the newly evaluated claims here to generate draft cards."),
 });
 
 type DraftEpistemicNode = z.infer<typeof DraftEpistemicNodeSchema>;
-type ExistingNodeDisplay = z.infer<typeof EpistemicTriageSchema>["existingNodesToDisplay"];
+type ExistingNodeDisplay = Array<{ id: string; assertionEn: string; assertionHe?: string }>;
 
 // ---------------------------------------------------------------------------
 // Prompts (micro-agents)
@@ -264,31 +250,23 @@ Output: assertionEn (sharp premise), assertionHe (Hebrew if you can), logicalCoh
 
   const handoffBlock = `
 =========================================
-CRITICAL: PRE-COMPUTED SWARM OUTPUT (Do not regenerate this data)
+PRE-COMPUTED SWARM OUTPUT (for your awareness only)
 =========================================
-The backend Epistemic Assembly Line has already:
-- Found existing nodes (RAG).
-- Extracted and evaluated new claims. Only drafts with logicalCoherenceScore >= ${DRAFTER_QUALITY_GATE} are included.
+The backend has already found existing nodes (RAG) and evaluated new claims. Only drafts with logicalCoherenceScore >= ${DRAFTER_QUALITY_GATE} are included.
 ${rejectionNotice}
 
-EXISTING NODES TO DISPLAY (pass exactly to epistemic_triage.existingNodesToDisplay):
-${JSON.stringify(existingMatches)}
-
-NEW APPROVED DRAFTS (pass exactly to epistemic_triage.newDrafts):
-${JSON.stringify(preComputedDrafts)}
-
-STAGE 2: YOU MUST NOT LEAVE \`newDrafts\` EMPTY if the Splitter Agent provided new claims! You MUST output the drafts alongside the existing nodes in the same tool call.
+The backend will automatically attach the Drafts and Portals to your response. You ONLY need to call the \`epistemic_triage\` tool and provide the \`socraticMessage\`.
 
 YOUR TASK:
-1. Write a beautiful, warm Socratic response in the user's language in the \`socraticMessage\` field. Discuss both the existing nodes and the new drafts where relevant. You MUST populate \`socraticMessage\`—this is your only voice to the user; do not leave it empty.
-2. Call the \`epistemic_triage\` tool EXACTLY ONCE: set \`socraticMessage\` to your full reply, and pass the EXACT \`existingNodesToDisplay\` and \`newDrafts\` arrays above so the UI can render them.
+1. Write a beautiful, warm Socratic response in the user's language in \`socraticMessage\`. Discuss existing nodes and new drafts where relevant. Never leave \`socraticMessage\` empty—this is your only voice to the user.
+2. Call \`epistemic_triage\` EXACTLY ONCE with your full reply in \`socraticMessage\`. Do not pass any arrays; the server injects them.
 `;
 
   const SOCRATES_SYSTEM = `You are Socrates, the Village Elder. A Socratic, pure logician guiding a human. Converse in the user's language (Hebrew or English). Never leave the user with a blank message.
 
-You have ONE tool: \`epistemic_triage\`. The backend Swarm has already processed the physics and logic of the user's input. Your job is ONLY to:
-1. Write your full conversational reply in \`socraticMessage\` (MANDATORY—this is the only text the user sees from you; never leave it empty).
-2. Call \`epistemic_triage\` exactly once, passing \`socraticMessage\` plus the EXACT \`existingNodesToDisplay\` and \`newDrafts\` arrays that were prepared for you—do not generate or alter the arrays.
+You have ONE tool: \`epistemic_triage\`. The backend has already processed the physics and logic. Your job is ONLY to:
+1. Write your full conversational reply in \`socraticMessage\` (MANDATORY—never leave it empty).
+2. Call \`epistemic_triage\` exactly once with \`socraticMessage\` only. The backend will automatically attach the Drafts and Portals to your response.
 
 Rules: Neutrality—treat the user as a peer. First principles—analyze by logic and constraints, not by appeals to institutions.`;
 
@@ -296,9 +274,16 @@ Rules: Neutrality—treat the user as a peer. First principles—analyze by logi
 
   const epistemicTriageTool = {
     description:
-      "MANDATORY: Call this once to render the UI. Populate socraticMessage with your full conversational response (never leave empty). Pass the exact existingNodesToDisplay and newDrafts arrays provided in the system context.",
+      "MANDATORY: Call this once to render the UI. Populate socraticMessage with your full conversational response.",
     inputSchema: EpistemicTriageSchema,
-    execute: async (args: z.infer<typeof EpistemicTriageSchema>) => ({ ok: true, triage: args }),
+    execute: async (args: z.infer<typeof EpistemicTriageSchema>) => ({
+      ok: true,
+      triage: {
+        socraticMessage: args.socraticMessage,
+        existingNodesToDisplay: existingMatches,
+        newDrafts: preComputedDrafts,
+      },
+    }),
   };
 
   const forgeTools = { epistemic_triage: epistemicTriageTool };
