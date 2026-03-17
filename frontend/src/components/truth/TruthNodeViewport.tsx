@@ -1,8 +1,10 @@
 "use client";
 
+import { useMemo, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ChevronRight, ArrowUp, Shield, Swords } from "lucide-react";
+import { ChevronRight, ArrowUp, Shield, Swords, Fingerprint, Activity } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent, truncateAssertion } from "@/lib/utils/truthParser";
@@ -10,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { SupportClaimDrawer } from "@/components/truth/SupportClaimDrawer";
 import { ChallengeClaimDrawer } from "@/components/truth/ChallengeClaimDrawer";
 import { SubmitClaimsDrawer } from "@/components/truth/SubmitClaimsDrawer";
+import { resonateWithNode } from "@/app/actions/truthWeaver";
 import type { TruthNodeWithRelations, TruthNode, TruthNodeMetadata, ChildrenByRelationship } from "@/types/truth";
 
 const CHILD_ASSERTION_MAX_LEN = 180;
@@ -52,6 +55,7 @@ const SUPPORTING_CLAIMS_LEVEL1 = { he: "טענות מבססות (רמה 1)", en:
 const SUPPORTING_CLAIMS_COUNT = { he: "טענות תומכות", en: "Supporting Claims" };
 const DIVE_INTO_CLAIM = { he: "צלול לטענה זו 🌊", en: "Dive into claim 🌊" };
 const NO_CLAIMS_FOR_THEORY = { he: "טרם בוססו טענות עבור תיאוריה זו.", en: "No claims have been anchored for this theory yet." };
+const RESONATE_CLAIM = { he: "הדהד טענה זו", en: "Resonate" };
 const LOGICAL_CLAIM = { he: "טענה לוגית", en: "Logical Claim" };
 const BACK_TO_PARENT = { he: "חזור להנחת האב", en: "Back to Parent Premise" };
 const TRUTH_WEAVE = { he: "מרחב האמת", en: "Truth Weave" };
@@ -82,6 +86,7 @@ function FocalPivot({
   arenaBubbling,
   arenaNodeId,
   validityBar,
+  resonanceCount,
 }: {
   content: string;
   thematicTags?: string[];
@@ -91,6 +96,8 @@ function FocalPivot({
   arenaNodeId?: string;
   /** When set, standard claim shows dynamic Validity Health Bar instead of static pulse. */
   validityBar?: ValidityBarData;
+  /** Epistemic Resonance votes (community overrule multiplier). */
+  resonanceCount?: number;
 }) {
   const parsed = parseNodeContent(content, locale);
   const isMacroArena = thematicTags?.includes("macro-arena");
@@ -202,10 +209,19 @@ function FocalPivot({
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 {locale === "he" ? "תוקף לוגי נוכחי" : "Current Validity"}
               </span>
-              <div className="flex items-center gap-3 text-xs font-medium">
+              <div className="flex items-center gap-3 text-xs font-medium flex-wrap">
                 <span className="text-muted-foreground" title="Base Score">
                   {locale === "he" ? "בסיס" : "Base"}: {validityBar.baseScore}
                 </span>
+                {(resonanceCount ?? 0) > 0 && (
+                  <span
+                    className="flex items-center gap-1 text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full"
+                    title={locale === "he" ? "הדהוד קהילתי (מכפיל כוח)" : "Community resonance (mass multiplier)"}
+                  >
+                    <Fingerprint className="size-3" aria-hidden />
+                    {resonanceCount}
+                  </span>
+                )}
                 {validityBar.supportMass > 0 && (
                   <span className="text-emerald-600 dark:text-emerald-400">+{validityBar.supportMass}</span>
                 )}
@@ -337,6 +353,12 @@ function ChildCard({
   );
 }
 
+function childMassForBubbling(child: TruthNode, locale: "he" | "en"): number {
+  const base = parseNodeContent(child.content, locale).pulse ?? 0;
+  const resonance = child.resonance_count ?? 0;
+  return Math.round(base * (1 + resonance * 0.2));
+}
+
 function computeArenaBubbling(
   childrenByRelationship: ChildrenByRelationship,
   locale: "he" | "en"
@@ -347,12 +369,10 @@ function computeArenaBubbling(
   const theoryBCount = childrenByRelationship.challenges.length;
 
   childrenByRelationship.supports.forEach((child) => {
-    const parsed = parseNodeContent(child.content, locale);
-    theoryAMass += parsed.pulse ?? 0;
+    theoryAMass += childMassForBubbling(child, locale);
   });
   childrenByRelationship.challenges.forEach((child) => {
-    const parsed = parseNodeContent(child.content, locale);
-    theoryBMass += parsed.pulse ?? 0;
+    theoryBMass += childMassForBubbling(child, locale);
   });
 
   const totalMass = theoryAMass + theoryBMass;
@@ -372,27 +392,30 @@ function computeArenaBubbling(
 export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProps) {
   const { locale } = useLocale();
   const { address } = useAccount();
+  const router = useRouter();
+  const [isResonating, startTransition] = useTransition();
   const isRtl = locale === "he";
   const { node, childrenByRelationship, parents } = data;
   const firstParent = parents[0] ?? null;
-  const focalAssertion = parseNodeContent(node.content, locale).assertion || node.content.slice(0, 500);
+  const parsedFocal = parseNodeContent(node.content, locale);
+  const focalAssertion = parsedFocal.assertion || node.content.slice(0, 500);
   const isMacroArena = node.thematic_tags?.includes("macro-arena");
+
+  // Rich context for Support/Challenge drawers: assertion + score + rationale so Socrates can explain and defend
+  const richContextForDrawer =
+    locale === "he"
+      ? `טענה: ${parsedFocal.assertion}\nציון לוגי נוכחי: ${parsedFocal.pulse ?? "—"}/100\nנימוק הציון (Rationale): ${parsedFocal.rationale ?? "לא סופק נימוק."}`
+      : `Claim: ${parsedFocal.assertion}\nCurrent Logical Score: ${parsedFocal.pulse ?? "—"}/100\nScore Rationale: ${parsedFocal.rationale ?? "No rationale provided."}`;
   const arenaBubbling = isMacroArena ? computeArenaBubbling(childrenByRelationship, locale) : undefined;
 
-  // Bubbling Algorithm: dynamic validity for standard claims (Mini-Arena)
+  // Bubbling Algorithm: Node Mass = Base Score * (1 + resonance_count * 0.2) — community overrule
   const supportingChildren = childrenByRelationship.supports;
   const challengingChildren = childrenByRelationship.challenges;
   const baseScore = !isMacroArena
     ? parseNodeContent(node.content, locale).pulse ?? 0
     : 0;
-  const supportMass = supportingChildren.reduce(
-    (sum, child) => sum + (parseNodeContent(child.content, locale).pulse ?? 0),
-    0
-  );
-  const challengeMass = challengingChildren.reduce(
-    (sum, child) => sum + (parseNodeContent(child.content, locale).pulse ?? 0),
-    0
-  );
+  const supportMass = supportingChildren.reduce((sum, child) => sum + childMassForBubbling(child, locale), 0);
+  const challengeMass = challengingChildren.reduce((sum, child) => sum + childMassForBubbling(child, locale), 0);
   const currentValidity = Math.max(
     0,
     Math.min(100, baseScore + supportMass - challengeMass)
@@ -442,7 +465,22 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
         ? childrenByRelationship.challenges
         : [];
 
-  // Level 1: Theory Dive view — breadcrumbs, theory header, list of supporting claims
+  // Cluster claims by primary thematic tag for Theory Dive (epistemic hierarchy, avoid flat feed)
+  const clusteredClaims = useMemo(() => {
+    const groups: Record<string, TruthNode[]> = {};
+    theoryClaims.forEach((child) => {
+      const rawTags = child.thematic_tags ?? [];
+      const primaryTag =
+        rawTags.length > 0 ? rawTags[0] : (locale === "he" ? "כללי" : "General");
+      const normalizedTag =
+        primaryTag.charAt(0).toUpperCase() + primaryTag.slice(1).toLowerCase();
+      if (!groups[normalizedTag]) groups[normalizedTag] = [];
+      groups[normalizedTag].push(child);
+    });
+    return Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+  }, [theoryClaims, locale]);
+
+  // Level 1: Theory Dive view — breadcrumbs, theory header, list of supporting claims (clustered by theme)
   if (isTheoryDive) {
     const theoryLabel =
       currentTheory === "THEORY_A"
@@ -494,37 +532,52 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
             <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
               {locale === "he" ? SUPPORTING_CLAIMS_LEVEL1.he : SUPPORTING_CLAIMS_LEVEL1.en}
             </h3>
-            {theoryClaims.length > 0 ? (
-              <ul className="space-y-3">
-                {theoryClaims.map((child) => {
-                  const parsed = parseNodeContent(child.content, locale);
-                  return (
-                    <li key={child.id}>
-                      <Link
-                        href={`/truth/node/${child.id}`}
-                        className="block group p-4 rounded-xl border border-border/50 bg-card hover:border-primary/50 hover:shadow-soft transition-all no-underline"
-                      >
-                        <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                          {parsed.assertion}
-                        </p>
-                        <div className="flex items-center justify-between mt-3">
-                          {parsed.pulse != null && (
-                            <span
-                              className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary/50 text-muted-foreground"
-                              aria-label={`Coherence ${parsed.pulse}`}
-                            >
-                              {parsed.pulse}/100
-                            </span>
-                          )}
-                          <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                            {locale === "he" ? DIVE_INTO_CLAIM.he : DIVE_INTO_CLAIM.en}
-                          </span>
-                        </div>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
+            {clusteredClaims.length > 0 ? (
+              <div className="flex flex-col gap-8 mt-6">
+                {clusteredClaims.map(([tag, claimsInGroup]) => (
+                  <div key={tag} className="flex flex-col gap-3">
+                    <h4 className="text-sm font-bold text-primary flex items-center gap-2 border-b border-border/50 pb-2">
+                      <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs">
+                        {claimsInGroup.length}
+                      </span>
+                      {tag}
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {claimsInGroup.map((child) => {
+                        const parsed = parseNodeContent(child.content, locale);
+                        return (
+                          <Link
+                            key={child.id}
+                            href={`/truth/node/${child.id}`}
+                            className="block group no-underline"
+                          >
+                            <div className="p-4 rounded-xl border border-border/50 bg-card hover:border-primary/50 hover:shadow-soft transition-all h-full flex flex-col">
+                              <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors flex-1">
+                                {parsed.assertion}
+                              </p>
+                              <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/30">
+                                {parsed.pulse != null ? (
+                                  <span
+                                    className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary/50 text-muted-foreground"
+                                    aria-label={`Coherence ${parsed.pulse}`}
+                                  >
+                                    {locale === "he" ? "ציון לוגי:" : "Score:"} {parsed.pulse}/100
+                                  </span>
+                                ) : (
+                                  <span />
+                                )}
+                                <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                  {locale === "he" ? "צלול לטענה זו" : "Dive into claim"} →
+                                </span>
+                              </div>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground italic text-center py-8">
                 {locale === "he" ? NO_CLAIMS_FOR_THEORY.he : NO_CLAIMS_FOR_THEORY.en}
@@ -642,6 +695,7 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
           arenaBubbling={arenaBubbling}
           arenaNodeId={isMacroArena ? node.id : undefined}
           validityBar={validityBar}
+          resonanceCount={node.resonance_count}
         />
 
         {/* Macro-Arena: no inline Submit Claims here; it lives in the sticky bottom bar below */}
@@ -654,13 +708,37 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
                 <SupportClaimDrawer
                   authorWallet={address}
                   parentId={node.id}
-                  targetNodeContext={focalAssertion}
+                  targetNodeContext={richContextForDrawer}
                 />
                 <ChallengeClaimDrawer
                   authorWallet={address}
                   parentId={node.id}
-                  targetNodeContext={focalAssertion}
+                  targetNodeContext={richContextForDrawer}
                 />
+                <div className="flex items-center gap-2">
+                  <span
+                    className="flex items-center gap-1 text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full text-xs font-medium"
+                    title={locale === "he" ? "הדהוד קהילתי (מכפיל כוח)" : "Community resonance (mass multiplier)"}
+                  >
+                    <Fingerprint className="size-3" aria-hidden />
+                    {node.resonance_count ?? 0}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      startTransition(async () => {
+                        await resonateWithNode(node.id, address);
+                        router.refresh();
+                      });
+                    }}
+                    disabled={isResonating}
+                    className="gap-2 rounded-full text-primary hover:bg-primary/10 hover:text-primary transition-colors border border-primary/20"
+                  >
+                    <Activity className={`size-4 ${isResonating ? "animate-pulse" : ""}`} aria-hidden />
+                    {locale === "he" ? RESONATE_CLAIM.he : RESONATE_CLAIM.en}
+                  </Button>
+                </div>
               </div>
             )}
 

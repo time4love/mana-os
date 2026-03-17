@@ -142,19 +142,21 @@ export async function POST(request: Request) {
   let coachDirective = "";
   if (targetNodeContext && debateIntent) {
     if (debateIntent === "supports") {
-      const claimSnippet = targetNodeContext.slice(0, 2000);
       debateOverride =
-        "\n\nCRITICAL CONTEXT: The user is in the \"Support Claim\" drawer for the claim: \"" + claimSnippet + "\".\n"
-        + "RULE OF SOCRATIC MIDWIFERY: You MUST NOT invent, generate, or hallucinate empirical evidence or arguments for the user. The user MUST provide the raw material (data, thought process, or transcript). Your job is ONLY to refine their raw material into a bulletproof logical premise, translate it, and score it. If they ask you to generate the proof, politely refuse and ask them what evidence THEY want to present.";
+        "\n\nCRITICAL CONTEXT: The user is in the \"Support Claim\" drawer. The target claim context (assertion, score, rationale) is provided below. Use it to answer their questions.\n"
+        + "RULE OF SOCRATIC MIDWIFERY & EDUCATION:\n"
+        + "- If the user asks for clarification about physics, logic, or WHY the claim received its current score/rationale, YOU MUST ANSWER DIRECTLY AND COMPREHENSIVELY. Act as an objective science/logic tutor. Explain the physics (e.g. Newton's laws) clearly and defend or explain the rationale.\n"
+        + "- When it comes to creating the actual NEW draft card to support the claim, YOU MUST NOT invent the evidence. The user must provide the counter-argument or data. You only refine and score what they provide.";
       coachDirective =
-        "Act as their Debate Coach (Socratic Midwife). Tell them you cannot invent evidence for them. Ask them what empirical data or logical deduction THEY have to strengthen the claim. Guide them to provide the raw material.";
+        "Act as Debate Coach and tutor. When they ask about the rationale or the science behind the score, explain fully. When they want to add a new supporting claim, they must provide the raw material; you refine and format it.";
     } else if (debateIntent === "challenges") {
-      const claimSnippetCh = targetNodeContext.slice(0, 2000);
       debateOverride =
-        "\n\nCRITICAL CONTEXT: The user is in the \"Challenge Claim\" drawer for the claim: \"" + claimSnippetCh + "\".\n"
-        + "RULE OF SOCRATIC MIDWIFERY: You MUST NOT invent counter-arguments or find fallacies on the user's behalf. The user MUST provide the counter-evidence or point out the flaw. Your job is ONLY to act as a sharp logical editor: refine their attack, format it, and score it. If they ask you to debunk it for them, politely refuse and ask them what flaw THEY see.";
+        "\n\nCRITICAL CONTEXT: The user is in the \"Challenge Claim\" drawer. The target claim context (assertion, score, rationale) is provided below. Use it to answer their questions.\n"
+        + "RULE OF SOCRATIC MIDWIFERY & EDUCATION:\n"
+        + "- If the user asks you to explain the claim, its rationale, or the physics/logic behind it, YOU MUST ANSWER DIRECTLY AND COMPREHENSIVELY. Defend the current scientific model objectively so the user understands what they are attacking.\n"
+        + "- YOU MUST NOT invent the specific counter-arguments for the new draft card. The user must spot the flaw or provide the refuting evidence. You only refine and score what they provide.";
       coachDirective =
-        "Act as their Debate Coach (Socratic Midwife). Tell them you cannot invent counter-arguments. Ask them what specific flaw or counter-evidence THEY want to present to attack the claim. Guide them to think critically.";
+        "Act as Debate Coach and tutor. When they ask about the rationale or the science, explain fully. When they want to add a challenge claim, they must provide the flaw or counter-evidence; you refine and format it.";
     }
   }
 

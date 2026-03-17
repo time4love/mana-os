@@ -66,6 +66,8 @@ export interface TruthNode {
   thematic_tags?: string[];
   /** Extensible metadata (e.g. competingTheories for macro-arenas). */
   metadata?: TruthNodeMetadata;
+  /** Epistemic Resonance votes from verified SBT holders. Multiplier: mass = baseScore * (1 + resonance_count * 0.2). */
+  resonance_count?: number;
 }
 
 /** Input shape when inserting a node (id and created_at are generated). */

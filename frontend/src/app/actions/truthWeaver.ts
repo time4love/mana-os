@@ -730,3 +730,43 @@ export async function anchorForgeDraft(
     return { success: false, error: toErrorMessage(err) || "An error occurred", writeTelemetry };
   }
 }
+
+/** Result of Epistemic Resonance action (Phase 10 Step 11). */
+export type ResonateWithNodeResult = { success: true } | { success: false; error: string };
+
+/**
+ * Increments the Epistemic Resonance count for a truth node.
+ * Later: verify userWallet holds Genesis Anchor SBT before allowing.
+ */
+export async function resonateWithNode(
+  nodeId: string,
+  userWallet: string
+): Promise<ResonateWithNodeResult> {
+  try {
+    const supabase = createServerSupabase();
+    const { data: node, error: fetchError } = await supabase
+      .from("truth_nodes")
+      .select("resonance_count")
+      .eq("id", nodeId)
+      .single();
+
+    if (fetchError || !node) {
+      return { success: false, error: fetchError?.message ?? "Node not found" };
+    }
+
+    const currentCount = typeof (node as { resonance_count?: number }).resonance_count === "number"
+      ? (node as { resonance_count: number }).resonance_count
+      : 0;
+    const { error: updateError } = await supabase
+      .from("truth_nodes")
+      .update({ resonance_count: currentCount + 1 })
+      .eq("id", nodeId);
+
+    if (updateError) return { success: false, error: updateError.message };
+    revalidatePath("/truth");
+    revalidatePath(`/truth/node/${nodeId}`);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: toErrorMessage(err) };
+  }
+}

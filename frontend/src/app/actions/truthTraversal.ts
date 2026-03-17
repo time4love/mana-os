@@ -22,6 +22,7 @@ function rowToNode(row: {
   is_macro_root?: boolean;
   thematic_tags?: string[] | null;
   metadata?: Record<string, unknown> | null;
+  resonance_count?: number | null;
 }): TruthNode {
   const meta = row.metadata as TruthNode["metadata"] | undefined;
   return {
@@ -33,6 +34,7 @@ function rowToNode(row: {
     is_macro_root: row.is_macro_root ?? false,
     thematic_tags: Array.isArray(row.thematic_tags) ? row.thematic_tags : undefined,
     metadata: meta ?? undefined,
+    resonance_count: typeof row.resonance_count === "number" ? row.resonance_count : undefined,
   };
 }
 
@@ -47,7 +49,7 @@ export async function fetchTruthNodeWithRelations(nodeId: string): Promise<Fetch
 
     const { data: nodeRow, error: nodeError } = await supabase
       .from("truth_nodes")
-      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata")
+      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata, resonance_count")
       .eq("id", nodeId)
       .single();
 
@@ -55,7 +57,7 @@ export async function fetchTruthNodeWithRelations(nodeId: string): Promise<Fetch
       return { success: false, error: nodeError?.message ?? "Node not found" };
     }
 
-    type NodeRow = { id: string; author_wallet: string | null; content: string; created_at: string; is_macro_root: boolean; thematic_tags?: string[] | null; metadata?: Record<string, unknown> | null };
+    type NodeRow = { id: string; author_wallet: string | null; content: string; created_at: string; is_macro_root: boolean; thematic_tags?: string[] | null; metadata?: Record<string, unknown> | null; resonance_count?: number | null };
     const node = rowToNode(nodeRow as NodeRow);
 
     // Children: edges where this node is the source (source_id = nodeId); target_id = child
@@ -75,7 +77,7 @@ export async function fetchTruthNodeWithRelations(nodeId: string): Promise<Fetch
       const targetIds = [...new Set(childEdges.map((e) => e.target_id))];
       const { data: childRowsData } = await supabase
         .from("truth_nodes")
-        .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags")
+        .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, resonance_count")
         .in("id", targetIds);
 
       const childRows = (childRowsData ?? []) as NodeRow[];
