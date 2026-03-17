@@ -1,7 +1,13 @@
 /**
  * Semantic Peeler — unwraps backend-formatted node content into clean UI fields.
- * Supports: (1) Rosetta bilingual JSON { en, he, pulse }, (2) legacy Content/Logician's Pulse/Rationale/Scout format, (3) plain text.
+ * Supports: (1) Rosetta JSON (canonical `en` + optional `locales`, or legacy `en`+`he`),
+ * (2) legacy Content/Logician's Pulse/Rationale/Scout format, (3) plain text.
  */
+
+import {
+  getRosettaBlockForUiLocale,
+  normalizeTruthRosetta,
+} from "@/lib/utils/truthRosetta";
 
 export interface ParsedNodeContent {
   /** The core claim or thesis text. */
@@ -14,13 +20,6 @@ export interface ParsedNodeContent {
   scoutWarning: string | null;
 }
 
-/** Stored Rosetta shape includes optional top-level pulse. */
-interface StoredRosettaContent {
-  en: { assertion: string; reasoning: string; hiddenAssumptions: string[]; challengePrompt: string };
-  he: { assertion: string; reasoning: string; hiddenAssumptions: string[]; challengePrompt: string };
-  pulse?: number;
-}
-
 const CONTENT_PREFIX = "Content: ";
 const LOGICIAN_TAG = "[Logician's Pulse:";
 const RATIONALE_PREFIX = "Rationale: ";
@@ -28,20 +27,24 @@ const SCOUT_START = "[The Scout's";
 
 /**
  * Parses raw node content (from truth_nodes.content) into structured fields.
- * If locale is provided and content is Rosetta JSON, returns the block for that locale (fallback to en).
+ * Rosetta: always canonical English internally; UI locale picks merged block (fallback: English).
  */
-export function parseNodeContent(rawText: string, locale?: "he" | "en"): ParsedNodeContent {
+export function parseNodeContent(
+  rawText: string,
+  locale?: "he" | "en" | string
+): ParsedNodeContent {
   const raw = typeof rawText === "string" ? rawText.trim() : "";
   if (!raw) {
     return { assertion: "", pulse: null, rationale: null, scoutWarning: null };
   }
 
-  // Universal Rosetta: bilingual JSON — pick block by locale with fallback to en
-  if (raw.startsWith("{") && raw.includes('"en"') && raw.includes('"he"')) {
+  if (raw.startsWith("{")) {
     try {
-      const parsed = JSON.parse(raw) as StoredRosettaContent;
-      if (parsed?.en && parsed?.he) {
-        const block = locale === "he" ? parsed.he : parsed.en;
+      const parsed = JSON.parse(raw) as unknown;
+      const norm = normalizeTruthRosetta(parsed);
+      if (norm) {
+        const ui = (locale ?? "en").toLowerCase();
+        const block = getRosettaBlockForUiLocale(norm, ui);
         const assumptions = block.hiddenAssumptions?.length
           ? block.hiddenAssumptions.join("\n• ")
           : "";
@@ -49,8 +52,8 @@ export function parseNodeContent(rawText: string, locale?: "he" | "en"): ParsedN
           (assumptions ? `Hidden assumptions:\n• ${assumptions}\n\n` : "") +
           (block.challengePrompt ? `Falsification prompt: ${block.challengePrompt}` : "");
         return {
-          assertion: block.assertion ?? "",
-          pulse: typeof parsed.pulse === "number" ? Math.min(100, Math.max(0, parsed.pulse)) : null,
+          assertion: block.assertion.trim(),
+          pulse: norm.pulse,
           rationale: block.reasoning?.trim() || null,
           scoutWarning: scoutWarning.trim() || null,
         };
@@ -71,7 +74,6 @@ export function parseNodeContent(rawText: string, locale?: "he" | "en"): ParsedN
     };
   }
 
-  // Assertion: after "Content: " and before "\n\n[Logician's Pulse:"
   let assertion = raw;
   if (raw.startsWith(CONTENT_PREFIX)) {
     const afterContent = raw.slice(CONTENT_PREFIX.length);
@@ -82,11 +84,9 @@ export function parseNodeContent(rawText: string, locale?: "he" | "en"): ParsedN
     if (pulseIdx >= 0) assertion = raw.slice(0, pulseIdx).trim();
   }
 
-  // Pulse: \d{1,3}/100 inside [Logician's Pulse: ...]
   const pulseMatch = raw.match(/\[Logician's Pulse:\s*(\d{1,3})\/100\]/i);
   const pulse = pulseMatch ? Math.min(100, Math.max(0, parseInt(pulseMatch[1], 10))) : null;
 
-  // Rationale: between "Rationale: " and "\n\n[The Scout's"
   let rationale: string | null = null;
   const rationalePrefixIdx = raw.indexOf(RATIONALE_PREFIX);
   const scoutIdx = raw.indexOf(SCOUT_START);
@@ -96,7 +96,6 @@ export function parseNodeContent(rawText: string, locale?: "he" | "en"): ParsedN
     if (!rationale) rationale = null;
   }
 
-  // Scout block: from "[The Scout's" to end
   let scoutWarning: string | null = null;
   if (scoutIdx >= 0) {
     scoutWarning = raw.slice(scoutIdx).trim();
@@ -120,9 +119,8 @@ export function truncateAssertion(text: string, maxLen: number = 180): string {
 
 /**
  * Returns the display assertion (or full content summary) for a node's content.
- * Use when showing node content in lists or duplicate match previews; respects Rosetta + locale.
  */
-export function getDisplayAssertion(rawContent: string, locale: "he" | "en" = "en"): string {
+export function getDisplayAssertion(rawContent: string, locale: "he" | "en" | string = "en"): string {
   const parsed = parseNodeContent(rawContent, locale);
   return parsed.assertion || rawContent.slice(0, 200) + (rawContent.length > 200 ? "…" : "");
 }

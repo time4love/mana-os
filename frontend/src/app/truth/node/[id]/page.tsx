@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { fetchTruthNodeWithRelations } from "@/app/actions/truthTraversal";
-import { TruthNodeViewport } from "@/components/truth/TruthNodeViewport";
+import { getTruthNodeWithEdges } from "@/app/actions/truthWeaver";
+import { EndlessDiveSpace } from "@/components/truth/EndlessDiveSpace";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -8,23 +8,20 @@ interface PageProps {
 }
 
 /**
- * Endless Dive — focal node view. One node per URL; children are links to their own node pages.
- * ?theory=THEORY_A | THEORY_B shows Level 1 (Theory Dive) for macro-arenas.
+ * Endless Dive — Perceptually Responsive Miller Columns.
+ * Desktop: Logical Panorama (fixed ~450px columns). Mobile: Sliding Deck (90vw + 10% peek).
+ * Initial column is server-fed; deeper columns load via getTruthNodeWithEdges.
  */
-export default async function TruthNodePage({ params, searchParams }: PageProps) {
+export default async function TruthNodePage({ params }: PageProps) {
   const { id } = await params;
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const theoryParam = resolvedSearchParams?.theory;
-  const currentTheory =
-    typeof theoryParam === "string" && (theoryParam === "THEORY_A" || theoryParam === "THEORY_B")
-      ? theoryParam
-      : undefined;
 
-  const result = await fetchTruthNodeWithRelations(id);
+  const result = await getTruthNodeWithEdges(id);
 
-  if (!result.success || !result.data) {
+  if (!result.success) {
     notFound();
   }
 
-  return <TruthNodeViewport data={result.data} currentTheory={currentTheory} />;
+  const initialData = { node: result.node, edges: result.edges };
+
+  return <EndlessDiveSpace initialNodeId={id} initialNodeData={initialData} />;
 }

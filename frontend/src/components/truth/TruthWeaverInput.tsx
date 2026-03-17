@@ -161,8 +161,7 @@ export function TruthWeaverInput({
     if (result.success) {
       setPrismDraft(null);
       onAnchored?.(result.thesisNodeId);
-      const note = locale === "he" ? ANCHOR_SUCCESS_NOTE.he : ANCHOR_SUCCESS_NOTE.en;
-      setAnchorSuccessNote(note);
+      setAnchorSuccessNote(locale === "he" ? ANCHOR_SUCCESS_NOTE.he : ANCHOR_SUCCESS_NOTE.en);
       setTimeout(() => {
         router.push("/truth");
       }, 1600);

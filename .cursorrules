@@ -52,6 +52,12 @@ CRITICAL: The system MUST support multiple natural languages from Day 1, with fl
 - **Styling**: ALWAYS use Tailwind CSS logical properties (e.g., `ms-`, `me-`, `ps-`, `pe-`, `start-`, `end-`). Never use physical directions (`ml-`, `left-`).
 - **AI Outputs**: The AI Oracle must converse with users in their native language, but the underlying JSON keys/schema it returns to the application MUST always remain strictly in English.
 
+### Truth Engine — Multilingual Rosetta (no display hacks)
+- **Canonical language for logic**: English. Embeddings, deduplication, and LLM scoring use the **English** block only (`en` in Rosetta JSON).
+- **Storage**: `schemaVersion: 2` with mandatory `en`, optional `locales` map (`he`, future `de`, …), and `source_locale`. Legacy nodes with top-level `he` are normalized when read (`truthRosetta.ts`).
+- **Display**: `parseNodeContent(raw, uiLocale)` merges `locales[uiLocale]` over `en` per field; **if that locale is missing, show English** (shared international read). Do **not** use script heuristics or reasoning snippets to fabricate localized assertions.
+- **New locales**: Extend Forge/LLM output into `locales.<code>`; one resolver pattern — no per-language function names.
+
 ## 🛠 Tech Stack
 - **Monorepo Structure**: Separate `/frontend` and `/contracts` directories.
 - **Smart Contracts**: Solidity, Foundry (Forge/Anvil), OpenZeppelin.

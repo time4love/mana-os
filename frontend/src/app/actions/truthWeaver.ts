@@ -16,6 +16,12 @@ import {
   type EpistemicPrismResult,
 } from "@/types/truth";
 import { syncConstellationMap } from "@/lib/agents/TheCartographer";
+import {
+  buildRosettaJsonV2,
+  isPrimarilyHebrewScript,
+  partitionBilingualField,
+  type RosettaClaimBlock,
+} from "@/lib/utils/truthRosetta";
 
 const MATCH_THRESHOLD = 0.85;
 const MATCH_COUNT = 3;
@@ -404,7 +410,81 @@ const AnchorPrismDraftSchema = z.object({
   ).max(50),
 });
 
-/** Formats a single claim for storage in truth_nodes (Logician + Scout). Legacy format. */
+const CompetingTheorySchema = z.object({
+  assertionEn: z.string().min(1),
+  assertionHe: z.string().optional().default(""),
+});
+
+const ForgeDraftSchema = z.object({
+  assertionEn: z.string().min(1),
+  assertionHe: z.string().optional().default(""),
+  logicalCoherenceScore: z.number().min(0).max(100),
+  reasoningEn: z.string().optional().default(""),
+  reasoningHe: z.string().optional().default(""),
+  hiddenAssumptionsEn: z.array(z.string()).default([]),
+  hiddenAssumptionsHe: z.array(z.string()).default([]),
+  challengePromptEn: z.string().optional().default(""),
+  challengePromptHe: z.string().optional().default(""),
+  relationshipToContext: z.enum(["supports", "challenges"]).optional(),
+  thematicTags: z.array(z.string()).max(3).optional().default([]),
+  competingTheories: z.array(CompetingTheorySchema).max(2).optional(),
+});
+
+/** Partitions Forge draft into canonical `en` + Hebrew locale block (no network). */
+function forgeDraftToRosettaBlocks(draft: z.infer<typeof ForgeDraftSchema>): {
+  pulse: number;
+  source_locale: string;
+  en: RosettaClaimBlock;
+  he: RosettaClaimBlock;
+} {
+  const enAssertion = draft.assertionEn.trim();
+  const assertionHe = (draft.assertionHe ?? "").trim();
+
+  const reasoning = partitionBilingualField(
+    (draft.reasoningEn ?? "").trim(),
+    (draft.reasoningHe ?? "").trim()
+  );
+  const cp = partitionBilingualField(
+    (draft.challengePromptEn ?? "").trim(),
+    (draft.challengePromptHe ?? "").trim()
+  );
+
+  const enAssList = Array.isArray(draft.hiddenAssumptionsEn) ? draft.hiddenAssumptionsEn : [];
+  const heAssList = Array.isArray(draft.hiddenAssumptionsHe) ? draft.hiddenAssumptionsHe : [];
+  const enAssOut: string[] = [];
+  const heAssOut = [...heAssList];
+  for (const s of enAssList) {
+    if (typeof s === "string" && isPrimarilyHebrewScript(s)) heAssOut.push(s);
+    else if (typeof s === "string") enAssOut.push(s);
+  }
+
+  const enBlock: RosettaClaimBlock = {
+    assertion: enAssertion,
+    reasoning: reasoning.enOut,
+    hiddenAssumptions: enAssOut,
+    challengePrompt: cp.enOut,
+  };
+  const heBlock: RosettaClaimBlock = {
+    assertion: assertionHe,
+    reasoning: reasoning.heOut,
+    hiddenAssumptions: heAssOut,
+    challengePrompt: cp.heOut,
+  };
+  const hasHebrewLocale =
+    assertionHe.length > 0 ||
+    reasoning.heOut.length > 0 ||
+    cp.heOut.length > 0 ||
+    heAssOut.length > 0;
+  const source_locale = hasHebrewLocale ? "he" : "en";
+  return {
+    pulse: draft.logicalCoherenceScore,
+    source_locale,
+    en: enBlock,
+    he: heBlock,
+  };
+}
+
+/** Legacy Prism claim blob (single locale; no EN translation layer). */
 function formatClaimContent(claim: {
   assertion: string;
   logicalCoherenceScore: number;
@@ -418,26 +498,15 @@ function formatClaimContent(claim: {
   return `Content: ${claim.assertion}\n\n[Logician's Pulse: ${claim.logicalCoherenceScore}/100]\nRationale: ${claim.reasoning}\n\n[The Scout's Edge] Hidden Assumptions: ${assumptions}\nFalsification Prompt: ${claim.challengePrompt}`;
 }
 
-/** Builds Rosetta (bilingual) content JSON for truth_nodes.content — en = vector, he = display (fallback to en when he empty). */
+/** Forge draft → Rosetta v2 JSON (partition only; bilingual fields from LLM, no auto-translate). */
 function formatRosettaContent(draft: z.infer<typeof ForgeDraftSchema>): string {
-  const enAssertion = draft.assertionEn.trim();
-  const heAssertion = (draft.assertionHe ?? "").trim() || enAssertion;
-  const rosetta = {
-    pulse: draft.logicalCoherenceScore,
-    en: {
-      assertion: enAssertion,
-      reasoning: (draft.reasoningEn ?? "").trim(),
-      hiddenAssumptions: Array.isArray(draft.hiddenAssumptionsEn) ? draft.hiddenAssumptionsEn : [],
-      challengePrompt: (draft.challengePromptEn ?? "").trim(),
-    },
-    he: {
-      assertion: heAssertion,
-      reasoning: (draft.reasoningHe ?? "").trim() || (draft.reasoningEn ?? "").trim(),
-      hiddenAssumptions: Array.isArray(draft.hiddenAssumptionsHe) ? draft.hiddenAssumptionsHe : (Array.isArray(draft.hiddenAssumptionsEn) ? draft.hiddenAssumptionsEn : []),
-      challengePrompt: (draft.challengePromptHe ?? "").trim() || (draft.challengePromptEn ?? "").trim(),
-    },
-  };
-  return JSON.stringify(rosetta);
+  const { pulse, source_locale, en, he } = forgeDraftToRosettaBlocks(draft);
+  return buildRosettaJsonV2({
+    pulse,
+    source_locale,
+    en,
+    locales: { he },
+  });
 }
 
 /**
@@ -505,7 +574,6 @@ export async function anchorPrismDraft(
     }
     const thesisNodeId = thesisRow.id;
 
-    // Step B & C: Format each claim, embed, insert as child nodes, collect IDs
     const childIds: string[] = [];
     for (const claim of parsed.data.extractedClaims) {
       try {
@@ -516,24 +584,20 @@ export async function anchorPrismDraft(
           providerOptions: { google: { outputDimensionality: 768 } },
         });
         const claimEmbedding = Array.from(claimEmbedResult.embedding);
-
-        const claimPayload = {
-          author_wallet: wallet,
-          content,
-          embedding: claimEmbedding,
-          is_macro_root: false,
-        };
         const { data: claimRowData, error: claimError } = await supabase
           .from("truth_nodes")
-          .insert(claimPayload as never)
+          .insert({
+            author_wallet: wallet,
+            content,
+            embedding: claimEmbedding,
+            is_macro_root: false,
+          } as never)
           .select("id")
           .single();
-
         const claimRow = claimRowData as { id: string } | null;
-        if (claimError || !claimRow?.id) continue;
-        childIds.push(claimRow.id);
+        if (!claimError && claimRow?.id) childIds.push(claimRow.id);
       } catch {
-        // Skip this claim on embed/insert failure; continue with others
+        /* skip failed claim */
       }
     }
 
@@ -568,27 +632,6 @@ export async function anchorPrismDraft(
 // ---------------------------------------------------------------------------
 // Epistemic Forge — single draft anchor (from Socratic chat)
 // ---------------------------------------------------------------------------
-
-const CompetingTheorySchema = z.object({
-  assertionEn: z.string().min(1),
-  assertionHe: z.string().optional().default(""),
-});
-
-/** Bilingual Forge draft (Rosetta Protocol): en = vector/algorithm, he = display (optional fallback to en). */
-const ForgeDraftSchema = z.object({
-  assertionEn: z.string().min(1),
-  assertionHe: z.string().optional().default(""),
-  logicalCoherenceScore: z.number().min(0).max(100),
-  reasoningEn: z.string().optional().default(""),
-  reasoningHe: z.string().optional().default(""),
-  hiddenAssumptionsEn: z.array(z.string()).default([]),
-  hiddenAssumptionsHe: z.array(z.string()).default([]),
-  challengePromptEn: z.string().optional().default(""),
-  challengePromptHe: z.string().optional().default(""),
-  relationshipToContext: z.enum(["supports", "challenges"]).optional(),
-  thematicTags: z.array(z.string()).max(3).optional().default([]),
-  competingTheories: z.array(CompetingTheorySchema).max(2).optional(),
-});
 
 export type AnchorForgeDraftResult =
   | { success: true; nodeId: string; writeTelemetry?: string[] }
@@ -675,6 +718,7 @@ export async function anchorForgeDraft(
     }
 
     const content = formatRosettaContent(parsed.data);
+    writeTelemetry.push("[4b] Rosetta JSON formatted (partition only, no auto-translate).");
     const thematicTags = Array.isArray(parsed.data.thematicTags)
       ? parsed.data.thematicTags.slice(0, 3).filter((t): t is string => typeof t === "string" && t.trim().length > 0)
       : [];
@@ -820,4 +864,102 @@ export async function checkUserResonance(
     .eq("wallet_address", userWallet.trim().toLowerCase())
     .maybeSingle();
   return !!data;
+}
+
+// ---------------------------------------------------------------------------
+// Endless Dive — dynamic column fetch (node + edges with embedded nodes)
+// ---------------------------------------------------------------------------
+
+export type TruthNodeWithEdgesResult =
+  | { success: true; node: TruthNodeRow; edges: TruthEdgeWithNodes[] }
+  | { success: false; error: string };
+
+/** truth_nodes row shape for Endless Dive (no embedding in response). */
+export interface TruthNodeRow {
+  id: string;
+  author_wallet: string | null;
+  content: string;
+  created_at: string;
+  is_macro_root?: boolean;
+  thematic_tags?: string[] | null;
+  metadata?: Record<string, unknown> | null;
+  resonance_count?: number | null;
+}
+
+/** truth_edges row with embedded source/target node rows for column rendering. */
+export interface TruthEdgeWithNodes {
+  id: string;
+  source_id: string;
+  target_id: string;
+  relationship: string;
+  source_node?: TruthNodeRow | null;
+  target_node?: TruthNodeRow | null;
+}
+
+/** Payload for Endless Dive initial column (node + edges). */
+export type EndlessDiveInitialData = {
+  node: TruthNodeRow;
+  edges: TruthEdgeWithNodes[];
+};
+
+/**
+ * Fetches a single truth node and all edges touching it, with embedded source/target nodes.
+ * Used by Endless Dive columns: children = edges where source_id === nodeId (target_node = child).
+ */
+export async function getTruthNodeWithEdges(nodeId: string): Promise<TruthNodeWithEdgesResult> {
+  try {
+    const supabase = createServerSupabase();
+
+    const { data: node, error: nodeError } = await supabase
+      .from("truth_nodes")
+      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata, resonance_count")
+      .eq("id", nodeId)
+      .single();
+
+    if (nodeError || !node) {
+      return { success: false, error: nodeError?.message ?? "Node not found" };
+    }
+
+    const { data: edgesRaw, error: edgesError } = await supabase
+      .from("truth_edges")
+      .select("id, source_id, target_id, relationship")
+      .or(`source_id.eq.${nodeId},target_id.eq.${nodeId}`);
+
+    if (edgesError) {
+      return { success: true, node: node as TruthNodeRow, edges: [] };
+    }
+
+    const edgeList = (edgesRaw ?? []) as { id: string; source_id: string; target_id: string; relationship: string }[];
+    const allNodeIds = new Set<string>();
+    edgeList.forEach((e) => {
+      allNodeIds.add(e.source_id);
+      allNodeIds.add(e.target_id);
+    });
+
+    if (allNodeIds.size === 0) {
+      return {
+        success: true,
+        node: node as TruthNodeRow,
+        edges: edgeList.map((e) => ({ ...e, source_node: null, target_node: null })),
+      };
+    }
+
+    const { data: nodeRows } = await supabase
+      .from("truth_nodes")
+      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata, resonance_count")
+      .in("id", Array.from(allNodeIds));
+
+    const nodeMap = new Map<string, TruthNodeRow>();
+    (nodeRows ?? []).forEach((row) => nodeMap.set((row as { id: string }).id, row as TruthNodeRow));
+
+    const edges: TruthEdgeWithNodes[] = edgeList.map((e) => ({
+      ...e,
+      source_node: nodeMap.get(e.source_id) ?? null,
+      target_node: nodeMap.get(e.target_id) ?? null,
+    }));
+
+    return { success: true, node: node as TruthNodeRow, edges };
+  } catch (err) {
+    return { success: false, error: toErrorMessage(err) || "Failed to fetch node" };
+  }
 }

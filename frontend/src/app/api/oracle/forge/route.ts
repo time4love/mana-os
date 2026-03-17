@@ -278,7 +278,9 @@ When calculating logicalCoherenceScore (0-100), you MUST strip away your pre-tra
 3. REWARD Direct Empirical Observation: Claims based on direct, reproducible sensory data (e.g., physics of pressurized gas, observable line-of-sight limits) score higher.
 4. REWARD Falsifiability: Does the claim expose a mathematical or physical contradiction in the opposing theory? If yes, score it highly based strictly on logic, even if it attacks the mainstream consensus.
 
-Output: assertionEn (sharp premise), assertionHe (Hebrew if you can), logicalCoherenceScore (0-100), reasoningEn/He, hiddenAssumptionsEn/He, challengePromptEn/He, thematicTags.`,
+CANONICAL ENGLISH (required for storage + English UI): reasoningEn MUST be a full English explanation of the score (never empty when you have a rationale). If the claim is in Hebrew, write the same logical reasoning in English in reasoningEn and mirror it in reasoningHe for Hebrew readers. challengePromptEn MUST be English; challengePromptHe mirrors when the user speaks Hebrew. hiddenAssumptionsEn: English strings; hiddenAssumptionsHe: Hebrew when applicable. assertionEn: sharp English premise when possible; assertionHe mirrors the claim in Hebrew when the claim is Hebrew.
+
+Output: assertionEn, assertionHe, logicalCoherenceScore (0-100), reasoningEn, reasoningHe, hiddenAssumptionsEn/He, challengePromptEn/He, thematicTags.`,
       })
     );
     const results = await Promise.allSettled(drafterPromises);
