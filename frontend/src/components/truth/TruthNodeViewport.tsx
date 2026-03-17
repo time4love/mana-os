@@ -1,18 +1,20 @@
 "use client";
 
-import { useMemo, useTransition } from "react";
+import { useMemo, useTransition, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ChevronRight, ArrowUp, Shield, Swords, Fingerprint, Activity } from "lucide-react";
+import { ChevronRight, ArrowUp, Shield, Swords, Fingerprint, Activity, Lock, Check } from "lucide-react";
 import { useAccount } from "wagmi";
+import { useGenesisAnchor } from "@/hooks/useGenesisAnchor";
+import { CodexSheet } from "@/components/ui/CodexSheet";
 import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent, truncateAssertion } from "@/lib/utils/truthParser";
 import { Button } from "@/components/ui/button";
 import { SupportClaimDrawer } from "@/components/truth/SupportClaimDrawer";
 import { ChallengeClaimDrawer } from "@/components/truth/ChallengeClaimDrawer";
 import { SubmitClaimsDrawer } from "@/components/truth/SubmitClaimsDrawer";
-import { resonateWithNode } from "@/app/actions/truthWeaver";
+import { toggleNodeResonance, checkUserResonance } from "@/app/actions/truthWeaver";
 import type { TruthNodeWithRelations, TruthNode, TruthNodeMetadata, ChildrenByRelationship } from "@/types/truth";
 
 const CHILD_ASSERTION_MAX_LEN = 180;
@@ -56,6 +58,8 @@ const SUPPORTING_CLAIMS_COUNT = { he: "טענות תומכות", en: "Supporting
 const DIVE_INTO_CLAIM = { he: "צלול לטענה זו 🌊", en: "Dive into claim 🌊" };
 const NO_CLAIMS_FOR_THEORY = { he: "טרם בוססו טענות עבור תיאוריה זו.", en: "No claims have been anchored for this theory yet." };
 const RESONATE_CLAIM = { he: "הדהד טענה זו", en: "Resonate" };
+const RESONATED_CLAIM = { he: "הדהדת · לחץ להסרה", en: "Resonated · Click to remove" };
+const SBT_REQUIRED_TITLE = { he: "נדרש חותם מאנה (SBT) להדהוד", en: "Genesis Anchor (SBT) required to resonate" };
 const LOGICAL_CLAIM = { he: "טענה לוגית", en: "Logical Claim" };
 const BACK_TO_PARENT = { he: "חזור להנחת האב", en: "Back to Parent Premise" };
 const TRUTH_WEAVE = { he: "מרחב האמת", en: "Truth Weave" };
@@ -390,12 +394,21 @@ function computeArenaBubbling(
 }
 
 export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProps) {
+  const { node, childrenByRelationship, parents } = data;
   const { locale } = useLocale();
   const { address } = useAccount();
+  const { hasGenesisAnchor } = useGenesisAnchor();
   const router = useRouter();
   const [isResonating, startTransition] = useTransition();
+  const [sbtCodexOpen, setSbtCodexOpen] = useState(false);
+  const [hasResonated, setHasResonated] = useState(false);
   const isRtl = locale === "he";
-  const { node, childrenByRelationship, parents } = data;
+
+  useEffect(() => {
+    if (address && node.id) {
+      checkUserResonance(node.id, address).then(setHasResonated);
+    }
+  }, [node.id, address]);
   const firstParent = parents[0] ?? null;
   const parsedFocal = parseNodeContent(node.content, locale);
   const focalAssertion = parsedFocal.assertion || node.content.slice(0, 500);
@@ -597,9 +610,16 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
               theoryAHe={node.metadata.competingTheories[0].assertionHe ?? node.metadata.competingTheories[0].assertionEn}
               theoryBEn={node.metadata.competingTheories[1].assertionEn}
               theoryBHe={node.metadata.competingTheories[1].assertionHe ?? node.metadata.competingTheories[1].assertionEn}
+              hasGenesisAnchor={hasGenesisAnchor}
+              onLockedClick={() => setSbtCodexOpen(true)}
             />
           </div>
         )}
+        <CodexSheet
+          open={sbtCodexOpen}
+          onOpenChange={setSbtCodexOpen}
+          chapterId="sybil-resistance"
+        />
       </motion.main>
     );
   }
@@ -705,42 +725,110 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
           <div className="flex flex-col gap-6 mt-8">
             {address && (
               <div className="flex flex-wrap items-center gap-3 mt-8 border-t border-border/50 pt-6">
-                <SupportClaimDrawer
-                  authorWallet={address}
-                  parentId={node.id}
-                  targetNodeContext={richContextForDrawer}
-                />
-                <ChallengeClaimDrawer
-                  authorWallet={address}
-                  parentId={node.id}
-                  targetNodeContext={richContextForDrawer}
-                />
-                <div className="flex items-center gap-2">
-                  <span
-                    className="flex items-center gap-1 text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full text-xs font-medium"
-                    title={locale === "he" ? "הדהוד קהילתי (מכפיל כוח)" : "Community resonance (mass multiplier)"}
-                  >
-                    <Fingerprint className="size-3" aria-hidden />
-                    {node.resonance_count ?? 0}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      startTransition(async () => {
-                        await resonateWithNode(node.id, address);
-                        router.refresh();
-                      });
-                    }}
-                    disabled={isResonating}
-                    className="gap-2 rounded-full text-primary hover:bg-primary/10 hover:text-primary transition-colors border border-primary/20"
-                  >
-                    <Activity className={`size-4 ${isResonating ? "animate-pulse" : ""}`} aria-hidden />
-                    {locale === "he" ? RESONATE_CLAIM.he : RESONATE_CLAIM.en}
-                  </Button>
-                </div>
+                {hasGenesisAnchor ? (
+                  <>
+                    <SupportClaimDrawer
+                      authorWallet={address}
+                      parentId={node.id}
+                      targetNodeContext={richContextForDrawer}
+                    />
+                    <ChallengeClaimDrawer
+                      authorWallet={address}
+                      parentId={node.id}
+                      targetNodeContext={richContextForDrawer}
+                    />
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="flex items-center gap-1 text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full text-xs font-medium"
+                        title={locale === "he" ? "הדהוד קהילתי (מכפיל כוח)" : "Community resonance (mass multiplier)"}
+                      >
+                        <Fingerprint className="size-3" aria-hidden />
+                        {node.resonance_count ?? 0}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          startTransition(async () => {
+                            const prev = hasResonated;
+                            setHasResonated(!prev);
+                            const res = await toggleNodeResonance(node.id, address);
+                            if (!res.success) {
+                              setHasResonated(prev);
+                            } else if ("resonating" in res) {
+                              setHasResonated(res.resonating);
+                            }
+                            router.refresh();
+                          });
+                        }}
+                        disabled={isResonating}
+                        className={`gap-2 rounded-full transition-colors border ${
+                          hasResonated
+                            ? "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 hover:text-white shadow-sm font-medium"
+                            : "text-primary hover:bg-primary/10 border-primary/20"
+                        }`}
+                      >
+                        {hasResonated ? (
+                          <Check className="size-4 shrink-0" aria-hidden />
+                        ) : (
+                          <Activity className={`size-4 shrink-0 ${isResonating ? "animate-pulse" : ""}`} aria-hidden />
+                        )}
+                        {locale === "he" ? (hasResonated ? RESONATED_CLAIM.he : RESONATE_CLAIM.he) : (hasResonated ? RESONATED_CLAIM.en : RESONATE_CLAIM.en)}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setSbtCodexOpen(true)}
+                      className="gap-2 rounded-full border-border/50 text-muted-foreground hover:bg-muted/50 cursor-not-allowed opacity-80"
+                      aria-label={locale === "he" ? "בסס טענה זו (נעול)" : "Support Claim (locked)"}
+                      title={locale === "he" ? "נדרש חותם מאנה (SBT)" : "Genesis Anchor (SBT) required"}
+                    >
+                      <Lock className="size-4" aria-hidden />
+                      {locale === "he" ? "בסס טענה זו" : "Support Claim"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setSbtCodexOpen(true)}
+                      className="gap-2 rounded-full border-border/50 text-muted-foreground hover:bg-muted/50 cursor-not-allowed opacity-80"
+                      aria-label={locale === "he" ? "הפרך טענה זו (נעול)" : "Challenge Claim (locked)"}
+                      title={locale === "he" ? "נדרש חותם מאנה (SBT)" : "Genesis Anchor (SBT) required"}
+                    >
+                      <Lock className="size-4" aria-hidden />
+                      {locale === "he" ? "הפרך טענה זו" : "Challenge Claim"}
+                    </Button>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="flex items-center gap-1 text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full text-xs font-medium"
+                        title={locale === "he" ? "הדהוד קהילתי (מכפיל כוח)" : "Community resonance (mass multiplier)"}
+                      >
+                        <Fingerprint className="size-3" aria-hidden />
+                        {node.resonance_count ?? 0}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSbtCodexOpen(true)}
+                        className="gap-2 rounded-full text-muted-foreground border border-border/50 opacity-70 hover:bg-muted/50 transition-colors cursor-not-allowed"
+                        title={locale === "he" ? SBT_REQUIRED_TITLE.he : SBT_REQUIRED_TITLE.en}
+                      >
+                        <Lock className="size-4" aria-hidden />
+                        {locale === "he" ? RESONATE_CLAIM.he : RESONATE_CLAIM.en}
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
+            <CodexSheet
+              open={sbtCodexOpen}
+              onOpenChange={setSbtCodexOpen}
+              chapterId="sybil-resistance"
+            />
 
             {/* Two-column tactical debate: Supports vs Challenges */}
             <motion.section
@@ -827,9 +915,16 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
               theoryAHe={node.metadata.competingTheories[0].assertionHe ?? node.metadata.competingTheories[0].assertionEn}
               theoryBEn={node.metadata.competingTheories[1].assertionEn}
               theoryBHe={node.metadata.competingTheories[1].assertionHe ?? node.metadata.competingTheories[1].assertionEn}
+              hasGenesisAnchor={hasGenesisAnchor}
+              onLockedClick={() => setSbtCodexOpen(true)}
             />
           </div>
         )}
+      <CodexSheet
+        open={sbtCodexOpen}
+        onOpenChange={setSbtCodexOpen}
+        chapterId="sybil-resistance"
+      />
     </motion.main>
   );
 }

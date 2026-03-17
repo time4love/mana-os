@@ -731,42 +731,93 @@ export async function anchorForgeDraft(
   }
 }
 
-/** Result of Epistemic Resonance action (Phase 10 Step 11). */
-export type ResonateWithNodeResult = { success: true } | { success: false; error: string };
+/** Result of Epistemic Resonance toggle (Phase 10 Step 11). One wallet = one resonance per node. */
+export type ToggleNodeResonanceResult =
+  | { success: true; resonating: boolean }
+  | { success: false; error: string };
 
 /**
- * Increments the Epistemic Resonance count for a truth node.
- * Later: verify userWallet holds Genesis Anchor SBT before allowing.
+ * Toggles Epistemic Resonance for a truth node: add or remove this wallet's vote.
+ * Uses truth_resonances junction table; one wallet can resonate at most once per node (Sybil resistance).
+ * TODO: WEB3 VALIDATION — Verify userWallet holds ManaSkills SBT before allowing (Phase 10 Step 8).
  */
-export async function resonateWithNode(
+export async function toggleNodeResonance(
   nodeId: string,
   userWallet: string
-): Promise<ResonateWithNodeResult> {
+): Promise<ToggleNodeResonanceResult> {
   try {
+    if (!userWallet?.trim()) return { success: false, error: "No wallet connected" };
     const supabase = createServerSupabase();
-    const { data: node, error: fetchError } = await supabase
+    const address = userWallet.trim().toLowerCase();
+
+    const { data: existing } = await supabase
+      .from("truth_resonances")
+      .select("node_id")
+      .eq("node_id", nodeId)
+      .eq("wallet_address", address)
+      .maybeSingle();
+
+    const { data: nodeRow } = await supabase
       .from("truth_nodes")
       .select("resonance_count")
       .eq("id", nodeId)
       .single();
 
-    if (fetchError || !node) {
-      return { success: false, error: fetchError?.message ?? "Node not found" };
+    const currentCount =
+      typeof (nodeRow as { resonance_count?: number } | null)?.resonance_count === "number"
+        ? (nodeRow as { resonance_count: number }).resonance_count
+        : 0;
+
+    if (existing) {
+      const { error: delError } = await supabase
+        .from("truth_resonances")
+        .delete()
+        .eq("node_id", nodeId)
+        .eq("wallet_address", address);
+      if (delError) return { success: false, error: delError.message };
+
+      const { error: updateError } = await supabase
+        .from("truth_nodes")
+        .update({ resonance_count: Math.max(0, currentCount - 1) })
+        .eq("id", nodeId);
+      if (updateError) return { success: false, error: updateError.message };
+      revalidatePath("/truth");
+      revalidatePath(`/truth/node/${nodeId}`);
+      return { success: true, resonating: false };
+    } else {
+      const { error: insertError } = await supabase
+        .from("truth_resonances")
+        .insert({ node_id: nodeId, wallet_address: address });
+      if (insertError) return { success: false, error: insertError.message };
+
+      const { error: updateError } = await supabase
+        .from("truth_nodes")
+        .update({ resonance_count: currentCount + 1 })
+        .eq("id", nodeId);
+      if (updateError) return { success: false, error: updateError.message };
+      revalidatePath("/truth");
+      revalidatePath(`/truth/node/${nodeId}`);
+      return { success: true, resonating: true };
     }
-
-    const currentCount = typeof (node as { resonance_count?: number }).resonance_count === "number"
-      ? (node as { resonance_count: number }).resonance_count
-      : 0;
-    const { error: updateError } = await supabase
-      .from("truth_nodes")
-      .update({ resonance_count: currentCount + 1 })
-      .eq("id", nodeId);
-
-    if (updateError) return { success: false, error: updateError.message };
-    revalidatePath("/truth");
-    revalidatePath(`/truth/node/${nodeId}`);
-    return { success: true };
   } catch (err) {
     return { success: false, error: toErrorMessage(err) };
   }
+}
+
+/**
+ * Returns whether the given wallet has resonated on the given node (for UI active state).
+ */
+export async function checkUserResonance(
+  nodeId: string,
+  userWallet: string
+): Promise<boolean> {
+  if (!userWallet?.trim()) return false;
+  const supabase = createServerSupabase();
+  const { data } = await supabase
+    .from("truth_resonances")
+    .select("node_id")
+    .eq("node_id", nodeId)
+    .eq("wallet_address", userWallet.trim().toLowerCase())
+    .maybeSingle();
+  return !!data;
 }

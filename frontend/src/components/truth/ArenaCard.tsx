@@ -84,18 +84,18 @@ export function ArenaCard({ arena, index = 0 }: ArenaCardProps) {
             {locale === "he" ? BALANCED_ARENA.he : BALANCED_ARENA.en}
           </div>
           {competingTheories && competingTheories.length === 2 && (
-            <div className="flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground bg-background/50 rounded-md p-2.5 border border-border/40 shadow-sm">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-xs font-medium text-muted-foreground bg-secondary/10 rounded-md p-3 border border-border/40 shadow-sm w-full overflow-hidden mt-1">
               <span
-                className="truncate flex-1 text-start"
+                className="line-clamp-2 min-w-0 break-words text-start"
                 title={locale === "he" ? competingTheories[0].assertionHe : competingTheories[0].assertionEn}
               >
                 {locale === "he" ? competingTheories[0].assertionHe : competingTheories[0].assertionEn}
               </span>
-              <span className="shrink-0 px-1.5 py-0.5 rounded bg-secondary/60 text-[9px] font-bold text-foreground">
+              <span className="px-1.5 py-0.5 rounded-md bg-background border border-border/50 text-[9px] font-black text-foreground shrink-0 shadow-sm">
                 VS
               </span>
               <span
-                className="truncate flex-1 text-end"
+                className="line-clamp-2 min-w-0 break-words text-end"
                 title={locale === "he" ? competingTheories[1].assertionHe : competingTheories[1].assertionEn}
               >
                 {locale === "he" ? competingTheories[1].assertionHe : competingTheories[1].assertionEn}

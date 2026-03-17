@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { FileText, Loader2, Anchor, Sparkles, Filter, LinkIcon } from "lucide-react";
+import { FileText, Loader2, Anchor, Sparkles, Filter, LinkIcon, Lock } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useLocale } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,10 @@ interface SubmitClaimsDrawerProps {
   theoryAHe: string;
   theoryBEn: string;
   theoryBHe: string;
+  /** When false, trigger shows as locked and onClick opens Codex (onLockedClick). Phase 10 Step 8: Sybil resistance. */
+  hasGenesisAnchor?: boolean;
+  /** Called when user clicks the locked trigger; open Codex for "sybil-resistance" chapter. */
+  onLockedClick?: () => void;
 }
 
 type Phase = "idle" | "processing" | "harvest";
@@ -92,6 +96,8 @@ export function SubmitClaimsDrawer({
   theoryAHe,
   theoryBEn,
   theoryBHe,
+  hasGenesisAnchor = true,
+  onLockedClick,
 }: SubmitClaimsDrawerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -252,14 +258,34 @@ export function SubmitClaimsDrawer({
   const theoryBLabel = locale === "he" ? theoryBHe : theoryBEn;
   const summary = buildSummary(processedClaims, theoryALabel.slice(0, 40), theoryBLabel.slice(0, 40), locale);
 
+  const triggerLabel = locale === "he" ? LABELS.trigger.he : LABELS.trigger.en;
+  const lockedTitle =
+    locale === "he" ? "נדרש חותם מאנה (SBT) להגשת תמלול" : "Genesis Anchor (SBT) required to submit transcript";
+
+  if (!hasGenesisAnchor && onLockedClick) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onLockedClick}
+        className="inline-flex items-center justify-center gap-2 rounded-xl border-border/50 bg-muted/30 px-4 py-2.5 text-sm font-medium text-muted-foreground shadow-soft opacity-80 cursor-not-allowed hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-muted"
+        aria-label={triggerLabel}
+        title={lockedTitle}
+      >
+        <Lock className="size-4 shrink-0" aria-hidden />
+        {triggerLabel}
+      </Button>
+    );
+  }
+
   return (
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetTrigger
         className="inline-flex items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary shadow-soft transition hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/30"
-        aria-label={locale === "he" ? LABELS.trigger.he : LABELS.trigger.en}
+        aria-label={triggerLabel}
       >
         <FileText className="size-4 shrink-0" aria-hidden />
-        {locale === "he" ? LABELS.trigger.he : LABELS.trigger.en}
+        {triggerLabel}
       </SheetTrigger>
       <SheetContent
         side={isRtl ? "start" : "end"}
