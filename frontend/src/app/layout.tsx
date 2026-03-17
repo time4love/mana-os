@@ -3,6 +3,7 @@ import { Web3Provider } from "@/components/Web3Provider";
 import { LocaleProvider } from "@/lib/i18n/context";
 import { ArchitectModeProvider } from "@/lib/context/ArchitectModeContext";
 import { Navbar } from "@/components/layout/Navbar";
+import { GlobalDraftIndicator } from "@/components/truth/GlobalDraftIndicator";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default function RootLayout({
             <Web3Provider>
               <Navbar />
               {children}
+              <GlobalDraftIndicator />
             </Web3Provider>
           </ArchitectModeProvider>
         </LocaleProvider>

@@ -24,6 +24,7 @@ const AnchorBodySchema = z.object({
       logicalCoherenceScore: z.number().min(0).max(100),
       supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]),
       reasoning: z.string(),
+      matchedExistingNodeId: z.string().nullable().optional(),
     })
   ).max(100),
   authorWallet: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
@@ -89,10 +90,13 @@ export async function POST(request: Request) {
   const { arenaId, claims, authorWallet } = parsed.data;
   const wallet = authorWallet.trim().toLowerCase();
 
-  if (claims.length === 0) {
+  // Only anchor claims that are not already in the weave (Scout deduplication)
+  const claimsToInsert = claims.filter((c) => !c.matchedExistingNodeId);
+
+  if (claimsToInsert.length === 0) {
     return NextResponse.json(
-      { error: "No claims to anchor" },
-      { status: 400 }
+      { error: "No claims to anchor", anchoredCount: 0, nodeIds: [] },
+      { status: 200 }
     );
   }
 
@@ -101,7 +105,7 @@ export async function POST(request: Request) {
   const createdIds: string[] = [];
   const edges: { source_id: string; target_id: string; relationship: EdgeRelationship }[] = [];
 
-  for (const claim of claims) {
+  for (const claim of claimsToInsert) {
     try {
       const content = buildSieveClaimRosettaContent(claim);
       const embedResult = await embed({

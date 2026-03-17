@@ -124,6 +124,7 @@ export async function POST(request: Request) {
     architectMode?: boolean;
     targetNodeContext?: string;
     locale?: string;
+    debateIntent?: "supports" | "challenges";
   };
   try {
     body = await request.json();
@@ -135,9 +136,33 @@ export async function POST(request: Request) {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const targetNodeContext = typeof body.targetNodeContext === "string" ? body.targetNodeContext.trim() : null;
   const locale = body.locale === "he" ? "he" : "en";
+  const debateIntent = body.debateIntent === "supports" || body.debateIntent === "challenges" ? body.debateIntent : undefined;
+
+  let debateOverride = "";
+  let coachDirective = "";
+  if (targetNodeContext && debateIntent) {
+    if (debateIntent === "supports") {
+      const claimSnippet = targetNodeContext.slice(0, 2000);
+      debateOverride =
+        "\n\nCRITICAL CONTEXT: The user is in the \"Support Claim\" drawer for the claim: \"" + claimSnippet + "\".\n"
+        + "RULE OF SOCRATIC MIDWIFERY: You MUST NOT invent, generate, or hallucinate empirical evidence or arguments for the user. The user MUST provide the raw material (data, thought process, or transcript). Your job is ONLY to refine their raw material into a bulletproof logical premise, translate it, and score it. If they ask you to generate the proof, politely refuse and ask them what evidence THEY want to present.";
+      coachDirective =
+        "Act as their Debate Coach (Socratic Midwife). Tell them you cannot invent evidence for them. Ask them what empirical data or logical deduction THEY have to strengthen the claim. Guide them to provide the raw material.";
+    } else if (debateIntent === "challenges") {
+      const claimSnippetCh = targetNodeContext.slice(0, 2000);
+      debateOverride =
+        "\n\nCRITICAL CONTEXT: The user is in the \"Challenge Claim\" drawer for the claim: \"" + claimSnippetCh + "\".\n"
+        + "RULE OF SOCRATIC MIDWIFERY: You MUST NOT invent counter-arguments or find fallacies on the user's behalf. The user MUST provide the counter-evidence or point out the flaw. Your job is ONLY to act as a sharp logical editor: refine their attack, format it, and score it. If they ask you to debunk it for them, politely refuse and ask them what flaw THEY see.";
+      coachDirective =
+        "Act as their Debate Coach (Socratic Midwife). Tell them you cannot invent counter-arguments. Ask them what specific flaw or counter-evidence THEY want to present to attack the claim. Guide them to think critically.";
+    }
+  }
 
   const contextBlock = targetNodeContext
-    ? `\n\nThe user is challenging or supporting the following existing claim (use this to frame your Socratic dialogue):\n---\n${targetNodeContext.slice(0, 8000)}\n---`
+    ? "\n\nThe user is challenging or supporting the following existing claim (use this to frame your Socratic dialogue):\n---\n"
+      + targetNodeContext.slice(0, 8000)
+      + "\n---"
+      + debateOverride
     : "";
 
   const userMessages = messages.filter((m: UIMessage) => m.role === "user");
@@ -296,24 +321,22 @@ YOUR TASK:
 `;
   } else {
     // Both EXPLORE and CHAT intents land here to perform Epistemic Triage
-    handoffBlock = `
-=========================================
-EXPLORE / CHAT MODE: Epistemic Triage
-=========================================
-The user is exploring, arguing, or providing new content. The backend ran RAG and found the EXISTING NODES below.
-
-EXISTING NODES TO DISPLAY (Portals):
-${JSON.stringify(existingMatches)}
-
-YOUR TASK:
-1. Be a Socratic peer. Populate \`socraticMessage\` with your response (never empty).
-2. THE ANTI-BULK GUARDRAIL: If the user provided a long text with MULTIPLE claims:
-   - Briefly map out/list the distinct claims they made in your message.
-   - Acknowledge which claims are already covered by the Portals (if any).
-   - EXPLICITLY ask the user to choose ONE of the *new/unaddressed* claims to focus on and draft (e.g., "Which of these new claims should we anchor first? Say 'Draft this claim: [X]'").
-3. Do NOT focus only on what already exists. Your goal is to map the unknown.
-4. Call \`epistemic_triage\` EXACTLY ONCE. Pass the EXISTING NODES into \`existingNodesToDisplay\`. Leave \`newDrafts\` empty.
-`;
+    const coachSuffix = coachDirective
+      ? "\nDEBATE COACH DIRECTIVE (when user is in Support or Challenge drawer): " + coachDirective + "\n"
+      : "";
+    handoffBlock =
+      "\n=========================================\nEXPLORE / CHAT MODE: Epistemic Triage\n=========================================\n"
+      + "The user is exploring, arguing, or providing new content. The backend ran RAG and found the EXISTING NODES below.\n\n"
+      + "EXISTING NODES TO DISPLAY (Portals):\n"
+      + JSON.stringify(existingMatches)
+      + "\n\nYOUR TASK:\n1. Be a Socratic peer. Populate `socraticMessage` with your response (never empty).\n"
+      + "2. THE ANTI-BULK GUARDRAIL: If the user provided a long text with MULTIPLE claims:\n"
+      + "   - Briefly map out/list the distinct claims they made in your message.\n"
+      + "   - Acknowledge which claims are already covered by the Portals (if any).\n"
+      + "   - EXPLICITLY ask the user to choose ONE of the *new/unaddressed* claims to focus on and draft (e.g., \"Which of these new claims should we anchor first? Say 'Draft this claim: [X]'\").\n"
+      + "3. Do NOT focus only on what already exists. Your goal is to map the unknown.\n"
+      + "4. Call `epistemic_triage` EXACTLY ONCE. Pass the EXISTING NODES into `existingNodesToDisplay`. Leave `newDrafts` empty.\n"
+      + coachSuffix;
   }
 
   const SOCRATES_SYSTEM = `You are Socrates, the Village Elder: a Socratic, pure logician guiding a human. Converse in the user's language (Hebrew or English). Never leave the user with a blank message.

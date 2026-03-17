@@ -241,16 +241,29 @@ export interface AgentTraceEntry {
 /** Which competing theory a claim supports (or neutral). */
 export type SieveSupportedTheory = "THEORY_A" | "THEORY_B" | "NEUTRAL";
 
-/** Single claim after Extractor + Logician & Aligner (Harvest Dashboard item). */
+/** Single claim after Extractor + Scout (RAG) + Logician & Aligner (Harvest Dashboard item). */
 export interface SieveProcessedClaim {
   assertionEn: string;
   assertionHe: string;
   logicalCoherenceScore: number;
   supportedTheory: SieveSupportedTheory;
   reasoning: string;
+  /** Set when Scout finds a near-exact semantic match in the weave (deduplication). */
+  matchedExistingNodeId?: string | null;
+}
+
+/** Telemetry returned by the Sieve pipeline (Extractor → Scout → Logician). */
+export interface SieveTelemetry {
+  /** Raw claims from Extractor before limit. */
+  extractedCount: number;
+  /** Claims passed to Scout + Logician (capped by MAX_CLAIMS_TO_PROCESS). */
+  processedCount: number;
+  /** Claims that matched an existing node in the weave (Scout deduplication). */
+  duplicateCount: number;
 }
 
 /** Response from POST /api/oracle/sieve (run sieve only; no DB write). */
 export interface SieveRunResult {
   processedClaims: SieveProcessedClaim[];
+  telemetry?: SieveTelemetry;
 }

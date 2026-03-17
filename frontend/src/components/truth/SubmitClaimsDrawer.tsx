@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Loader2, Anchor, Sparkles, Filter } from "lucide-react";
+import Link from "next/link";
+import { FileText, Loader2, Anchor, Sparkles, Filter, LinkIcon } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useLocale } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import {
   SheetTitle,
   SheetBody,
 } from "@/components/ui/sheet";
-import type { SieveProcessedClaim, SieveSupportedTheory } from "@/types/truth";
+import type { SieveProcessedClaim, SieveSupportedTheory, SieveTelemetry } from "@/types/truth";
 
 const LABELS = {
   trigger: { he: "הגש כתב טענות / תמלול", en: "Submit Claims / Transcript" },
@@ -33,6 +34,12 @@ const LABELS = {
   anchored: { he: "הטענות עוגנו לזירה.", en: "Claims anchored to the arena." },
   connectWallet: { he: "חבר ארנק כדי לעגן.", en: "Connect wallet to anchor." },
   anotherTranscript: { he: "הזן טקסט אחר", en: "Enter another transcript" },
+  alreadyAnchored: { he: "טענה זו כבר מעוגנת במארג", en: "Claim already anchored in the weave" },
+  summaryAlreadyExist: { he: "מהן כבר במארג", en: "of them already exist in the weave" },
+  telemetryTitle: { he: "מעקב נחיל", en: "Swarm telemetry" },
+  telemetryExtractor: { he: "חילוץ", en: "Extractor" },
+  telemetryScout: { he: "סקָאוּט (כפילויות)", en: "Scout (duplicates)" },
+  telemetryLogician: { he: "לוגיקן (ציון)", en: "Logician (scored)" },
 } as const;
 
 interface SubmitClaimsDrawerProps {
@@ -58,12 +65,19 @@ function buildSummary(
 ): string {
   const total = processedClaims.length;
   if (total === 0) return locale === "he" ? LABELS.noClaims.he : LABELS.noClaims.en;
+  const duplicateCount = processedClaims.filter((c) => c.matchedExistingNodeId != null).length;
+  const pre = locale === "he" ? LABELS.summaryPrefix.he : LABELS.summaryPrefix.en;
+  const claimsWord = locale === "he" ? LABELS.summaryClaims.he : LABELS.summaryClaims.en;
+  const alreadyExist = locale === "he" ? LABELS.summaryAlreadyExist.he : LABELS.summaryAlreadyExist.en;
+
+  const parts: string[] = [`${pre} ${total} ${claimsWord}`];
+  if (duplicateCount > 0) {
+    parts.push(`${duplicateCount} ${alreadyExist}`);
+  }
+
   const a = processedClaims.filter((c) => c.supportedTheory === "THEORY_A").length;
   const b = processedClaims.filter((c) => c.supportedTheory === "THEORY_B").length;
   const n = processedClaims.filter((c) => c.supportedTheory === "NEUTRAL").length;
-  const pre = locale === "he" ? LABELS.summaryPrefix.he : LABELS.summaryPrefix.en;
-  const claimsWord = locale === "he" ? LABELS.summaryClaims.he : LABELS.summaryClaims.en;
-  const parts: string[] = [`${pre} ${total} ${claimsWord}`];
   const supportAEn = a === 1 ? "supports Theory A" : "support Theory A";
   const supportBEn = b === 1 ? "supports Theory B" : "support Theory B";
   if (a > 0) parts.push(`${a} ${locale === "he" ? LABELS.summarySupportA.he : supportAEn} (${theoryALabel})`);
@@ -80,14 +94,18 @@ export function SubmitClaimsDrawer({
   theoryBHe,
 }: SubmitClaimsDrawerProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { locale } = useLocale();
   const { address } = useAccount();
   const isRtl = locale === "he";
 
-  const [open, setOpen] = useState(false);
+  const STORAGE_KEY = `mana_sieve_draft_${arenaId}`;
+
+  const [isOpen, setIsOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [transcript, setTranscript] = useState("");
   const [processedClaims, setProcessedClaims] = useState<SieveProcessedClaim[]>([]);
+  const [telemetry, setTelemetry] = useState<SieveTelemetry | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [anchorStatus, setAnchorStatus] = useState<"idle" | "pending" | "done" | "error">("idle");
 
@@ -95,13 +113,68 @@ export function SubmitClaimsDrawer({
     setPhase("idle");
     setTranscript("");
     setProcessedClaims([]);
+    setTelemetry(null);
     setError(null);
     setAnchorStatus("idle");
   }
 
-  function handleOpenChange(next: boolean) {
-    setOpen(next);
-    if (!next) resetDrawer();
+  // 1. Load draft from sessionStorage & handle ?openDraft=true
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as {
+          transcript?: string;
+          processedClaims?: SieveProcessedClaim[];
+          telemetry?: SieveTelemetry | null;
+        };
+        if (parsed.transcript) setTranscript(parsed.transcript);
+        if (parsed.processedClaims?.length) {
+          setProcessedClaims(parsed.processedClaims);
+          setPhase("harvest");
+        }
+        if (parsed.telemetry) setTelemetry(parsed.telemetry);
+      }
+    } catch (e) {
+      console.error("Failed to load draft", e);
+    }
+    if (searchParams?.get("openDraft") === "true") {
+      setIsOpen(true);
+    }
+  }, [arenaId, searchParams]);
+
+  // 2. Auto-save draft to sessionStorage (include telemetry so harvest view restores fully)
+  useEffect(() => {
+    if (transcript.trim().length > 0 || processedClaims.length > 0) {
+      sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ transcript, processedClaims, telemetry })
+      );
+    } else {
+      sessionStorage.removeItem(STORAGE_KEY);
+    }
+  }, [transcript, processedClaims, telemetry, arenaId]);
+
+  function handleOpenChange(newOpen: boolean) {
+    if (newOpen) {
+      setIsOpen(true);
+      return;
+    }
+    const hasUnsavedData = transcript.trim().length > 0 || processedClaims.length > 0;
+    if (hasUnsavedData) {
+      const confirmMsg =
+        locale === "he"
+          ? "ישנם נתונים שלא עוגנו. האם אתה בטוח שברצונך לסגור ולאבד אותם?"
+          : "Unanchored claims exist. Close and discard?";
+      if (window.confirm(confirmMsg)) {
+        setTranscript("");
+        setProcessedClaims([]);
+        sessionStorage.removeItem(STORAGE_KEY);
+        setIsOpen(false);
+      }
+    } else {
+      setIsOpen(false);
+    }
   }
 
   async function runSieve() {
@@ -131,6 +204,7 @@ export function SubmitClaimsDrawer({
         return;
       }
       setProcessedClaims(data.processedClaims ?? []);
+      setTelemetry(data.telemetry ?? null);
       setPhase("harvest");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
@@ -139,7 +213,8 @@ export function SubmitClaimsDrawer({
   }
 
   async function anchorToArena() {
-    if (!address || processedClaims.length === 0) return;
+    const claimsToAnchor = processedClaims.filter((c) => !c.matchedExistingNodeId);
+    if (!address || claimsToAnchor.length === 0) return;
     setAnchorStatus("pending");
     setError(null);
     try {
@@ -148,7 +223,7 @@ export function SubmitClaimsDrawer({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           arenaId,
-          claims: processedClaims,
+          claims: claimsToAnchor,
           authorWallet: address,
         }),
       });
@@ -160,7 +235,9 @@ export function SubmitClaimsDrawer({
       }
       setAnchorStatus("done");
       router.refresh();
-      handleOpenChange(false);
+      resetDrawer();
+      sessionStorage.removeItem(STORAGE_KEY);
+      setIsOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
       setAnchorStatus("error");
@@ -170,12 +247,13 @@ export function SubmitClaimsDrawer({
   const claimsA = processedClaims.filter((c) => c.supportedTheory === "THEORY_A");
   const claimsB = processedClaims.filter((c) => c.supportedTheory === "THEORY_B");
   const claimsNeutral = processedClaims.filter((c) => c.supportedTheory === "NEUTRAL");
+  const claimsToAnchor = processedClaims.filter((c) => !c.matchedExistingNodeId);
   const theoryALabel = locale === "he" ? theoryAHe : theoryAEn;
   const theoryBLabel = locale === "he" ? theoryBHe : theoryBEn;
   const summary = buildSummary(processedClaims, theoryALabel.slice(0, 40), theoryBLabel.slice(0, 40), locale);
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
+    <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetTrigger
         className="inline-flex items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary shadow-soft transition hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/30"
         aria-label={locale === "he" ? LABELS.trigger.he : LABELS.trigger.en}
@@ -259,7 +337,28 @@ export function SubmitClaimsDrawer({
                 exit={{ opacity: 0 }}
                 className="space-y-6"
               >
-                {/* Clear summary first */}
+                {telemetry != null && (
+                  <div
+                    className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 text-xs font-medium text-muted-foreground"
+                    role="status"
+                    aria-label={locale === "he" ? LABELS.telemetryTitle.he : LABELS.telemetryTitle.en}
+                  >
+                    <p className="mb-1.5 font-semibold uppercase tracking-wider text-foreground/80">
+                      {locale === "he" ? LABELS.telemetryTitle.he : LABELS.telemetryTitle.en}
+                    </p>
+                    <ul className="flex flex-wrap gap-x-4 gap-y-1">
+                      <li>
+                        {locale === "he" ? LABELS.telemetryExtractor.he : LABELS.telemetryExtractor.en}: {telemetry.extractedCount}
+                      </li>
+                      <li>
+                        {locale === "he" ? LABELS.telemetryScout.he : LABELS.telemetryScout.en}: {telemetry.duplicateCount}
+                      </li>
+                      <li>
+                        {locale === "he" ? LABELS.telemetryLogician.he : LABELS.telemetryLogician.en}: {telemetry.processedCount}
+                      </li>
+                    </ul>
+                  </div>
+                )}
                 <p className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm font-medium text-foreground leading-relaxed">
                   {summary}
                 </p>
@@ -297,7 +396,7 @@ export function SubmitClaimsDrawer({
                       <Button
                         type="button"
                         onClick={anchorToArena}
-                        disabled={anchorStatus === "pending" || processedClaims.length === 0}
+                        disabled={anchorStatus === "pending" || claimsToAnchor.length === 0}
                         className="w-full bg-primary text-primary-foreground shadow-soft hover:opacity-90"
                         aria-label={locale === "he" ? LABELS.anchorToArena.he : LABELS.anchorToArena.en}
                       >
@@ -388,8 +487,23 @@ function HarvestColumn({
             initial={{ opacity: 0, x: locale === "he" ? 6 : -6 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.03 }}
-            className="rounded-lg border border-border/50 bg-background/80 px-3 py-2 shadow-soft"
+            className={`rounded-xl border px-4 py-3 shadow-soft ${
+              claim.matchedExistingNodeId ? "border-primary/50 bg-primary/5" : "border-border/50 bg-background/80"
+            }`}
           >
+            {claim.matchedExistingNodeId && (
+              <div className="mb-3 inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-1 ring-inset ring-primary/20">
+                <LinkIcon className="size-3" aria-hidden />
+                {locale === "he" ? LABELS.alreadyAnchored.he : LABELS.alreadyAnchored.en}
+                <Link
+                  href={`/truth/node/${claim.matchedExistingNodeId}`}
+                  className="ms-1 underline decoration-primary/50 hover:decoration-primary focus:outline-none focus:ring-2 focus:ring-primary/30 rounded"
+                  aria-label={locale === "he" ? "צלול לצומת" : "Dive to node"}
+                >
+                  {locale === "he" ? "צלול לצומת" : "Dive to node"}
+                </Link>
+              </div>
+            )}
             <p className="text-sm text-foreground leading-relaxed line-clamp-2">
               {getClaimAssertion(claim, locale)}
             </p>

@@ -1,23 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, ArrowUp, Feather, Shield, Swords } from "lucide-react";
+import { ChevronRight, ArrowUp, Shield, Swords } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent, truncateAssertion } from "@/lib/utils/truthParser";
 import { Button } from "@/components/ui/button";
-import { ForgeSheet } from "@/components/truth/ForgeSheet";
-import { ForgeChat } from "@/components/truth/ForgeChat";
+import { SupportClaimDrawer } from "@/components/truth/SupportClaimDrawer";
+import { ChallengeClaimDrawer } from "@/components/truth/ChallengeClaimDrawer";
 import { SubmitClaimsDrawer } from "@/components/truth/SubmitClaimsDrawer";
 import type { TruthNodeWithRelations, TruthNode, TruthNodeMetadata, ChildrenByRelationship } from "@/types/truth";
-
-const FORGE_ENTRY = {
-  he: "לטש תובנה במארג…",
-  en: "Refine an insight in the Weave…",
-};
 
 const CHILD_ASSERTION_MAX_LEN = 180;
 
@@ -436,19 +429,6 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
         ? childrenByRelationship.challenges
         : [];
 
-  const [forgeOpen, setForgeOpen] = useState(false);
-  const [forgeRelationship, setForgeRelationship] = useState<"supports" | "challenges" | null>(null);
-  const router = useRouter();
-
-  function openForge() {
-    setForgeOpen(true);
-  }
-
-  function handleAnchoredFromMiniArena() {
-    setForgeRelationship(null);
-    router.refresh();
-  }
-
   // Level 1: Theory Dive view — breadcrumbs, theory header, list of supporting claims
   if (isTheoryDive) {
     const theoryLabel =
@@ -657,70 +637,18 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
         {!isMacroArena && (
           <div className="flex flex-col gap-6 mt-8">
             {address && (
-              <>
-                <div className="flex flex-wrap items-center gap-3 mt-8 border-t border-border/50 pt-6">
-                  <Button
-                    type="button"
-                    variant={forgeRelationship === "supports" ? "default" : "outline"}
-                    onClick={() =>
-                      setForgeRelationship(forgeRelationship === "supports" ? null : "supports")
-                    }
-                    className="gap-2 rounded-full border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
-                  >
-                    <Shield className="size-4" aria-hidden />
-                    {locale === "he" ? "בסס טענה זו" : "Support Claim"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={forgeRelationship === "challenges" ? "default" : "outline"}
-                    onClick={() =>
-                      setForgeRelationship(forgeRelationship === "challenges" ? null : "challenges")
-                    }
-                    className="gap-2 rounded-full border-amber-500/30 hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
-                  >
-                    <Swords className="size-4" aria-hidden />
-                    {locale === "he" ? "הפרך טענה זו" : "Challenge Claim"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={openForge}
-                    className="gap-2 rounded-full text-muted-foreground hover:text-foreground"
-                    aria-label={locale === "he" ? FORGE_ENTRY.he : FORGE_ENTRY.en}
-                  >
-                    <Feather className="size-4" aria-hidden />
-                    {locale === "he" ? FORGE_ENTRY.he : FORGE_ENTRY.en}
-                  </Button>
-                </div>
-
-                {forgeRelationship && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="animate-in slide-in-from-top-4 duration-300"
-                  >
-                    <ForgeChat
-                      authorWallet={address}
-                      parentId={node.id}
-                      relationship={forgeRelationship}
-                      targetNodeContext={focalAssertion}
-                      onAnchored={handleAnchoredFromMiniArena}
-                    />
-                  </motion.div>
-                )}
-
-                <ForgeSheet
-                  isOpen={forgeOpen}
-                  onOpenChange={setForgeOpen}
-                  targetNodeContext={focalAssertion}
-                  mode="branch"
+              <div className="flex flex-wrap items-center gap-3 mt-8 border-t border-border/50 pt-6">
+                <SupportClaimDrawer
                   authorWallet={address}
                   parentId={node.id}
-                  onAnchored={() => setForgeOpen(false)}
+                  targetNodeContext={focalAssertion}
                 />
-              </>
+                <ChallengeClaimDrawer
+                  authorWallet={address}
+                  parentId={node.id}
+                  targetNodeContext={focalAssertion}
+                />
+              </div>
             )}
 
             {/* Two-column tactical debate: Supports vs Challenges */}

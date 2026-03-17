@@ -10,10 +10,15 @@
  */
 
 import { NextResponse } from "next/server";
-import { generateObject } from "ai";
+import { generateObject, embed } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
-import type { SieveProcessedClaim, SieveSupportedTheory } from "@/types/truth";
+import { createServerSupabase } from "@/lib/supabase/server";
+import type { SieveProcessedClaim, SieveSupportedTheory, SieveTelemetry } from "@/types/truth";
+
+/** English-to-English semantic match (Rosetta Protocol: DB vectors are assertionEn). */
+const SIEVE_SCOUT_THRESHOLD = 0.8;
+const SIEVE_SCOUT_MATCH_COUNT = 1;
 
 const MAX_TRANSCRIPT_LENGTH = 500_000;
 const MAX_CLAIMS_TO_PROCESS = 10;
@@ -65,7 +70,11 @@ const LogicianAlignerSchema = z.object({
   logicalCoherenceScore: z.number().min(0).max(100),
   supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]),
   reasoning: z.string(),
+  matchedExistingNodeId: z.string().nullable().optional().describe("Set by server after Scout RAG; not emitted by Logician"),
 });
+
+/** Schema for Logician LLM output only (Scout sets matchedExistingNodeId server-side). */
+const LogicianOutputSchema = LogicianAlignerSchema.omit({ matchedExistingNodeId: true });
 
 function buildLogicianAlignerPrompt(
   claim: string,
@@ -138,6 +147,7 @@ export async function POST(request: Request) {
     const extractorModel = google("gemini-2.5-flash");
     const { object: extractorResult } = await generateObject({
       model: extractorModel,
+      temperature: 0.1,
       schema: ExtractorClaimsSchema,
       schemaName: "ExtractorClaims",
       schemaDescription: "Core logical arguments relevant to the arena's two theories",
@@ -148,35 +158,80 @@ export async function POST(request: Request) {
       : [];
     const claimsToProcess = rawClaims.slice(0, MAX_CLAIMS_TO_PROCESS);
     if (claimsToProcess.length === 0) {
-      return NextResponse.json({ processedClaims: [] });
+      const telemetry: SieveTelemetry = {
+        extractedCount: rawClaims.length,
+        processedCount: 0,
+        duplicateCount: 0,
+      };
+      return NextResponse.json({ processedClaims: [], telemetry });
     }
 
-    // Agent 2: The Logician & Aligner (parallel per claim)
+    // Agent 2: Logician FIRST (Rosetta Protocol → assertionEn), then Scout (RAG on English only)
     const model = google("gemini-2.5-flash");
+    const supabase = createServerSupabase();
     const results = await Promise.all(
       claimsToProcess.map(async (claim): Promise<SieveProcessedClaim> => {
-        const { object } = await generateObject({
+        // 1. Logician first: get Universal English (assertionEn) for vector math
+        const { object: logicianObject } = await generateObject({
           model,
-          schema: LogicianAlignerSchema,
+          temperature: 0.1,
+          schema: LogicianOutputSchema,
           schemaName: "LogicianAligner",
           schemaDescription: "Claim normalized, scored, and aligned to Theory A or B",
           prompt: buildLogicianAlignerPrompt(claim, theoryA, theoryB, userLanguage),
         });
 
-        const o = object as z.infer<typeof LogicianAlignerSchema>;
-        return {
-          assertionEn: (o.assertionEn ?? claim).trim().slice(0, 4000),
-          assertionHe: (o.assertionHe ?? o.assertionEn ?? claim).trim().slice(0, 4000),
-          logicalCoherenceScore: typeof o.logicalCoherenceScore === "number"
+        const o = logicianObject as z.infer<typeof LogicianAlignerSchema>;
+        const assertionEn = (o.assertionEn ?? claim).trim().slice(0, 4000);
+        const assertionHe = (o.assertionHe ?? o.assertionEn ?? claim).trim().slice(0, 4000);
+        const logicalCoherenceScore =
+          typeof o.logicalCoherenceScore === "number"
             ? Math.max(0, Math.min(100, o.logicalCoherenceScore))
-            : 50,
-          supportedTheory: (o.supportedTheory ?? "NEUTRAL") as SieveSupportedTheory,
-          reasoning: (o.reasoning ?? "").trim().slice(0, 2000),
+            : 50;
+        const supportedTheory = (o.supportedTheory ?? "NEUTRAL") as SieveSupportedTheory;
+        const reasoning = (o.reasoning ?? "").trim().slice(0, 2000);
+
+        // 2. Scout (RAG) using assertionEn only — English-to-English deduplication (Rosetta Protocol)
+        let matchedNodeId: string | null = null;
+        try {
+          const embeddingResult = await embed({
+            model: google.textEmbeddingModel("gemini-embedding-001"),
+            value: assertionEn,
+            providerOptions: { google: { outputDimensionality: 768 } },
+          });
+          if (embeddingResult.embedding.length > 0) {
+            const { data: matches } = await supabase.rpc("match_truth_nodes", {
+              query_embedding: Array.from(embeddingResult.embedding),
+              match_threshold: SIEVE_SCOUT_THRESHOLD,
+              match_count: SIEVE_SCOUT_MATCH_COUNT,
+            } as never);
+            const matchList = (matches ?? []) as Array<{ id: string }>;
+            if (matchList.length > 0 && matchList[0].id) {
+              matchedNodeId = matchList[0].id;
+            }
+          }
+        } catch (err) {
+          console.error("[Sieve Scout Error]", err);
+        }
+
+        return {
+          assertionEn,
+          assertionHe,
+          logicalCoherenceScore,
+          supportedTheory,
+          reasoning,
+          matchedExistingNodeId: matchedNodeId,
         };
       })
     );
 
-    return NextResponse.json({ processedClaims: results });
+    const duplicateCount = results.filter((r) => r.matchedExistingNodeId != null).length;
+    const telemetry: SieveTelemetry = {
+      extractedCount: rawClaims.length,
+      processedCount: results.length,
+      duplicateCount,
+    };
+    return NextResponse.json({ processedClaims: results, telemetry });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[Sieve API]", err);

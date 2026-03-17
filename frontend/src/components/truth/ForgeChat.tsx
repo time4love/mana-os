@@ -334,6 +334,7 @@ export function ForgeChat({
         locale,
         targetNodeContext: targetNodeContext ?? undefined,
         architectMode: isArchitectMode,
+        debateIntent: relationship === "supports" || relationship === "challenges" ? relationship : undefined,
       },
     }),
   });
