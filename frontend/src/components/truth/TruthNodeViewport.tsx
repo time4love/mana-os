@@ -129,15 +129,28 @@ function FocalPivot({
         </p>
         {isMacroArena ? (
           <div className="mt-6 flex flex-col gap-4">
-            <div className="relative w-full h-3 rounded-full overflow-hidden bg-secondary/30 flex" role="img" aria-label={locale === "he" ? LOGICAL_MASS_BALANCE.he : LOGICAL_MASS_BALANCE.en}>
-              <div className="h-full bg-amber-500/60 transition-all duration-1000" style={{ width: `${theoryBPct}%` }} />
-              <div className="h-full bg-emerald-500/60 transition-all duration-1000" style={{ width: `${theoryAPct}%` }} />
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-5 bg-border rounded-full z-10" aria-hidden />
+            {/* Tug-of-War: Sky (Theory A) vs Amber (Theory B); bar order matches boxes (RTL: A=start, B=end) */}
+            <div
+              className="relative w-full h-3 rounded-full overflow-hidden bg-secondary/30 flex flex-row"
+              role="img"
+              aria-label={locale === "he" ? LOGICAL_MASS_BALANCE.he : LOGICAL_MASS_BALANCE.en}
+            >
+              <div
+                className="h-full bg-sky-500/60 transition-all duration-1000 ease-out"
+                style={{ width: `${theoryAPct}%` }}
+              />
+              <div
+                className="h-full bg-amber-500/60 transition-all duration-1000 ease-out"
+                style={{ width: `${theoryBPct}%` }}
+              />
+              <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-background/80 z-10" aria-hidden />
             </div>
-            <div className="flex justify-between text-xs font-medium text-muted-foreground mt-1 px-1">
-              <span>{theoryBPct}%</span>
-              <span>{locale === "he" ? LOGICAL_MASS_BALANCE.he : LOGICAL_MASS_BALANCE.en}</span>
-              <span>{theoryAPct}%</span>
+            <div className="flex justify-between text-xs font-bold mt-2 px-1">
+              <span className="text-sky-600 dark:text-sky-400">{theoryAPct}%</span>
+              <span className="text-muted-foreground font-medium">
+                {locale === "he" ? LOGICAL_MASS_BALANCE.he : LOGICAL_MASS_BALANCE.en}
+              </span>
+              <span className="text-amber-600 dark:text-amber-400">{theoryBPct}%</span>
             </div>
             {competingTheories && competingTheories.length === 2 && basePath && (
               <div className="mt-2 grid grid-cols-2 gap-4 relative">
@@ -146,10 +159,10 @@ function FocalPivot({
                 </div>
                 <Link
                   href={`${basePath}?theory=THEORY_A`}
-                  className="group relative rounded-xl bg-secondary/10 p-5 pt-6 border border-border/50 flex flex-col justify-center text-center hover:bg-secondary/20 hover:border-primary/50 transition-all cursor-pointer mt-2 no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  className="group relative rounded-xl bg-secondary/5 p-5 pt-6 border-2 border-sky-500/20 hover:bg-sky-500/5 hover:border-sky-500/40 transition-all cursor-pointer mt-2 no-underline flex flex-col justify-center text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/50"
                   aria-label={locale === "he" ? `תיאוריה א', ${theoryACount} טענות` : `Theory A, ${theoryACount} claims`}
                 >
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-background border border-border text-[10px] font-bold rounded-full px-3 py-1 shadow-sm text-muted-foreground group-hover:text-primary transition-colors whitespace-nowrap">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-background border border-sky-500/30 text-[10px] font-bold rounded-full px-3 py-1 shadow-sm text-sky-600 dark:text-sky-400 whitespace-nowrap">
                     {locale === "he" ? `${theoryACount} ${CLAIMS_LABEL.he}` : `${theoryACount} ${CLAIMS_LABEL.en}`}
                   </div>
                   <span className="text-xs font-semibold text-muted-foreground block mb-2">
@@ -164,10 +177,10 @@ function FocalPivot({
                 </Link>
                 <Link
                   href={`${basePath}?theory=THEORY_B`}
-                  className="group relative rounded-xl bg-secondary/10 p-5 pt-6 border border-border/50 flex flex-col justify-center text-center hover:bg-secondary/20 hover:border-primary/50 transition-all cursor-pointer mt-2 no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  className="group relative rounded-xl bg-secondary/5 p-5 pt-6 border-2 border-amber-500/20 hover:bg-amber-500/5 hover:border-amber-500/40 transition-all cursor-pointer mt-2 no-underline flex flex-col justify-center text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50"
                   aria-label={locale === "he" ? `תיאוריה ב', ${theoryBCount} טענות` : `Theory B, ${theoryBCount} claims`}
                 >
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-background border border-border text-[10px] font-bold rounded-full px-3 py-1 shadow-sm text-muted-foreground group-hover:text-primary transition-colors whitespace-nowrap">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-background border border-amber-500/30 text-[10px] font-bold rounded-full px-3 py-1 shadow-sm text-amber-600 dark:text-amber-400 whitespace-nowrap">
                     {locale === "he" ? `${theoryBCount} ${CLAIMS_LABEL.he}` : `${theoryBCount} ${CLAIMS_LABEL.en}`}
                   </div>
                   <span className="text-xs font-semibold text-muted-foreground block mb-2">
