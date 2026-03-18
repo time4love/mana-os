@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Scale, ChevronRight } from "lucide-react";
 import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent, truncateAssertion } from "@/lib/utils/truthParser";
+import { competingTheoryDisplayAssertion } from "@/lib/utils/truthRosetta";
 import type { MacroRootWithMeta } from "@/types/truth";
 
 const ENTER_ARENA = {
@@ -87,18 +88,18 @@ export function ArenaCard({ arena, index = 0 }: ArenaCardProps) {
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-xs font-medium text-muted-foreground bg-secondary/10 rounded-md p-3 border border-border/40 shadow-sm w-full overflow-hidden mt-1">
               <span
                 className="line-clamp-2 min-w-0 break-words text-start"
-                title={locale === "he" ? competingTheories[0].assertionHe : competingTheories[0].assertionEn}
+                title={competingTheoryDisplayAssertion(competingTheories[0], locale === "he" ? "he" : "en")}
               >
-                {locale === "he" ? competingTheories[0].assertionHe : competingTheories[0].assertionEn}
+                {competingTheoryDisplayAssertion(competingTheories[0], locale === "he" ? "he" : "en")}
               </span>
               <span className="px-1.5 py-0.5 rounded-md bg-background border border-border/50 text-[9px] font-black text-foreground shrink-0 shadow-sm">
                 VS
               </span>
               <span
                 className="line-clamp-2 min-w-0 break-words text-end"
-                title={locale === "he" ? competingTheories[1].assertionHe : competingTheories[1].assertionEn}
+                title={competingTheoryDisplayAssertion(competingTheories[1], locale === "he" ? "he" : "en")}
               >
-                {locale === "he" ? competingTheories[1].assertionHe : competingTheories[1].assertionEn}
+                {competingTheoryDisplayAssertion(competingTheories[1], locale === "he" ? "he" : "en")}
               </span>
             </div>
           )}

@@ -1,9 +1,5 @@
 /**
- * POST /api/oracle/sieve/anchor
- *
- * Anchors the Sieve harvest to the Arena: creates truth_nodes for each claim
- * and truth_edges from the arena to each node (supports / challenges / ai_analysis).
- * THEORY_A → supports, THEORY_B → challenges, NEUTRAL → ai_analysis.
+ * POST /api/oracle/sieve/anchor — anchors Sieve harvest to Arena (Rosetta V2 JSON in content).
  */
 
 import { NextResponse } from "next/server";
@@ -12,21 +8,29 @@ import { embed } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
-import type { SieveProcessedClaim, SieveSupportedTheory } from "@/types/truth";
+import type { SieveSupportedTheory } from "@/types/truth";
 import type { EdgeRelationship } from "@/types/truth";
+import { RosettaBlockSchema } from "@/lib/truth/rosettaSchemas";
+import {
+  embeddingTextFromCanonical,
+  truthNodeContentV2ToJson,
+  fixRosettaV2BlockFlip,
+} from "@/lib/utils/truthRosetta";
 
 const AnchorBodySchema = z.object({
   arenaId: z.string().uuid(),
-  claims: z.array(
-    z.object({
-      assertionEn: z.string(),
-      assertionHe: z.string(),
-      logicalCoherenceScore: z.number().min(0).max(100),
-      supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]),
-      reasoning: z.string(),
-      matchedExistingNodeId: z.string().nullable().optional(),
-    })
-  ).max(100),
+  claims: z
+    .array(
+      z.object({
+        canonical_en: RosettaBlockSchema,
+        source_locale: z.string(),
+        local_translation: RosettaBlockSchema.optional(),
+        logicalCoherenceScore: z.number().min(0).max(100),
+        supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]),
+        matchedExistingNodeId: z.string().nullable().optional(),
+      })
+    )
+    .max(100),
   authorWallet: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
 });
 
@@ -41,24 +45,16 @@ function supportedTheoryToRelationship(t: SieveSupportedTheory): EdgeRelationshi
   }
 }
 
-/** Builds Rosetta content JSON for a Sieve claim (no Scout fields). */
-function buildSieveClaimRosettaContent(claim: SieveProcessedClaim): string {
-  const rosetta = {
+type SieveAnchorClaim = z.infer<typeof AnchorBodySchema>["claims"][number];
+
+function buildSieveClaimContent(claim: SieveAnchorClaim): string {
+  const sl = claim.source_locale.trim().toLowerCase();
+  return truthNodeContentV2ToJson({
+    canonical_en: claim.canonical_en,
+    source_locale: claim.source_locale,
+    locales: claim.local_translation ? { [sl]: claim.local_translation } : {},
     pulse: claim.logicalCoherenceScore,
-    en: {
-      assertion: claim.assertionEn.trim().slice(0, 8000),
-      reasoning: claim.reasoning.trim().slice(0, 2000),
-      hiddenAssumptions: [] as string[],
-      challengePrompt: "",
-    },
-    he: {
-      assertion: (claim.assertionHe || claim.assertionEn).trim().slice(0, 8000),
-      reasoning: claim.reasoning.trim().slice(0, 2000),
-      hiddenAssumptions: [] as string[],
-      challengePrompt: "",
-    },
-  };
-  return JSON.stringify(rosetta);
+  });
 }
 
 export const maxDuration = 60;
@@ -90,7 +86,6 @@ export async function POST(request: Request) {
   const { arenaId, claims, authorWallet } = parsed.data;
   const wallet = authorWallet.trim().toLowerCase();
 
-  // Only anchor claims that are not already in the weave (Scout deduplication)
   const claimsToInsert = claims.filter((c) => !c.matchedExistingNodeId);
 
   if (claimsToInsert.length === 0) {
@@ -105,12 +100,14 @@ export async function POST(request: Request) {
   const createdIds: string[] = [];
   const edges: { source_id: string; target_id: string; relationship: EdgeRelationship }[] = [];
 
-  for (const claim of claimsToInsert) {
+  for (const raw of claimsToInsert) {
     try {
-      const content = buildSieveClaimRosettaContent(claim);
+      const flipped = fixRosettaV2BlockFlip(raw.canonical_en, raw.local_translation);
+      const claim = { ...raw, canonical_en: flipped.canonical_en, local_translation: flipped.local_translation };
+      const content = buildSieveClaimContent(claim);
       const embedResult = await embed({
         model: embeddingModel,
-        value: claim.assertionEn.trim().slice(0, 8000),
+        value: embeddingTextFromCanonical(claim.canonical_en).slice(0, 8000),
         providerOptions: { google: { outputDimensionality: 768 } },
       });
       const embedding = Array.from(embedResult.embedding);
@@ -136,14 +133,12 @@ export async function POST(request: Request) {
         relationship: supportedTheoryToRelationship(claim.supportedTheory),
       });
     } catch {
-      // Skip this claim on failure
+      /* skip */
     }
   }
 
   if (edges.length > 0) {
-    const { error: edgeError } = await supabase
-      .from("truth_edges")
-      .insert(edges as never);
+    const { error: edgeError } = await supabase.from("truth_edges").insert(edges as never);
     if (edgeError) {
       return NextResponse.json(
         { error: "Nodes created but edges failed", detail: edgeError.message },

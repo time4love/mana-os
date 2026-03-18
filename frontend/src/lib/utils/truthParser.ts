@@ -1,22 +1,13 @@
 /**
- * Semantic Peeler — unwraps backend-formatted node content into clean UI fields.
- * Supports: (1) Rosetta JSON (canonical `en` + optional `locales`, or legacy `en`+`he`),
- * (2) legacy Content/Logician's Pulse/Rationale/Scout format, (3) plain text.
+ * Semantic Peeler — unwraps truth_nodes.content (Rosetta V2 JSON or legacy plain / Logician string).
  */
 
-import {
-  getRosettaBlockForUiLocale,
-  normalizeTruthRosetta,
-} from "@/lib/utils/truthRosetta";
+import { getDisplayBlock, parseTruthNodeContentJson } from "@/lib/utils/truthRosetta";
 
 export interface ParsedNodeContent {
-  /** The core claim or thesis text. */
   assertion: string;
-  /** Logician's coherence score 0–100, or null if not present. */
   pulse: number | null;
-  /** Logician's rationale, or null. */
   rationale: string | null;
-  /** Scout's assumptions + falsification block, or null. */
   scoutWarning: string | null;
 }
 
@@ -25,10 +16,6 @@ const LOGICIAN_TAG = "[Logician's Pulse:";
 const RATIONALE_PREFIX = "Rationale: ";
 const SCOUT_START = "[The Scout's";
 
-/**
- * Parses raw node content (from truth_nodes.content) into structured fields.
- * Rosetta: always canonical English internally; UI locale picks merged block (fallback: English).
- */
 export function parseNodeContent(
   rawText: string,
   locale?: "he" | "en" | string
@@ -39,27 +26,22 @@ export function parseNodeContent(
   }
 
   if (raw.startsWith("{")) {
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      const norm = normalizeTruthRosetta(parsed);
-      if (norm) {
-        const ui = (locale ?? "en").toLowerCase();
-        const block = getRosettaBlockForUiLocale(norm, ui);
-        const assumptions = block.hiddenAssumptions?.length
-          ? block.hiddenAssumptions.join("\n• ")
-          : "";
-        const scoutWarning =
-          (assumptions ? `Hidden assumptions:\n• ${assumptions}\n\n` : "") +
-          (block.challengePrompt ? `Falsification prompt: ${block.challengePrompt}` : "");
-        return {
-          assertion: block.assertion.trim(),
-          pulse: norm.pulse,
-          rationale: block.reasoning?.trim() || null,
-          scoutWarning: scoutWarning.trim() || null,
-        };
-      }
-    } catch {
-      // Fall through to legacy/plain
+    const v2 = parseTruthNodeContentJson(raw);
+    if (v2) {
+      const ui = (locale ?? "en").toLowerCase();
+      const block = getDisplayBlock(v2, ui);
+      const assumptions = block.hiddenAssumptions?.length
+        ? block.hiddenAssumptions.join("\n• ")
+        : "";
+      const scoutWarning =
+        (assumptions ? `Hidden assumptions:\n• ${assumptions}\n\n` : "") +
+        (block.challengePrompt ? `Falsification prompt: ${block.challengePrompt}` : "");
+      return {
+        assertion: block.assertion.trim(),
+        pulse: v2.pulse ?? null,
+        rationale: block.reasoning?.trim() || null,
+        scoutWarning: scoutWarning.trim() || null,
+      };
     }
   }
 
@@ -110,17 +92,16 @@ export function parseNodeContent(
   };
 }
 
-/** Truncates text to max length with ellipsis. */
 export function truncateAssertion(text: string, maxLen: number = 180): string {
   const t = text.trim();
   if (t.length <= maxLen) return t;
   return t.slice(0, maxLen).trim() + "…";
 }
 
-/**
- * Returns the display assertion (or full content summary) for a node's content.
- */
-export function getDisplayAssertion(rawContent: string, locale: "he" | "en" | string = "en"): string {
+export function getDisplayAssertion(
+  rawContent: string,
+  locale: "he" | "en" | string = "en"
+): string {
   const parsed = parseNodeContent(rawContent, locale);
   return parsed.assertion || rawContent.slice(0, 200) + (rawContent.length > 200 ? "…" : "");
 }

@@ -5,6 +5,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getDisplayAssertion } from "@/lib/utils/truthParser";
+import {
+  DraftEpistemicNodeV2HeForgeSchema,
+  DraftEpistemicNodeV2LooseSchema,
+} from "@/lib/truth/rosettaSchemas";
+import { fixDraftRosettaV2Flip } from "@/lib/utils/truthRosetta";
 
 const RAG_MATCH_THRESHOLD = 0.5;
 const RAG_MATCH_COUNT = 5;
@@ -13,23 +18,8 @@ const RAG_MATCH_COUNT = 5;
 const MIN_MESSAGE_LENGTH_FOR_SCOUT = 20;
 
 // ---------------------------------------------------------------------------
-// Schemas (single source of truth)
+// Schemas (Rosetta Protocol V2)
 // ---------------------------------------------------------------------------
-
-const DraftEpistemicNodeSchema = z.object({
-  assertionEn: z.string().min(1).catch("Assertion unavailable"),
-  assertionHe: z.string().optional().catch(""),
-  logicalCoherenceScore: z.number().min(0).max(100).catch(50),
-  reasoningEn: z.string().optional().catch(""),
-  reasoningHe: z.string().optional().catch(""),
-  hiddenAssumptionsEn: z.array(z.string()).optional().catch([]),
-  hiddenAssumptionsHe: z.array(z.string()).optional().catch([]),
-  challengePromptEn: z.string().optional().catch(""),
-  challengePromptHe: z.string().optional().catch(""),
-  matchedExistingNodeId: z.string().nullable().optional().catch(null),
-  relationshipToContext: z.enum(["supports", "challenges"]).optional().catch("supports"),
-  thematicTags: z.array(z.string()).max(10).optional().catch([]),
-});
 
 /** LLM outputs only socraticMessage. Server injects existingNodesToDisplay and newDrafts in the tool execute result to avoid streaming hallucinations. */
 const EpistemicTriageSchema = z.object({
@@ -39,9 +29,6 @@ const EpistemicTriageSchema = z.object({
       "MANDATORY: Your warm, Socratic conversational response. Write your analysis and greeting here. Never leave empty."
     ),
 });
-
-/** Triage result shape: newDrafts is strictly at most one item (Single-Seed Protocol). */
-const TriageResultNewDraftsSchema = z.array(DraftEpistemicNodeSchema).max(1);
 
 /** Semantic Intent Router: classify user message to avoid RAG overriding draft requests. */
 const IntentSchema = z.object({
@@ -56,8 +43,8 @@ const IntentSchema = z.object({
     .describe("If intent is DRAFT_REQUEST, the exact claim they want to draft. Otherwise empty."),
 });
 
-type DraftEpistemicNode = z.infer<typeof DraftEpistemicNodeSchema>;
-type ExistingNodeDisplay = Array<{ id: string; assertionEn: string; assertionHe?: string }>;
+/** Weave portal lines: canonical (en) + localized (he) preview for chat UI. */
+type ExistingNodeDisplay = Array<{ id: string; enLine: string; heLine: string }>;
 type UserIntent = z.infer<typeof IntentSchema>["intent"];
 
 // ---------------------------------------------------------------------------
@@ -136,6 +123,9 @@ export async function POST(request: Request) {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const targetNodeContext = typeof body.targetNodeContext === "string" ? body.targetNodeContext.trim() : null;
   const locale = body.locale === "he" ? "he" : "en";
+  const drafterSchema = locale === "he" ? DraftEpistemicNodeV2HeForgeSchema : DraftEpistemicNodeV2LooseSchema;
+  const triageDraftArrSchema = z.array(drafterSchema).max(1);
+  type DraftEpistemicNode = z.infer<typeof drafterSchema>;
   const debateIntent = body.debateIntent === "supports" || body.debateIntent === "challenges" ? body.debateIntent : undefined;
 
   let debateOverride = "";
@@ -202,7 +192,7 @@ export async function POST(request: Request) {
 
   let existingMatches: ExistingNodeDisplay = [];
   let newClaimsToDraft: string[] = [];
-  let newDraftsInjected: DraftEpistemicNode[] = [];
+  let newDraftsInjected: DraftEpistemicNode[] = [] as DraftEpistemicNode[];
   const supabase = createServerSupabase();
 
   // ========== DRAFT_REQUEST: Bypass RAG/Splitter — feed extracted claim directly to Drafter Swarm ==========
@@ -252,8 +242,8 @@ export async function POST(request: Request) {
         telemetry.scoutMatches = matchList.length;
         existingMatches = matchList.map((m) => ({
           id: m.id,
-          assertionEn: getDisplayAssertion(m.content ?? "", "en"),
-          assertionHe: getDisplayAssertion(m.content ?? "", "he"),
+          enLine: getDisplayAssertion(m.content ?? "", "en"),
+          heLine: getDisplayAssertion(m.content ?? "", "he"),
         }));
       }
     } catch {
@@ -263,24 +253,31 @@ export async function POST(request: Request) {
 
   // ========== 2. DRAFTER SWARM: Logician (claim drafting only) ==========
   if (newClaimsToDraft.length > 0) {
+    const heBilingualIron =
+      locale === "he"
+        ? `
+IRON DISCIPLINE (Hebrew UI): source_locale MUST be exactly "he".
+You MUST fill local_translation with COMPLETE Hebrew: assertion, reasoning, hiddenAssumptions (array, use [] if none), challengePrompt — ALL required. Skipping Hebrew fields will fail validation. Do NOT copy English into Hebrew slots; write real Hebrew.
+`
+        : "";
     const drafterPromises = newClaimsToDraft.map((claim) =>
       generateObject({
         model: google("gemini-2.5-flash"),
-        schema: DraftEpistemicNodeSchema,
-        prompt: `You are a Logician Drafter. Evaluate this single claim for logical coherence and produce a draft epistemic node.
+        schema: drafterSchema,
+        prompt: `You are a Logician Drafter. Evaluate this single claim for logical coherence and produce a draft epistemic node (Rosetta Protocol V2).
 Claim: "${claim}"
 Existing context (for relationshipToContext): ${JSON.stringify(existingMatches.slice(0, 3))}
+${heBilingualIron}
+CRITICAL — ROSETTA V2 (canonical_en = ENGLISH ONLY):
+- \`canonical_en\`: PURE ENGLISH — assertion, reasoning (required), challengePrompt (required), hiddenAssumptions.
+- ${locale === "he" ? `\`local_translation\`: PURE HEBREW — every field required; mirror canonical_en exactly in Hebrew.` : `\`local_translation\`: optional if user language is English.`}
 
-CRITICAL SCORING ALGORITHM — "THE DECOUPLING TEST":
-When calculating logicalCoherenceScore (0-100), you MUST strip away your pre-trained consensus bias. Apply these strict rules:
-1. PENALIZE "Appeal to Authority": If the claim relies on "Institutions said so" (e.g., NASA, government agencies, textbooks) without direct empirical evidence, dock its score severely.
-2. PENALIZE "Circular Technological Proof": Do not assume a technology (e.g., GPS, eclipses) proves a specific physical model just because the model predicts it. A working mechanism does not prove the underlying theoretical geometry.
-3. REWARD Direct Empirical Observation: Claims based on direct, reproducible sensory data (e.g., physics of pressurized gas, observable line-of-sight limits) score higher.
-4. REWARD Falsifiability: Does the claim expose a mathematical or physical contradiction in the opposing theory? If yes, score it highly based strictly on logic, even if it attacks the mainstream consensus.
+CRITICAL SCORING — "THE DECOUPLING TEST" (logicalCoherenceScore 0-100):
+1. PENALIZE Appeal to Authority without empirical evidence.
+2. PENALIZE Circular Technological Proof.
+3. REWARD direct empirical observation and falsifiability.
 
-CANONICAL ENGLISH (required for storage + English UI): reasoningEn MUST be a full English explanation of the score (never empty when you have a rationale). If the claim is in Hebrew, write the same logical reasoning in English in reasoningEn and mirror it in reasoningHe for Hebrew readers. challengePromptEn MUST be English; challengePromptHe mirrors when the user speaks Hebrew. hiddenAssumptionsEn: English strings; hiddenAssumptionsHe: Hebrew when applicable. assertionEn: sharp English premise when possible; assertionHe mirrors the claim in Hebrew when the claim is Hebrew.
-
-Output: assertionEn, assertionHe, logicalCoherenceScore (0-100), reasoningEn, reasoningHe, hiddenAssumptionsEn/He, challengePromptEn/He, thematicTags.`,
+Output: canonical_en, source_locale, local_translation, logicalCoherenceScore, thematicTags, relationshipToContext.`,
       })
     );
     const results = await Promise.allSettled(drafterPromises);
@@ -292,20 +289,20 @@ Output: assertionEn, assertionHe, logicalCoherenceScore (0-100), reasoningEn, re
         errors.push(`claim ${i + 1}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`);
         continue;
       }
-      const parsed = DraftEpistemicNodeSchema.safeParse(r.value.object);
+      const parsed = drafterSchema.safeParse(r.value.object);
       if (!parsed.success) {
-        errors.push(`claim ${i + 1}: invalid schema`);
+        errors.push(`claim ${i + 1}: invalid schema — ${parsed.error.issues.map((x) => x.message).join("; ")}`);
         continue;
       }
-      drafts.push(parsed.data);
+      drafts.push(fixDraftRosettaV2Flip(parsed.data) as DraftEpistemicNode);
     }
     telemetry.drafterProcessed = newClaimsToDraft.length;
     telemetry.drafterPassed = drafts.length;
     if (errors.length > 0) telemetry.drafterErrors = errors;
-    newDraftsInjected = TriageResultNewDraftsSchema.parse(drafts);
+    newDraftsInjected = triageDraftArrSchema.parse(drafts);
   }
 
-  const newDraftsForTriage = TriageResultNewDraftsSchema.parse(newDraftsInjected);
+  const newDraftsForTriage = triageDraftArrSchema.parse(newDraftsInjected);
 
   // ========== 3. HANDOFF → Socrates (intent-specific system prompt) ==========
   let handoffBlock: string;

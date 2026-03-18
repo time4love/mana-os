@@ -17,6 +17,7 @@ import {
   SheetBody,
 } from "@/components/ui/sheet";
 import type { SieveProcessedClaim, SieveSupportedTheory, SieveTelemetry } from "@/types/truth";
+import { getDisplayBlock } from "@/lib/utils/truthRosetta";
 
 const LABELS = {
   trigger: { he: "הגש כתב טענות / תמלול", en: "Submit Claims / Transcript" },
@@ -57,8 +58,15 @@ interface SubmitClaimsDrawerProps {
 type Phase = "idle" | "processing" | "harvest";
 
 function getClaimAssertion(claim: SieveProcessedClaim, locale: "he" | "en"): string {
-  if (locale === "he" && claim.assertionHe.trim()) return claim.assertionHe;
-  return claim.assertionEn;
+  const sl = claim.source_locale.trim().toLowerCase();
+  return getDisplayBlock(
+    {
+      canonical_en: claim.canonical_en,
+      source_locale: claim.source_locale,
+      locales: claim.local_translation ? { [sl]: claim.local_translation } : {},
+    },
+    locale
+  ).assertion;
 }
 
 function buildSummary(

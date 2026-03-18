@@ -7,6 +7,7 @@ import { useAccount } from "wagmi";
 import { useLocale } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/button";
 import type { SieveProcessedClaim, SieveSupportedTheory } from "@/types/truth";
+import { getDisplayBlock } from "@/lib/utils/truthRosetta";
 
 const LABELS = {
   runSieve: { he: "הפעל נפה", en: "Run Sieve" },
@@ -31,9 +32,21 @@ interface TranscriptSieveProps {
 
 type Phase = "idle" | "processing" | "harvest";
 
+function claimContentV2(claim: SieveProcessedClaim) {
+  const sl = claim.source_locale.trim().toLowerCase();
+  return {
+    canonical_en: claim.canonical_en,
+    source_locale: claim.source_locale,
+    locales: claim.local_translation ? { [sl]: claim.local_translation } : {},
+  };
+}
+
 function getClaimAssertion(claim: SieveProcessedClaim, locale: "he" | "en"): string {
-  if (locale === "he" && claim.assertionHe.trim()) return claim.assertionHe;
-  return claim.assertionEn;
+  return getDisplayBlock(claimContentV2(claim), locale).assertion;
+}
+
+function getClaimReasoning(claim: SieveProcessedClaim, locale: "he" | "en"): string {
+  return getDisplayBlock(claimContentV2(claim), locale).reasoning ?? "";
 }
 
 export function TranscriptSieve({
@@ -326,9 +339,9 @@ function HarvestColumn({
                 {claim.logicalCoherenceScore}
               </span>
             </div>
-            {claim.reasoning.trim() && (
+            {getClaimReasoning(claim, locale).trim() && (
               <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
-                {claim.reasoning}
+                {getClaimReasoning(claim, locale)}
               </p>
             )}
           </motion.li>

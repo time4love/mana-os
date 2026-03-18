@@ -1,154 +1,200 @@
 /**
- * Truth Engine — multilingual Rosetta payload (canonical English + optional locale blocks).
- * Canonical `en` is required for embeddings, scoring, and cross-locale arena logic.
- * UI picks `locales[uiLocale]` merged over `en`; missing locale → show English (lingua franca).
+ * Rosetta Protocol V2 — canonical English + extensible locales; single display resolver.
  */
 
-export interface RosettaClaimBlock {
-  assertion: string;
-  reasoning: string;
-  hiddenAssumptions: string[];
-  challengePrompt: string;
+import type { RosettaBlock, TruthNodeContentV2 } from "@/types/truth";
+
+const HEBREW_SCRIPT = /[\u0590-\u05FF]/;
+
+/** Regex-level failsafe: LLM sometimes puts Hebrew in the "English" slot and English in the "local" slot. */
+export function fixBilingualFlipping(enText: string, heText: string): { enOut: string; heOut: string } {
+  const enStr = (enText ?? "").trim();
+  const heStr = (heText ?? "").trim();
+  const enHasHebrew = HEBREW_SCRIPT.test(enStr);
+  const heHasHebrew = HEBREW_SCRIPT.test(heStr);
+  if (enHasHebrew && !heHasHebrew && heStr.length > 0) {
+    return { enOut: heStr, heOut: enStr };
+  }
+  return { enOut: enStr, heOut: heStr };
 }
 
-export interface TruthRosettaNormalized {
-  schemaVersion: number;
-  pulse: number | null;
-  source_locale?: string;
-  en: RosettaClaimBlock;
-  locales: Record<string, RosettaClaimBlock>;
+export function fixBilingualArrayFlipping(
+  enArr: string[],
+  heArr: string[]
+): { enOut: string[]; heOut: string[] } {
+  const safeEn = Array.isArray(enArr) ? [...enArr] : [];
+  const safeHe = Array.isArray(heArr) ? [...heArr] : [];
+  const enHasHebrew = safeEn.some((s) => HEBREW_SCRIPT.test((s ?? "").trim()));
+  const heHasHebrew = safeHe.some((s) => HEBREW_SCRIPT.test((s ?? "").trim()));
+  if (enHasHebrew && !heHasHebrew && safeHe.length > 0) {
+    return { enOut: safeHe, heOut: safeEn };
+  }
+  return { enOut: safeEn, heOut: safeHe };
 }
 
-/** True when text is mostly Hebrew letters (LLM sometimes fills "English" slots with Hebrew). */
-export function isPrimarilyHebrewScript(text: string): boolean {
-  const t = text.trim();
-  if (t.length < 6) return false;
-  const he = (t.match(/[\u0590-\u05FF]/g) ?? []).length;
-  const lat = (t.match(/[a-zA-Z]/g) ?? []).length;
-  if (he < 8) return false;
-  return he >= lat;
+function primaryLine(block: RosettaBlock): string {
+  const a = (block.assertion ?? "").trim();
+  if (a.length > 0) return a;
+  return (block.reasoning ?? "").trim();
 }
 
 /**
- * English UI: never show Hebrew mistakenly stored in canonical `en` (rationale / scout).
- * Assertion may stay mixed until LLM always emits English in `en.assertion`.
+ * Rosetta V2 failsafe: if canonical_en reads as Hebrew and local_translation reads as Latin English, swap blocks.
  */
-export function sanitizeCanonicalBlockForEnglishUi(block: RosettaClaimBlock): RosettaClaimBlock {
-  return {
-    ...block,
-    reasoning: isPrimarilyHebrewScript(block.reasoning) ? "" : block.reasoning,
-    challengePrompt: isPrimarilyHebrewScript(block.challengePrompt) ? "" : block.challengePrompt,
-    hiddenAssumptions: block.hiddenAssumptions.filter((s) => !isPrimarilyHebrewScript(s)),
-  };
-}
-
-/** Move Hebrew-only EN-slot text into HE slot so `en` stays lingua-franca clean at rest. */
-export function partitionBilingualField(enVal: string, heVal: string): { enOut: string; heOut: string } {
-  let e = enVal.trim();
-  let h = heVal.trim();
-  if (isPrimarilyHebrewScript(e)) {
-    if (!h) h = e;
-    e = "";
+export function fixRosettaV2BlockFlip(
+  canonical_en: RosettaBlock,
+  local_translation: RosettaBlock | undefined
+): { canonical_en: RosettaBlock; local_translation?: RosettaBlock } {
+  if (!local_translation) {
+    return { canonical_en, local_translation };
   }
-  return { enOut: e, heOut: h };
+  const canon = primaryLine(canonical_en);
+  const local = primaryLine(local_translation);
+  if (!local) {
+    return { canonical_en, local_translation };
+  }
+  const canonHasHebrew = HEBREW_SCRIPT.test(canon);
+  const localHasHebrew = HEBREW_SCRIPT.test(local);
+  const localLooksLatin = /[a-zA-Z]{3,}/.test(local);
+  if (canonHasHebrew && !localHasHebrew && localLooksLatin) {
+    return { canonical_en: local_translation, local_translation: canonical_en };
+  }
+  return { canonical_en, local_translation };
 }
 
-function asBlock(raw: unknown): RosettaClaimBlock {
+export type DraftLikeForFlip = {
+  canonical_en: RosettaBlock;
+  local_translation?: RosettaBlock;
+  competingTheories?: Array<{ canonical_en: RosettaBlock; local_translation?: RosettaBlock }>;
+};
+
+export function fixDraftRosettaV2Flip<T extends DraftLikeForFlip>(draft: T): T {
+  const top = fixRosettaV2BlockFlip(draft.canonical_en, draft.local_translation);
+  let competing = draft.competingTheories;
+  if (Array.isArray(competing) && competing.length > 0) {
+    competing = competing.map((ct) => {
+      const f = fixRosettaV2BlockFlip(ct.canonical_en, ct.local_translation);
+      return { ...ct, canonical_en: f.canonical_en, local_translation: f.local_translation };
+    });
+  }
+  return { ...draft, ...top, competingTheories: competing };
+}
+
+function normalizeBlock(raw: unknown): RosettaBlock {
   if (!raw || typeof raw !== "object") {
-    return { assertion: "", reasoning: "", hiddenAssumptions: [], challengePrompt: "" };
+    return { assertion: "" };
   }
   const o = raw as Record<string, unknown>;
   const assumptions = o.hiddenAssumptions;
   return {
     assertion: typeof o.assertion === "string" ? o.assertion : "",
-    reasoning: typeof o.reasoning === "string" ? o.reasoning : "",
+    reasoning: typeof o.reasoning === "string" ? o.reasoning : undefined,
     hiddenAssumptions: Array.isArray(assumptions)
       ? assumptions.filter((x): x is string => typeof x === "string")
-      : [],
-    challengePrompt: typeof o.challengePrompt === "string" ? o.challengePrompt : "",
+      : undefined,
+    challengePrompt: typeof o.challengePrompt === "string" ? o.challengePrompt : undefined,
   };
 }
 
+function normalizeLocales(raw: unknown): Record<string, RosettaBlock> {
+  const out: Record<string, RosettaBlock> = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (const [code, block] of Object.entries(raw as Record<string, unknown>)) {
+    const k = code.trim().toLowerCase();
+    if (k) out[k] = normalizeBlock(block);
+  }
+  return out;
+}
+
+/** Parsed stored node content (JSONB string → object). */
+export interface TruthNodeStoredV2 extends TruthNodeContentV2 {
+  schemaVersion: 2;
+  pulse?: number;
+}
+
+export function parseTruthNodeContentJson(raw: string): TruthNodeStoredV2 | null {
+  const t = typeof raw === "string" ? raw.trim() : "";
+  if (!t.startsWith("{")) return null;
+  try {
+    const p = JSON.parse(t) as Record<string, unknown>;
+    if (!p.canonical_en || typeof p.canonical_en !== "object") return null;
+    const pulse =
+      typeof p.pulse === "number" && Number.isFinite(p.pulse)
+        ? Math.min(100, Math.max(0, p.pulse))
+        : undefined;
+    return {
+      schemaVersion: 2,
+      canonical_en: normalizeBlock(p.canonical_en),
+      source_locale: typeof p.source_locale === "string" ? p.source_locale.trim() : "en",
+      locales: normalizeLocales(p.locales),
+      pulse,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Accepts legacy `{ en, he }` or v2 `{ schemaVersion, en, locales, source_locale }`.
+ * Resolves the block to display for UI locale. Falls back to canonical English.
  */
-export function normalizeTruthRosetta(parsed: unknown): TruthRosettaNormalized | null {
-  if (!parsed || typeof parsed !== "object") return null;
-  const p = parsed as Record<string, unknown>;
-  if (!p.en || typeof p.en !== "object") return null;
-
-  const en = asBlock(p.en);
-  const locales: Record<string, RosettaClaimBlock> = {};
-
-  if (p.locales && typeof p.locales === "object" && !Array.isArray(p.locales)) {
-    for (const [code, block] of Object.entries(p.locales as Record<string, unknown>)) {
-      const k = code.trim().toLowerCase();
-      if (k) locales[k] = asBlock(block);
+export function getDisplayBlock(
+  content: TruthNodeContentV2 | Record<string, unknown> | null | undefined,
+  uiLocale: string
+): RosettaBlock & { isFallback: boolean } {
+  const code = (uiLocale || "en").trim().toLowerCase();
+  if (!content || typeof content !== "object") {
+    return { assertion: "Content unavailable", isFallback: true };
+  }
+  const c = content as Record<string, unknown>;
+  const locales = c.locales as Record<string, unknown> | undefined;
+  if (locales && typeof locales === "object" && !Array.isArray(locales)) {
+    const block = locales[code] ?? locales[uiLocale.trim()];
+    if (block && typeof block === "object") {
+      const b = normalizeBlock(block);
+      if (b.assertion.trim()) {
+        return { ...b, isFallback: false };
+      }
     }
   }
-  if (p.he && typeof p.he === "object" && !locales.he) {
-    locales.he = asBlock(p.he);
+  if (c.canonical_en && typeof c.canonical_en === "object") {
+    const b = normalizeBlock(c.canonical_en);
+    if (b.assertion.trim()) {
+      return { ...b, isFallback: code !== "en" };
+    }
   }
-
-  const pulse =
-    typeof p.pulse === "number" && Number.isFinite(p.pulse)
-      ? Math.min(100, Math.max(0, p.pulse))
-      : null;
-  const schemaVersion = typeof p.schemaVersion === "number" ? p.schemaVersion : 1;
-  const source_locale = typeof p.source_locale === "string" ? p.source_locale.trim() : undefined;
-
-  return { schemaVersion, pulse, source_locale, en, locales };
+  return { assertion: "Content unavailable", isFallback: true };
 }
 
-function pickField(local: string, canonical: string): string {
-  const t = local.trim();
-  return t.length > 0 ? t : canonical.trim();
+/** Embedding text: universal English core only. */
+export function embeddingTextFromCanonical(block: RosettaBlock): string {
+  const a = block.assertion.trim();
+  const r = (block.reasoning ?? "").trim();
+  return r ? `${a}\n${r}` : a;
 }
 
-/** Merge localized strings over canonical; empty local field falls back to English. */
-export function mergeRosettaBlockForLocale(
-  canonical: RosettaClaimBlock,
-  localized: RosettaClaimBlock | undefined
-): RosettaClaimBlock {
-  if (!localized) return canonical;
-  return {
-    assertion: pickField(localized.assertion, canonical.assertion),
-    reasoning: pickField(localized.reasoning, canonical.reasoning),
-    hiddenAssumptions:
-      localized.hiddenAssumptions.length > 0
-        ? localized.hiddenAssumptions
-        : canonical.hiddenAssumptions,
-    challengePrompt: pickField(localized.challengePrompt, canonical.challengePrompt),
-  };
-}
-
-/**
- * Block to show for UI locale. Unknown locale or missing translation → canonical English.
- */
-export function getRosettaBlockForUiLocale(
-  normalized: TruthRosettaNormalized,
-  uiLocale: string
-): RosettaClaimBlock {
-  const code = uiLocale.trim().toLowerCase();
-  if (code === "en" || code === "") {
-    return sanitizeCanonicalBlockForEnglishUi({ ...normalized.en });
-  }
-  const localized = normalized.locales[code] ?? normalized.locales[uiLocale.trim()];
-  return mergeRosettaBlockForLocale(normalized.en, localized);
-}
-
-/** Serialize v2 payload for truth_nodes.content (Forge anchor). */
-export function buildRosettaJsonV2(input: {
-  pulse: number;
-  source_locale: string;
-  en: RosettaClaimBlock;
-  locales: Record<string, RosettaClaimBlock>;
-}): string {
+export function truthNodeContentV2ToJson(
+  body: TruthNodeContentV2 & { pulse?: number }
+): string {
   return JSON.stringify({
     schemaVersion: 2,
-    pulse: input.pulse,
-    source_locale: input.source_locale,
-    en: input.en,
-    locales: input.locales,
+    canonical_en: body.canonical_en,
+    source_locale: body.source_locale,
+    locales: body.locales,
+    ...(typeof body.pulse === "number" ? { pulse: body.pulse } : {}),
   });
+}
+
+/** Stored competing theory row (metadata.competingTheories[]). */
+export function competingTheoryDisplayAssertion(
+  theory: { canonical_en: RosettaBlock; locales: Record<string, RosettaBlock> },
+  uiLocale: string
+): string {
+  return getDisplayBlock(
+    {
+      canonical_en: theory.canonical_en,
+      source_locale: "en",
+      locales: theory.locales,
+    },
+    uiLocale
+  ).assertion;
 }

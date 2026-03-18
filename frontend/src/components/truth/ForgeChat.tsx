@@ -366,8 +366,7 @@ export function ForgeChat({
   const isLoading = status === "submitted" || status === "streaming";
 
   const draftsToRender = useMemo(
-    (): Array<ForgeDraft & { matchedExistingNodeId?: string | null }> =>
-      extractDraftsFromMessages(messages),
+    (): Array<ForgeDraft & { matchedExistingNodeId?: string | null }> => extractDraftsFromMessages(messages),
     [messages]
   );
 
@@ -382,8 +381,13 @@ export function ForgeChat({
     setIsAnchoring(true);
     const dynamicRelationship = draft.relationshipToContext ?? relationship ?? "supports";
     const normalizedDraft = {
-      ...draft,
+      canonical_en: draft.canonical_en,
+      source_locale: draft.source_locale,
+      local_translation: draft.local_translation,
+      logicalCoherenceScore: draft.logicalCoherenceScore,
       thematicTags: draft.thematicTags ?? [],
+      relationshipToContext: draft.relationshipToContext,
+      competingTheories: draft.competingTheories,
     };
     const result = await anchorForgeDraft(
       normalizedDraft,
@@ -479,13 +483,13 @@ export function ForgeChat({
                         output?: {
                           triage?: {
                             socraticMessage?: string;
-                            existingNodesToDisplay?: Array<{ id: string; assertionEn?: string; assertionHe?: string }>;
+                            existingNodesToDisplay?: Array<{ id: string; enLine?: string; heLine?: string }>;
                             newDrafts?: Array<Record<string, unknown>>;
                           };
                         };
                         input?: {
                           socraticMessage?: string;
-                          existingNodesToDisplay?: Array<{ id: string; assertionEn?: string; assertionHe?: string }>;
+                          existingNodesToDisplay?: Array<{ id: string; enLine?: string; heLine?: string }>;
                           newDrafts?: Array<Record<string, unknown>>;
                         };
                       };
@@ -516,14 +520,17 @@ export function ForgeChat({
                       const socraticMessage = ((triage?.socraticMessage ?? "") as string).trim();
                       const existingNodes = (triage?.existingNodesToDisplay ?? []) as Array<{
                         id: string;
-                        assertionEn?: string;
-                        assertionHe?: string;
+                        enLine?: string;
+                        heLine?: string;
                       }>;
                       const triageNewDrafts = (triage?.newDrafts ?? []) as Array<Record<string, unknown>>;
                       const hasPortals = existingNodes.length > 0;
                       const hasDrafts =
                         triageNewDrafts.length > 0 &&
-                        triageNewDrafts.some((d) => (d.assertionEn as string)?.trim());
+                        triageNewDrafts.some((d) => {
+                          const ce = d?.canonical_en as { assertion?: string } | undefined;
+                          return typeof ce?.assertion === "string" && ce.assertion.trim();
+                        });
 
                       const { isPending, isError, errorText } = getToolPartState(partLike);
                       if (socraticMessage || hasPortals || hasDrafts || (isPending && !hasDrafts) || isError) {
@@ -551,7 +558,7 @@ export function ForgeChat({
                                   className="flex flex-col gap-2 p-3 bg-background rounded-lg shadow-sm border border-border/50 min-w-0 overflow-hidden"
                                 >
                                   <p className="text-xs text-muted-foreground line-clamp-2 italic break-words">
-                                    &quot;{node.assertionHe || node.assertionEn || ""}&quot;
+                                    &quot;{(locale === "he" ? node.heLine : node.enLine) || node.enLine || ""}&quot;
                                   </p>
                                   <Link
                                     href={`/truth/node/${node.id}`}
@@ -637,10 +644,11 @@ export function ForgeChat({
             >
               {draftsToRender.map((claim, idx) => {
                 const draft = claim as ForgeDraft;
-                const isThisDuplicate = duplicateDraft?.assertionEn === draft.assertionEn;
+                const isThisDuplicate =
+                  duplicateDraft?.canonical_en?.assertion === draft.canonical_en?.assertion;
                 return (
                   <DraftNodeCard
-                    key={`${draft.assertionEn.slice(0, 40)}-${idx}`}
+                    key={`${draft.canonical_en.assertion.slice(0, 40)}-${idx}`}
                     draft={draft}
                     onAnchor={() => handleAnchor(draft, false)}
                     isAnchoring={isAnchoring}

@@ -34,13 +34,14 @@ export async function syncConstellationMap(themeTag: string, newNodeContext: str
 
   const supabase = createServerSupabase();
 
-  const { data: existing } = await supabase
+  const { data: existingRaw } = await supabase
     .from("epistemic_constellations")
     .select("id, living_summary")
     .eq("theme_name", themeName)
     .maybeSingle();
 
-  const currentSummary = (existing?.living_summary as string | undefined)?.trim() ?? "";
+  const existing = existingRaw as { id?: string; living_summary?: string } | null;
+  const currentSummary = (existing?.living_summary)?.trim() ?? "";
   const newContext = newNodeContext?.trim().slice(0, 12000) ?? "";
 
   const prompt = currentSummary
@@ -71,7 +72,7 @@ export async function syncConstellationMap(themeTag: string, newNodeContext: str
     await supabase
       .from("epistemic_constellations")
       .update({ living_summary: livingSummary, embedding, updated_at: updatedAt } as never)
-      .eq("id", existing.id);
+      .eq("id", existing.id as string);
   } else {
     await supabase.from("epistemic_constellations").insert({
       theme_name: themeName,

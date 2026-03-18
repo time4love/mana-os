@@ -5,31 +5,15 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getDisplayAssertion } from "@/lib/utils/truthParser";
+import {
+  DraftEpistemicNodeV2HeArenaSchema,
+  DraftEpistemicNodeV2LooseSchema,
+} from "@/lib/truth/rosettaSchemas";
+import { fixDraftRosettaV2Flip } from "@/lib/utils/truthRosetta";
 
 // ---------------------------------------------------------------------------
-// Schemas (Arena: single draft card, score 50, macro-arena tag)
+// Schemas (Arena — Rosetta V2, macro-arena)
 // ---------------------------------------------------------------------------
-
-const CompetingTheorySchema = z.object({
-  assertionEn: z.string().min(1),
-  assertionHe: z.string().optional().catch(""),
-});
-
-const DraftEpistemicNodeSchema = z.object({
-  assertionEn: z.string().min(1).catch("Assertion unavailable"),
-  assertionHe: z.string().optional().catch(""),
-  logicalCoherenceScore: z.number().min(0).max(100).catch(50),
-  reasoningEn: z.string().optional().catch(""),
-  reasoningHe: z.string().optional().catch(""),
-  hiddenAssumptionsEn: z.array(z.string()).optional().catch([]),
-  hiddenAssumptionsHe: z.array(z.string()).optional().catch([]),
-  challengePromptEn: z.string().optional().catch(""),
-  challengePromptHe: z.string().optional().catch(""),
-  matchedExistingNodeId: z.string().nullable().optional().catch(null),
-  relationshipToContext: z.enum(["supports", "challenges"]).optional().catch("supports"),
-  thematicTags: z.array(z.string()).max(10).optional().catch([]),
-  competingTheories: z.array(CompetingTheorySchema).max(2).optional(),
-});
 
 const EpistemicTriageSchema = z.object({
   socraticMessage: z
@@ -39,36 +23,35 @@ const EpistemicTriageSchema = z.object({
     ),
 });
 
-const TriageResultNewDraftsSchema = z.array(DraftEpistemicNodeSchema).max(1);
-
-type DraftEpistemicNode = z.infer<typeof DraftEpistemicNodeSchema>;
 
 // ---------------------------------------------------------------------------
 // Arena Drafter: neutral root title only (no RAG, no intent router)
 // ---------------------------------------------------------------------------
 
-const ARENA_DRAFTER_PROMPT = (topic: string) => `You are the Arena Architect of Mana OS. The user wants to establish a new Macro-Arena for debate.
+const ARENA_DRAFTER_PROMPT = (topic: string, hebrewStrict: boolean) =>
+  hebrewStrict
+    ? `You are the Arena Architect (Rosetta V2, Hebrew UI — IRON DISCIPLINE).
 
-Your task is to extract THREE things from their request:
-1. The neutral Root Question of the arena (e.g. "What is the shape of the Earth?").
-2. Theory A: The first main competing theory/answer.
-3. Theory B: The second main competing theory/answer.
+Topic: "${topic}"
 
-Topic or request: "${topic}"
+Output MUST satisfy strict JSON:
+- source_locale: exactly "he"
+- canonical_en: FULL English block — assertion, reasoning (min 1 sentence), challengePrompt (min 1 sentence), hiddenAssumptions (array, [] if none)
+- local_translation: FULL Hebrew mirror of canonical_en — same four fields, all real Hebrew (never copy-paste English)
+- logicalCoherenceScore: 50
+- thematicTags: include "macro-arena"
+- relationshipToContext: "supports"
+- competingTheories: EXACTLY 2 entries. Each entry: canonical_en (full English block) + local_translation (full Hebrew block). Every reasoning and challengePrompt required in BOTH languages.`
+    : `You are the Arena Architect (Rosetta V2).
 
-Output requirements:
-- assertionEn & assertionHe: The neutral root question only (no theory text here).
-- thematicTags: MUST include "macro-arena". Add 1–2 other broad themes if relevant (e.g. Cosmology, Education).
-- logicalCoherenceScore: 50 (system placeholder; the Arena is an open question and has no logical score).
-- competingTheories: An array of EXACTLY 2 objects representing the opposing theories. Example:
-  [
-    { assertionEn: "The Earth is a spherical globe.", assertionHe: "הארץ היא כדור." },
-    { assertionEn: "The Earth is a flat plane.", assertionHe: "הארץ היא מישור שטוח." }
-  ]
-- relationshipToContext: "supports".
-- reasoningEn, reasoningHe, hiddenAssumptionsEn/He, challengePromptEn/He: empty or one-line.
+Topic: "${topic}"
 
-Do not ask for permission. Output the JSON so the UI can render the complete Arena card with the question and the two theories.`;
+- canonical_en: English root question + reasoning + challengePrompt
+- source_locale: "en"
+- local_translation: optional
+- competingTheories: 2 theories, English in canonical_en
+- thematicTags: include "macro-arena"
+- logicalCoherenceScore: 50, relationshipToContext: "supports"`;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -131,7 +114,7 @@ export async function POST(request: Request) {
   // ---------------------------------------------------------------------------
   // Arena Scout (RAG): deduplication — only macro roots (existing arenas)
   // ---------------------------------------------------------------------------
-  type ExistingNodeDisplay = Array<{ id: string; assertionEn: string; assertionHe?: string }>;
+  type ExistingNodeDisplay = Array<{ id: string; enLine: string; heLine: string }>;
   let existingMatches: ExistingNodeDisplay = [];
 
   if (topic.length > 0) {
@@ -158,12 +141,14 @@ export async function POST(request: Request) {
             .in("id", matchList.map((m) => m.id))
             .eq("is_macro_root", true);
 
-          const macroIds = new Set((macroRows ?? []).map((r) => r.id));
+          const macroIds = new Set(
+            ((macroRows ?? []) as { id: string }[]).map((r) => r.id)
+          );
           const arenaMatches = matchList.filter((m) => macroIds.has(m.id));
           existingMatches = arenaMatches.map((m) => ({
             id: m.id,
-            assertionEn: getDisplayAssertion(m.content ?? "", "en"),
-            assertionHe: getDisplayAssertion(m.content ?? "", "he"),
+            enLine: getDisplayAssertion(m.content ?? "", "en"),
+            heLine: getDisplayAssertion(m.content ?? "", "he"),
           }));
         }
       }
@@ -172,29 +157,32 @@ export async function POST(request: Request) {
     }
   }
 
+  const arenaDrafterSchema =
+    locale === "he" ? DraftEpistemicNodeV2HeArenaSchema : DraftEpistemicNodeV2LooseSchema;
+  const arenaTriageArr = z.array(arenaDrafterSchema).max(1);
+  type ArenaDraft = z.infer<typeof arenaDrafterSchema>;
+
   // ---------------------------------------------------------------------------
   // Draft generation only when NO similar arena exists
   // ---------------------------------------------------------------------------
-  let newDraftsForTriage: DraftEpistemicNode[] = [];
+  let newDraftsForTriage: ArenaDraft[] = [];
 
   if (topic.length > 0 && existingMatches.length === 0) {
     try {
       const result = await generateObject({
         model: google("gemini-2.5-flash"),
-        schema: DraftEpistemicNodeSchema,
-        prompt: ARENA_DRAFTER_PROMPT(topic),
+        schema: arenaDrafterSchema,
+        prompt: ARENA_DRAFTER_PROMPT(topic, locale === "he"),
       });
-      const draft = DraftEpistemicNodeSchema.parse(result.object);
+      const draft = arenaDrafterSchema.parse(result.object);
+      const flipped = fixDraftRosettaV2Flip(draft);
+      const tags = (flipped as { thematicTags?: string[] }).thematicTags ?? [];
       const normalized = {
-        ...draft,
+        ...flipped,
         logicalCoherenceScore: 50,
-        thematicTags: [...new Set([...(draft.thematicTags ?? []), "macro-arena"])],
-        competingTheories:
-          Array.isArray(draft.competingTheories) && draft.competingTheories.length === 2
-            ? draft.competingTheories
-            : undefined,
+        thematicTags: [...new Set([...tags, "macro-arena"])],
       };
-      newDraftsForTriage = TriageResultNewDraftsSchema.parse([normalized]);
+      newDraftsForTriage = arenaTriageArr.parse([normalized]);
     } catch {
       newDraftsForTriage = [];
     }

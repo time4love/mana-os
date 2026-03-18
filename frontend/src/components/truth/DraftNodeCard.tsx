@@ -9,7 +9,7 @@ import { useLocale } from "@/lib/i18n/context";
 import { getLocalized } from "@/components/truth/forgeChatLib";
 import { getDisplayAssertion } from "@/lib/utils/truthParser";
 import type { MatchTruthNodeResult } from "@/types/truth";
-import type { ForgeDraftBilingual } from "@/types/truth";
+import type { DraftEpistemicNodeV2, RosettaBlock } from "@/types/truth";
 
 const ANCHOR_CTA = {
   he: "עגן טיעון למארג",
@@ -46,8 +46,35 @@ const REVIEW_EXISTING = { he: "עיין או הדהד בשורש הקיים", en
 const DETAILS_LABEL = { he: "פרטים", en: "Details" };
 const ANCHORING_LABEL = { he: "עוגן…", en: "Anchoring…" };
 
-/** Bilingual Forge draft (Rosetta): display uses locale; vector uses assertionEn. */
-export type ForgeDraft = ForgeDraftBilingual;
+export type ForgeDraft = DraftEpistemicNodeV2;
+
+function pickDisplayBlock(
+  draft: DraftEpistemicNodeV2,
+  locale: string
+): RosettaBlock & { isFallback: boolean } {
+  const isHeUi = locale === "he";
+  const src = (draft.source_locale ?? "en").toLowerCase();
+  const lt = draft.local_translation;
+  if (isHeUi && src === "he" && lt?.assertion?.trim()) {
+    return { ...lt, isFallback: false };
+  }
+  if (isHeUi && lt?.assertion?.trim()) {
+    return { ...lt, isFallback: false };
+  }
+  if (isHeUi) {
+    return { ...draft.canonical_en, isFallback: true };
+  }
+  return { ...draft.canonical_en, isFallback: false };
+}
+
+function theoryAssertion(
+  t: NonNullable<DraftEpistemicNodeV2["competingTheories"]>[0],
+  locale: string
+): string {
+  const isHe = locale === "he";
+  if (isHe && t.local_translation?.assertion?.trim()) return t.local_translation.assertion;
+  return t.canonical_en.assertion;
+}
 
 const PORTAL_EXISTING_CTA = {
   he: "👉 הטיעון קיים במארג - צלול לדיון",
@@ -66,15 +93,10 @@ interface DraftNodeCardProps {
   authorWallet: string;
   parentId?: string;
   relationship?: "supports" | "challenges" | "ai_analysis";
-  /** When set (Epistemic Triage): this claim matches an existing node; show portal link and hide Anchor. */
   matchedExistingNodeId?: string | null;
-  /** When set, anchor was blocked by semantic dedup; show warning + links and force-plant option. */
   semanticDuplicates?: MatchTruthNodeResult[] | null;
-  /** Call to anchor with forceBypass (plant new seed despite similar existing nodes). */
   onForcePlant?: () => void;
-  /** Backend write pipeline telemetry (anchor steps); shown in Architect mode or when present. */
   writeTelemetry?: string[] | null;
-  /** When true, show write telemetry terminal even if only for dev visibility. */
   isArchitectMode?: boolean;
 }
 
@@ -105,12 +127,12 @@ export function DraftNodeCard({
   }, [semanticDuplicates]);
 
   const isMacroArena = draft.thematicTags?.includes("macro-arena");
-
-  const assertion = (locale === "he" && (draft.assertionHe ?? "").trim()) ? (draft.assertionHe ?? "").trim() : (draft.assertionEn ?? "").trim();
-  const reasoning = (locale === "he" && (draft.reasoningHe ?? "").trim()) ? (draft.reasoningHe ?? "").trim() : (draft.reasoningEn ?? "").trim();
-  const hiddenAssumptions = (locale === "he" && (draft.hiddenAssumptionsHe ?? []).length > 0) ? (draft.hiddenAssumptionsHe ?? []) : (draft.hiddenAssumptionsEn ?? []);
-  const challengePrompt = (locale === "he" && (draft.challengePromptHe ?? "").trim()) ? (draft.challengePromptHe ?? "").trim() : (draft.challengePromptEn ?? "").trim();
-  const hasDetails = reasoning || (hiddenAssumptions?.length ?? 0) > 0 || challengePrompt;
+  const display = pickDisplayBlock(draft, locale);
+  const assertion = display.assertion;
+  const reasoning = display.reasoning ?? "";
+  const hiddenAssumptions = display.hiddenAssumptions ?? [];
+  const challengePrompt = display.challengePrompt ?? "";
+  const hasDetails = reasoning || hiddenAssumptions.length > 0 || challengePrompt;
 
   const anchorLabel = isMacroArena ? getLocalized(ARENA_CTA, locale) : getLocalized(ANCHOR_CTA, locale);
   const macroArenaBadgeLabel = getLocalized(MACRO_ARENA_BADGE, locale);
@@ -167,9 +189,16 @@ export function DraftNodeCard({
             )}
           </div>
         ) : null}
-        <p className="text-lg font-medium text-foreground leading-relaxed">
-          {assertion}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-lg font-medium text-foreground leading-relaxed flex-1 min-w-0">
+            {assertion}
+          </p>
+          {display.isFallback && (
+            <span className="text-[10px] shrink-0 bg-secondary text-muted-foreground px-2 py-0.5 rounded-full">
+              {locale === "he" ? "מוצג באנגלית" : "Shown in English"}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {!isMacroArena && (
             <span
@@ -203,12 +232,12 @@ export function DraftNodeCard({
                 <p className="text-sm text-foreground leading-relaxed">{reasoning}</p>
               </div>
             )}
-            {(hiddenAssumptions?.length > 0 || challengePrompt) && (
+            {(hiddenAssumptions.length > 0 || challengePrompt) && (
               <div className="rounded-lg border border-amber-200/70 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2">
                 <p className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-1">
                   {scoutLabel}
                 </p>
-                {hiddenAssumptions?.length > 0 && (
+                {hiddenAssumptions.length > 0 && (
                   <ul className="list-disc list-inside text-xs text-amber-900/90 dark:text-amber-100/90 mb-1">
                     {hiddenAssumptions.map((a, i) => (
                       <li key={i}>{a}</li>
@@ -216,9 +245,7 @@ export function DraftNodeCard({
                   </ul>
                 )}
                 {challengePrompt && (
-                  <p className="text-xs text-amber-900/90 dark:text-amber-100/90">
-                    {challengePrompt}
-                  </p>
+                  <p className="text-xs text-amber-900/90 dark:text-amber-100/90">{challengePrompt}</p>
                 )}
               </div>
             )}
@@ -234,7 +261,7 @@ export function DraftNodeCard({
                 {locale === "he" ? "תיאוריה א'" : "Theory A"}
               </span>
               <p className="text-sm font-medium text-foreground">
-                {locale === "he" ? draft.competingTheories[0].assertionHe : draft.competingTheories[0].assertionEn}
+                {theoryAssertion(draft.competingTheories[0], locale)}
               </p>
             </div>
             <div className="rounded-md border border-border bg-muted/40 p-3 ring-1 ring-inset ring-border/30 text-center shadow-soft">
@@ -242,7 +269,7 @@ export function DraftNodeCard({
                 {locale === "he" ? "תיאוריה ב'" : "Theory B"}
               </span>
               <p className="text-sm font-medium text-foreground">
-                {locale === "he" ? draft.competingTheories[1].assertionHe : draft.competingTheories[1].assertionEn}
+                {theoryAssertion(draft.competingTheories[1], locale)}
               </p>
             </div>
           </div>
@@ -261,15 +288,15 @@ export function DraftNodeCard({
             </p>
             <ul className="space-y-2 text-start">
               {resonanceBlock.duplicates.map((dup) => {
-                const display = getDisplayAssertion(dup.content, locale);
+                const displayDup = getDisplayAssertion(dup.content, locale);
                 return (
                   <li key={dup.id}>
                     <Link
                       href={`/truth/node/${dup.id}`}
                       className="text-sm text-primary hover:underline font-medium block"
                     >
-                      {display.slice(0, 120)}
-                      {display.length > 120 ? "…" : ""}
+                      {displayDup.slice(0, 120)}
+                      {displayDup.length > 120 ? "…" : ""}
                     </Link>
                     <span className="text-xs text-muted-foreground ms-1" title={reviewLabel}>
                       → /truth/node/{dup.id.slice(0, 8)}…
@@ -313,35 +340,37 @@ export function DraftNodeCard({
             </Button>
           </div>
         )}
-        {Array.isArray(writeTelemetry) && writeTelemetry.length > 0 && (isArchitectMode || writeTelemetry.some((l) => l.startsWith("[CRITICAL]"))) && (
-          <div className="rounded-lg border border-border overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setTelemetryOpen((o) => !o)}
-              className="w-full flex items-center justify-between px-3 py-2 bg-muted text-muted-foreground font-mono text-xs text-start hover:bg-muted/80"
-              aria-expanded={telemetryOpen}
-            >
-              <span className="text-primary font-semibold">
-                [Write Telemetry] {writeTelemetry.length} line(s)
-              </span>
-              <span aria-hidden>{telemetryOpen ? "−" : "+"}</span>
-            </button>
-            {telemetryOpen && (
-              <pre
-                className="p-3 bg-background text-primary font-mono text-xs leading-relaxed overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-words border-t border-border"
-                role="log"
-                aria-label="Backend anchor pipeline telemetry"
+        {Array.isArray(writeTelemetry) &&
+          writeTelemetry.length > 0 &&
+          (isArchitectMode || writeTelemetry.some((l) => l.startsWith("[CRITICAL]"))) && (
+            <div className="rounded-lg border border-border overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setTelemetryOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-muted text-muted-foreground font-mono text-xs text-start hover:bg-muted/80"
+                aria-expanded={telemetryOpen}
               >
-                {writeTelemetry.map((line, i) => (
-                  <span key={i} className={line.startsWith("[CRITICAL]") ? "text-destructive" : undefined}>
-                    {line}
-                    {"\n"}
-                  </span>
-                ))}
-              </pre>
-            )}
-          </div>
-        )}
+                <span className="text-primary font-semibold">
+                  [Write Telemetry] {writeTelemetry.length} line(s)
+                </span>
+                <span aria-hidden>{telemetryOpen ? "−" : "+"}</span>
+              </button>
+              {telemetryOpen && (
+                <pre
+                  className="p-3 bg-background text-primary font-mono text-xs leading-relaxed overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-words border-t border-border"
+                  role="log"
+                  aria-label="Backend anchor pipeline telemetry"
+                >
+                  {writeTelemetry.map((line, i) => (
+                    <span key={i} className={line.startsWith("[CRITICAL]") ? "text-destructive" : undefined}>
+                      {line}
+                      {"\n"}
+                    </span>
+                  ))}
+                </pre>
+              )}
+            </div>
+          )}
       </div>
     </motion.div>
   );

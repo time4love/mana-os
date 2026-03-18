@@ -6,7 +6,7 @@
  * Does NOT write to DB; returns processed claims for the Harvest Dashboard.
  *
  * Body: { transcript, arenaId, theoryA, theoryB, locale? }
- * Rosetta Protocol: assertionEn = Universal English (vector math); assertionHe = display in user language.
+ * Rosetta Protocol V2: canonical_en for vectors; locales for display.
  */
 
 import { NextResponse } from "next/server";
@@ -15,8 +15,14 @@ import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { SieveProcessedClaim, SieveSupportedTheory, SieveTelemetry } from "@/types/truth";
+import {
+  CanonicalRosettaBlockStrictSchema,
+  LocalRosettaBlockSchema,
+  LocalRosettaBlockStrictSchema,
+} from "@/lib/truth/rosettaSchemas";
+import { embeddingTextFromCanonical, fixRosettaV2BlockFlip } from "@/lib/utils/truthRosetta";
 
-/** English-to-English semantic match (Rosetta Protocol: DB vectors are assertionEn). */
+/** English-to-English semantic match on canonical_en. */
 const SIEVE_SCOUT_THRESHOLD = 0.8;
 const SIEVE_SCOUT_MATCH_COUNT = 1;
 
@@ -64,17 +70,26 @@ function localeToUserLanguage(locale: string): string {
   }
 }
 
-const LogicianAlignerSchema = z.object({
-  assertionEn: z.string().describe("Universal English: the core logical premise for vector math and cross-language deduplication"),
-  assertionHe: z.string().describe("Exact translation of assertionEn into the user's display language (Hebrew, English, etc.)"),
+const LogicianAlignerHeSchema = z.object({
+  canonical_en: CanonicalRosettaBlockStrictSchema,
+  source_locale: z.literal("he"),
+  local_translation: LocalRosettaBlockStrictSchema,
   logicalCoherenceScore: z.number().min(0).max(100),
   supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]),
-  reasoning: z.string(),
-  matchedExistingNodeId: z.string().nullable().optional().describe("Set by server after Scout RAG; not emitted by Logician"),
+  matchedExistingNodeId: z.string().nullable().optional().describe("Set by server; not from LLM"),
 });
 
-/** Schema for Logician LLM output only (Scout sets matchedExistingNodeId server-side). */
-const LogicianOutputSchema = LogicianAlignerSchema.omit({ matchedExistingNodeId: true });
+const LogicianAlignerEnSchema = z.object({
+  canonical_en: CanonicalRosettaBlockStrictSchema,
+  source_locale: z.string().min(1),
+  local_translation: LocalRosettaBlockSchema.optional(),
+  logicalCoherenceScore: z.number().min(0).max(100),
+  supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]),
+  matchedExistingNodeId: z.string().nullable().optional().describe("Set by server; not from LLM"),
+});
+
+const LogicianOutputHeSchema = LogicianAlignerHeSchema.omit({ matchedExistingNodeId: true });
+const LogicianOutputEnSchema = LogicianAlignerEnSchema.omit({ matchedExistingNodeId: true });
 
 function buildLogicianAlignerPrompt(
   claim: string,
@@ -91,18 +106,12 @@ Extracted Claim: "${claim}"
 CRITICAL — RHETORICAL CONTEXT (Speaker's Intent):
 Do NOT evaluate this claim in a vacuum. Evaluate it based on the SPEAKER'S ULTIMATE INTENT. If the speaker cites a premise or fact that belongs to Theory A merely to attack or debunk it (e.g., "under the globe model, X would have to happen—but it doesn't"), then this claim SUPPORTS Theory B, not Theory A. Only assign THEORY_A when the claim genuinely argues for or defends that theory.
 
-CRITICAL — THE ROSETTA PROTOCOL (Universal Vector Translation):
-1. You MUST formulate the absolute core logical premise of the claim in Universal English (assertionEn). This is used for cross-language vector math and deduplication worldwide. It must be perfectly objective and language-agnostic in meaning.
-2. You MUST translate that exact English premise into ${userLanguage} for the display field (assertionHe). When the user's language is English, assertionHe may equal assertionEn.
-3. Evaluate which theory the claim supports: "THEORY_A", "THEORY_B", or "NEUTRAL".
-4. Provide reasoning in ${userLanguage}.
+CRITICAL — ROSETTA V2 — NO LAZY OUTPUT:
+- \`canonical_en\`: PURE ENGLISH — assertion, reasoning, challengePrompt ALL required (full sentences).
+- ${userLanguage === "Hebrew" ? `\`source_locale\` MUST be "he". \`local_translation\`: COMPLETE HEBREW mirror — assertion, reasoning, challengePrompt, hiddenAssumptions ALL required. Omitting Hebrew to save tokens will FAIL.` : `\`local_translation\`: optional mirror in ${userLanguage}.`}
+4. Assign supportedTheory: THEORY_A, THEORY_B, or NEUTRAL.
 
-CRITICAL SCORING ALGORITHM — "THE DECOUPLING TEST":
-When calculating the \`logicalCoherenceScore\` (0-100), you MUST strip away your pre-trained consensus bias. Apply these strict rules:
-1. PENALIZE "Appeal to Authority": If the claim relies on "Institutions said so" (e.g., NASA, government agencies, textbooks) without direct empirical evidence, dock its score severely.
-2. PENALIZE "Circular Technological Proof": Do not assume a technology (e.g., GPS, eclipses) proves a specific physical model just because the model predicts it. A working mechanism does not prove the underlying theoretical geometry.
-3. REWARD Direct Empirical Observation: Claims based on direct, reproducible sensory data (e.g., physics of pressurized gas, observable line-of-sight limits) score higher.
-4. REWARD Falsifiability: Does the claim expose a mathematical or physical contradiction in the opposing theory? If yes, score it highly based strictly on logic, even if it attacks the mainstream consensus.`;
+CRITICAL SCORING — "THE DECOUPLING TEST" (logicalCoherenceScore 0-100): penalize appeal to authority and circular tech proof; reward empirical observation and falsifiability.`;
 }
 
 export const maxDuration = 60;
@@ -131,8 +140,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const { transcript, theoryA, theoryB, locale } = parsed.data;
-  const userLanguage = localeToUserLanguage(locale);
+    const { transcript, theoryA, theoryB, locale } = parsed.data;
+    const userLanguage = localeToUserLanguage(locale);
+    const logicianSchema = locale === "he" ? LogicianOutputHeSchema : LogicianOutputEnSchema;
   const trimmedTranscript = transcript.trim().slice(0, MAX_TRANSCRIPT_LENGTH);
 
   if (trimmedTranscript.length < 50) {
@@ -166,64 +176,97 @@ export async function POST(request: Request) {
       return NextResponse.json({ processedClaims: [], telemetry });
     }
 
-    // Agent 2: Logician FIRST (Rosetta Protocol → assertionEn), then Scout (RAG on English only)
+    // Agent 2: Logician (canonical_en) then Scout (RAG on English embedding)
     const model = google("gemini-2.5-flash");
     const supabase = createServerSupabase();
-    const results = await Promise.all(
-      claimsToProcess.map(async (claim): Promise<SieveProcessedClaim> => {
-        // 1. Logician first: get Universal English (assertionEn) for vector math
-        const { object: logicianObject } = await generateObject({
-          model,
-          temperature: 0.1,
-          schema: LogicianOutputSchema,
-          schemaName: "LogicianAligner",
-          schemaDescription: "Claim normalized, scored, and aligned to Theory A or B",
-          prompt: buildLogicianAlignerPrompt(claim, theoryA, theoryB, userLanguage),
-        });
-
-        const o = logicianObject as z.infer<typeof LogicianAlignerSchema>;
-        const assertionEn = (o.assertionEn ?? claim).trim().slice(0, 4000);
-        const assertionHe = (o.assertionHe ?? o.assertionEn ?? claim).trim().slice(0, 4000);
-        const logicalCoherenceScore =
-          typeof o.logicalCoherenceScore === "number"
-            ? Math.max(0, Math.min(100, o.logicalCoherenceScore))
-            : 50;
-        const supportedTheory = (o.supportedTheory ?? "NEUTRAL") as SieveSupportedTheory;
-        const reasoning = (o.reasoning ?? "").trim().slice(0, 2000);
-
-        // 2. Scout (RAG) using assertionEn only — English-to-English deduplication (Rosetta Protocol)
-        let matchedNodeId: string | null = null;
+    const rowResults = await Promise.all(
+      claimsToProcess.map(async (claim): Promise<SieveProcessedClaim | null> => {
         try {
-          const embeddingResult = await embed({
-            model: google.textEmbeddingModel("gemini-embedding-001"),
-            value: assertionEn,
-            providerOptions: { google: { outputDimensionality: 768 } },
+          const { object: logicianObject } = await generateObject({
+            model,
+            temperature: 0.1,
+            schema: logicianSchema,
+            schemaName: "LogicianAligner",
+            schemaDescription:
+              locale === "he"
+                ? "Strict bilingual EN+HE — all fields required"
+                : "English canonical + optional local mirror",
+            prompt: buildLogicianAlignerPrompt(claim, theoryA, theoryB, userLanguage),
           });
-          if (embeddingResult.embedding.length > 0) {
-            const { data: matches } = await supabase.rpc("match_truth_nodes", {
-              query_embedding: Array.from(embeddingResult.embedding),
-              match_threshold: SIEVE_SCOUT_THRESHOLD,
-              match_count: SIEVE_SCOUT_MATCH_COUNT,
-            } as never);
-            const matchList = (matches ?? []) as Array<{ id: string }>;
-            if (matchList.length > 0 && matchList[0].id) {
-              matchedNodeId = matchList[0].id;
-            }
-          }
-        } catch (err) {
-          console.error("[Sieve Scout Error]", err);
-        }
 
-        return {
-          assertionEn,
-          assertionHe,
-          logicalCoherenceScore,
-          supportedTheory,
-          reasoning,
-          matchedExistingNodeId: matchedNodeId,
-        };
+          const parsedLog = logicianSchema.safeParse(logicianObject);
+          if (!parsedLog.success) {
+            console.error("[Sieve Logician schema]", parsedLog.error.flatten());
+            return null;
+          }
+          const o = parsedLog.data;
+          let canonical_en = o.canonical_en;
+          const source_locale =
+            typeof o.source_locale === "string" && o.source_locale.trim()
+              ? o.source_locale.trim()
+              : "en";
+          let local_translation =
+            "local_translation" in o && o.local_translation !== undefined
+              ? o.local_translation
+              : undefined;
+          const fixed = fixRosettaV2BlockFlip(canonical_en, local_translation);
+          canonical_en = {
+            assertion: fixed.canonical_en.assertion,
+            reasoning: fixed.canonical_en.reasoning ?? "",
+            challengePrompt: fixed.canonical_en.challengePrompt ?? "",
+            hiddenAssumptions: fixed.canonical_en.hiddenAssumptions ?? [],
+          };
+          local_translation = fixed.local_translation
+            ? {
+                assertion: fixed.local_translation.assertion,
+                reasoning: fixed.local_translation.reasoning ?? "",
+                challengePrompt: fixed.local_translation.challengePrompt ?? "",
+                hiddenAssumptions: fixed.local_translation.hiddenAssumptions ?? [],
+              }
+            : undefined;
+          const logicalCoherenceScore = Math.max(0, Math.min(100, o.logicalCoherenceScore));
+          const supportedTheory = o.supportedTheory as SieveSupportedTheory;
+
+          const embedValue = embeddingTextFromCanonical(canonical_en).slice(0, 8000);
+
+          let matchedNodeId: string | null = null;
+          try {
+            const embeddingResult = await embed({
+              model: google.textEmbeddingModel("gemini-embedding-001"),
+              value: embedValue,
+              providerOptions: { google: { outputDimensionality: 768 } },
+            });
+            if (embeddingResult.embedding.length > 0) {
+              const { data: matches } = await supabase.rpc("match_truth_nodes", {
+                query_embedding: Array.from(embeddingResult.embedding),
+                match_threshold: SIEVE_SCOUT_THRESHOLD,
+                match_count: SIEVE_SCOUT_MATCH_COUNT,
+              } as never);
+              const matchList = (matches ?? []) as Array<{ id: string }>;
+              if (matchList.length > 0 && matchList[0].id) {
+                matchedNodeId = matchList[0].id;
+              }
+            }
+          } catch (err) {
+            console.error("[Sieve Scout Error]", err);
+          }
+
+          const out: SieveProcessedClaim = {
+            canonical_en,
+            source_locale,
+            local_translation,
+            logicalCoherenceScore,
+            supportedTheory,
+            matchedExistingNodeId: matchedNodeId,
+          };
+          return out;
+        } catch (e) {
+          console.error("[Sieve claim pipeline]", e);
+          return null;
+        }
       })
     );
+    const results = rowResults.filter((r): r is SieveProcessedClaim => r != null);
 
     const duplicateCount = results.filter((r) => r.matchedExistingNodeId != null).length;
     const telemetry: SieveTelemetry = {

@@ -17,11 +17,15 @@ import {
 } from "@/types/truth";
 import { syncConstellationMap } from "@/lib/agents/TheCartographer";
 import {
-  buildRosettaJsonV2,
-  isPrimarilyHebrewScript,
-  partitionBilingualField,
-  type RosettaClaimBlock,
+  parseForgeDraftForAnchor,
+  type AnchorableForgeDraft,
+} from "@/lib/truth/rosettaSchemas";
+import {
+  embeddingTextFromCanonical,
+  truthNodeContentV2ToJson,
+  fixDraftRosettaV2Flip,
 } from "@/lib/utils/truthRosetta";
+import type { CompetingTheoryV2 } from "@/types/truth";
 
 const MATCH_THRESHOLD = 0.85;
 const MATCH_COUNT = 3;
@@ -410,77 +414,15 @@ const AnchorPrismDraftSchema = z.object({
   ).max(50),
 });
 
-const CompetingTheorySchema = z.object({
-  assertionEn: z.string().min(1),
-  assertionHe: z.string().optional().default(""),
-});
-
-const ForgeDraftSchema = z.object({
-  assertionEn: z.string().min(1),
-  assertionHe: z.string().optional().default(""),
-  logicalCoherenceScore: z.number().min(0).max(100),
-  reasoningEn: z.string().optional().default(""),
-  reasoningHe: z.string().optional().default(""),
-  hiddenAssumptionsEn: z.array(z.string()).default([]),
-  hiddenAssumptionsHe: z.array(z.string()).default([]),
-  challengePromptEn: z.string().optional().default(""),
-  challengePromptHe: z.string().optional().default(""),
-  relationshipToContext: z.enum(["supports", "challenges"]).optional(),
-  thematicTags: z.array(z.string()).max(3).optional().default([]),
-  competingTheories: z.array(CompetingTheorySchema).max(2).optional(),
-});
-
-/** Partitions Forge draft into canonical `en` + Hebrew locale block (no network). */
-function forgeDraftToRosettaBlocks(draft: z.infer<typeof ForgeDraftSchema>): {
-  pulse: number;
-  source_locale: string;
-  en: RosettaClaimBlock;
-  he: RosettaClaimBlock;
-} {
-  const enAssertion = draft.assertionEn.trim();
-  const assertionHe = (draft.assertionHe ?? "").trim();
-
-  const reasoning = partitionBilingualField(
-    (draft.reasoningEn ?? "").trim(),
-    (draft.reasoningHe ?? "").trim()
-  );
-  const cp = partitionBilingualField(
-    (draft.challengePromptEn ?? "").trim(),
-    (draft.challengePromptHe ?? "").trim()
-  );
-
-  const enAssList = Array.isArray(draft.hiddenAssumptionsEn) ? draft.hiddenAssumptionsEn : [];
-  const heAssList = Array.isArray(draft.hiddenAssumptionsHe) ? draft.hiddenAssumptionsHe : [];
-  const enAssOut: string[] = [];
-  const heAssOut = [...heAssList];
-  for (const s of enAssList) {
-    if (typeof s === "string" && isPrimarilyHebrewScript(s)) heAssOut.push(s);
-    else if (typeof s === "string") enAssOut.push(s);
-  }
-
-  const enBlock: RosettaClaimBlock = {
-    assertion: enAssertion,
-    reasoning: reasoning.enOut,
-    hiddenAssumptions: enAssOut,
-    challengePrompt: cp.enOut,
-  };
-  const heBlock: RosettaClaimBlock = {
-    assertion: assertionHe,
-    reasoning: reasoning.heOut,
-    hiddenAssumptions: heAssOut,
-    challengePrompt: cp.heOut,
-  };
-  const hasHebrewLocale =
-    assertionHe.length > 0 ||
-    reasoning.heOut.length > 0 ||
-    cp.heOut.length > 0 ||
-    heAssOut.length > 0;
-  const source_locale = hasHebrewLocale ? "he" : "en";
+function metadataFromForgeDraft(draft: AnchorableForgeDraft): { competingTheories?: CompetingTheoryV2[] } {
+  if (!draft.competingTheories || draft.competingTheories.length !== 2) return {};
+  const sl = draft.source_locale.trim().toLowerCase();
   return {
-    pulse: draft.logicalCoherenceScore,
-    source_locale,
-    en: enBlock,
-    he: heBlock,
+    competingTheories: draft.competingTheories.map((ct) => ({
+      canonical_en: ct.canonical_en,
+      source_locale: draft.source_locale,
+      locales: ct.local_translation ? { [sl]: ct.local_translation } : {},
+    })),
   };
 }
 
@@ -496,17 +438,6 @@ function formatClaimContent(claim: {
     ? claim.hiddenAssumptions.join(", ")
     : "—";
   return `Content: ${claim.assertion}\n\n[Logician's Pulse: ${claim.logicalCoherenceScore}/100]\nRationale: ${claim.reasoning}\n\n[The Scout's Edge] Hidden Assumptions: ${assumptions}\nFalsification Prompt: ${claim.challengePrompt}`;
-}
-
-/** Forge draft → Rosetta v2 JSON (partition only; bilingual fields from LLM, no auto-translate). */
-function formatRosettaContent(draft: z.infer<typeof ForgeDraftSchema>): string {
-  const { pulse, source_locale, en, he } = forgeDraftToRosettaBlocks(draft);
-  return buildRosettaJsonV2({
-    pulse,
-    source_locale,
-    en,
-    locales: { he },
-  });
 }
 
 /**
@@ -645,11 +576,10 @@ const FORGE_MATCH_COUNT = 3;
 /**
  * Anchors a single Epistemic Forge draft to the graph: one node (formatted content),
  * optionally linked to a parent. Used when the user approves the draft from the Forge chat.
- * Runs semantic deduplication on draft.assertionEn (Universal vector); if near-duplicate nodes exist and
- * forceBypass is not true, returns semantic_resonance with duplicates instead of inserting.
+ * Runs semantic deduplication on canonical_en (Universal English embedding).
  */
 export async function anchorForgeDraft(
-  draft: z.infer<typeof ForgeDraftSchema>,
+  draft: AnchorableForgeDraft | Record<string, unknown>,
   authorWallet: string,
   parentId?: string,
   relationship?: EdgeRelationship,
@@ -658,11 +588,13 @@ export async function anchorForgeDraft(
   const writeTelemetry: string[] = [];
 
   try {
-    const parsed = ForgeDraftSchema.safeParse(draft);
+    const parsed = parseForgeDraftForAnchor(draft);
     if (!parsed.success) {
       const issues = "issues" in parsed.error ? parsed.error.issues : [];
       return { success: false, error: (issues as { message: string }[]).map((e) => e.message).join("; "), writeTelemetry };
     }
+
+    const data = fixDraftRosettaV2Flip(parsed.data as AnchorableForgeDraft);
 
     const wallet = authorWallet?.trim().toLowerCase();
     if (!/^0x[a-fa-f0-9]{40}$/.test(wallet)) {
@@ -676,9 +608,11 @@ export async function anchorForgeDraft(
     }
 
     const supabase = createServerSupabase();
-    const assertionEnText = parsed.data.assertionEn.trim().slice(0, 8000);
+    const embedSource = embeddingTextFromCanonical(data.canonical_en).slice(0, 8000);
 
-    writeTelemetry.push("[1] Started anchoring process for assertion (en): " + assertionEnText.slice(0, 80) + (assertionEnText.length > 80 ? "…" : ""));
+    writeTelemetry.push(
+      "[1] Started anchoring (canonical_en): " + embedSource.slice(0, 80) + (embedSource.length > 80 ? "…" : "")
+    );
     writeTelemetry.push("[2] Requesting Google Vector Embedding (gemini-embedding-001, 768 dims)...");
 
     let embedding: number[];
@@ -686,7 +620,7 @@ export async function anchorForgeDraft(
       const embeddingModel = google.textEmbeddingModel("gemini-embedding-001");
       const assertionEmbedResult = await embed({
         model: embeddingModel,
-        value: assertionEnText,
+        value: embedSource,
         providerOptions: { google: { outputDimensionality: 768 } },
       });
       embedding = Array.from(assertionEmbedResult.embedding);
@@ -717,17 +651,20 @@ export async function anchorForgeDraft(
       }
     }
 
-    const content = formatRosettaContent(parsed.data);
-    writeTelemetry.push("[4b] Rosetta JSON formatted (partition only, no auto-translate).");
-    const thematicTags = Array.isArray(parsed.data.thematicTags)
-      ? parsed.data.thematicTags.slice(0, 3).filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+    const sl = data.source_locale.trim().toLowerCase();
+    const content = truthNodeContentV2ToJson({
+      canonical_en: data.canonical_en,
+      source_locale: data.source_locale,
+      locales: data.local_translation ? { [sl]: data.local_translation } : {},
+      pulse: data.logicalCoherenceScore,
+    });
+    writeTelemetry.push("[4b] Rosetta Protocol V2 JSON stored (Rosetta failsafe applied).");
+    const thematicTags = Array.isArray(data.thematicTags)
+      ? data.thematicTags.slice(0, 10).filter((t): t is string => typeof t === "string" && t.trim().length > 0)
       : [];
 
     writeTelemetry.push("[5] Executing Supabase Insert...");
-    const metadata =
-      Array.isArray(parsed.data.competingTheories) && parsed.data.competingTheories.length === 2
-        ? { competingTheories: parsed.data.competingTheories }
-        : {};
+    const metadata = metadataFromForgeDraft(data);
     const nodePayload = {
       author_wallet: wallet,
       content,
@@ -807,10 +744,8 @@ export async function toggleNodeResonance(
       .eq("id", nodeId)
       .single();
 
-    const currentCount =
-      typeof (nodeRow as { resonance_count?: number } | null)?.resonance_count === "number"
-        ? (nodeRow as { resonance_count: number }).resonance_count
-        : 0;
+    const nr = nodeRow as { resonance_count?: number } | null;
+    const currentCount = typeof nr?.resonance_count === "number" ? nr.resonance_count : 0;
 
     if (existing) {
       const { error: delError } = await supabase
@@ -822,7 +757,7 @@ export async function toggleNodeResonance(
 
       const { error: updateError } = await supabase
         .from("truth_nodes")
-        .update({ resonance_count: Math.max(0, currentCount - 1) })
+        .update({ resonance_count: Math.max(0, currentCount - 1) } as never)
         .eq("id", nodeId);
       if (updateError) return { success: false, error: updateError.message };
       revalidatePath("/truth");
@@ -831,12 +766,12 @@ export async function toggleNodeResonance(
     } else {
       const { error: insertError } = await supabase
         .from("truth_resonances")
-        .insert({ node_id: nodeId, wallet_address: address });
+        .insert({ node_id: nodeId, wallet_address: address } as never);
       if (insertError) return { success: false, error: insertError.message };
 
       const { error: updateError } = await supabase
         .from("truth_nodes")
-        .update({ resonance_count: currentCount + 1 })
+        .update({ resonance_count: currentCount + 1 } as never)
         .eq("id", nodeId);
       if (updateError) return { success: false, error: updateError.message };
       revalidatePath("/truth");

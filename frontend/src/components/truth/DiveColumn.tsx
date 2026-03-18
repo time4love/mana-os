@@ -6,6 +6,8 @@ import { useAccount } from "wagmi";
 import { getTruthNodeWithEdges, toggleNodeResonance, checkUserResonance, type EndlessDiveInitialData, type TruthNodeRow } from "@/app/actions/truthWeaver";
 import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent } from "@/lib/utils/truthParser";
+import { competingTheoryDisplayAssertion } from "@/lib/utils/truthRosetta";
+import type { CompetingTheoryV2 } from "@/types/truth";
 import { SupportClaimDrawer } from "./SupportClaimDrawer";
 import { ChallengeClaimDrawer } from "./ChallengeClaimDrawer";
 import { SubmitClaimsDrawer } from "./SubmitClaimsDrawer";
@@ -19,9 +21,8 @@ const RATIONALE_LABEL = { he: "נימוק הלוגיקן", en: "Rationale" };
 const SCOUT_LABEL = { he: "הנחות מובלעות וזיהוי הפרכה", en: "Hidden assumptions & falsification" };
 const SCORE_LABEL = { he: "ציון לוגי", en: "Score" };
 
-/** Arena node metadata: competing theories for tug-of-war display. */
 interface CompetingTheoriesMeta {
-  competingTheories?: Array<{ assertionEn: string; assertionHe?: string }>;
+  competingTheories?: CompetingTheoryV2[];
 }
 
 interface DiveColumnProps {
@@ -105,7 +106,11 @@ export function DiveColumn({
       const meta = data.node.metadata as CompetingTheoriesMeta | undefined;
       const theories = meta?.competingTheories ?? [];
       const obj = theoryKey === "THEORY_A" ? theories[0] : theories[1];
-      label = obj ? (lang === "he" ? obj.assertionHe ?? obj.assertionEn : obj.assertionEn) : (locale === "he" ? `תיאוריה ${theoryKey === "THEORY_A" ? "א'" : "ב'"}` : `Theory ${theoryKey === "THEORY_A" ? "A" : "B"}`);
+      label = obj
+        ? competingTheoryDisplayAssertion(obj, lang)
+        : locale === "he"
+          ? `תיאוריה ${theoryKey === "THEORY_A" ? "א'" : "ב'"}`
+          : `Theory ${theoryKey === "THEORY_A" ? "A" : "B"}`;
     } else {
       label = parseNodeContent(data.node.content, lang).assertion || "";
     }
@@ -172,11 +177,15 @@ export function DiveColumn({
   const competingTheories = metadata?.competingTheories ?? [];
   const hasArenaTheories = competingTheories.length >= 2;
   const theoryALabel = competingTheories[0]
-    ? (lang === "he" ? competingTheories[0].assertionHe ?? competingTheories[0].assertionEn : competingTheories[0].assertionEn)
-    : locale === "he" ? "תיאוריה א'" : "Theory A";
+    ? competingTheoryDisplayAssertion(competingTheories[0], lang)
+    : locale === "he"
+      ? "תיאוריה א'"
+      : "Theory A";
   const theoryBLabel = competingTheories[1]
-    ? (lang === "he" ? competingTheories[1].assertionHe ?? competingTheories[1].assertionEn : competingTheories[1].assertionEn)
-    : locale === "he" ? "תיאוריה ב'" : "Theory B";
+    ? competingTheoryDisplayAssertion(competingTheories[1], lang)
+    : locale === "he"
+      ? "תיאוריה ב'"
+      : "Theory B";
 
   // Children = edges where this node is the source; use actualNodeId for fetch consistency
   const childEdges = data.edges.filter((e) => e.source_id === actualNodeId && e.target_node);
@@ -286,10 +295,10 @@ export function DiveColumn({
               <div className="mt-6">
                 <SubmitClaimsDrawer
                   arenaId={data.node.id}
-                  theoryAEn={competingTheories[0].assertionEn}
-                  theoryAHe={competingTheories[0].assertionHe ?? competingTheories[0].assertionEn}
-                  theoryBEn={competingTheories[1].assertionEn}
-                  theoryBHe={competingTheories[1].assertionHe ?? competingTheories[1].assertionEn}
+                  theoryAEn={competingTheoryDisplayAssertion(competingTheories[0], "en")}
+                  theoryAHe={competingTheoryDisplayAssertion(competingTheories[0], "he")}
+                  theoryBEn={competingTheoryDisplayAssertion(competingTheories[1], "en")}
+                  theoryBHe={competingTheoryDisplayAssertion(competingTheories[1], "he")}
                   hasGenesisAnchor={hasGenesisAnchor}
                   onLockedClick={() => setSbtCodexOpen(true)}
                 />

@@ -10,6 +10,7 @@ import { useGenesisAnchor } from "@/hooks/useGenesisAnchor";
 import { CodexSheet } from "@/components/ui/CodexSheet";
 import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent, truncateAssertion } from "@/lib/utils/truthParser";
+import { competingTheoryDisplayAssertion } from "@/lib/utils/truthRosetta";
 import { Button } from "@/components/ui/button";
 import { SupportClaimDrawer } from "@/components/truth/SupportClaimDrawer";
 import { ChallengeClaimDrawer } from "@/components/truth/ChallengeClaimDrawer";
@@ -180,7 +181,7 @@ function FocalPivot({
                     {locale === "he" ? THEORY_A_LABEL.he : THEORY_A_LABEL.en}
                   </span>
                   <p className="text-sm font-medium text-foreground leading-relaxed">
-                    {locale === "he" ? competingTheories[0].assertionHe : competingTheories[0].assertionEn}
+                    {competingTheoryDisplayAssertion(competingTheories[0], locale === "he" ? "he" : "en")}
                   </p>
                   <div className="mt-3 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                     {locale === "he" ? DIVE_INTO_CLAIMS.he : DIVE_INTO_CLAIMS.en}
@@ -198,7 +199,7 @@ function FocalPivot({
                     {locale === "he" ? THEORY_B_LABEL.he : THEORY_B_LABEL.en}
                   </span>
                   <p className="text-sm font-medium text-foreground leading-relaxed">
-                    {locale === "he" ? competingTheories[1].assertionHe : competingTheories[1].assertionEn}
+                    {competingTheoryDisplayAssertion(competingTheories[1], locale === "he" ? "he" : "en")}
                   </p>
                   <div className="mt-3 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                     {locale === "he" ? DIVE_INTO_CLAIMS.he : DIVE_INTO_CLAIMS.en}
@@ -456,7 +457,7 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
   ) {
     const theoryIdx = supportedTheoryKey === "THEORY_A" ? 0 : 1;
     const theoryObj = connectedArena.node.metadata.competingTheories[theoryIdx];
-    theoryTitle = locale === "he" ? (theoryObj.assertionHe ?? theoryObj.assertionEn) : theoryObj.assertionEn;
+    theoryTitle = competingTheoryDisplayAssertion(theoryObj, locale === "he" ? "he" : "en");
   }
   const arenaTitle =
     connectedArena?.node.content != null
@@ -530,7 +531,9 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
           <div className="rounded-2xl bg-secondary/10 p-6 border border-border/50 shadow-sm relative overflow-hidden">
             <div className="absolute top-0 inset-x-0 h-1 bg-primary/40" aria-hidden />
             <h2 className="text-lg md:text-xl font-bold text-foreground leading-relaxed">
-              {locale === "he" ? activeTheoryObj?.assertionHe : activeTheoryObj?.assertionEn}
+              {activeTheoryObj
+                ? competingTheoryDisplayAssertion(activeTheoryObj, locale === "he" ? "he" : "en")
+                : ""}
             </h2>
             <div className="mt-4 inline-flex items-center gap-2 bg-background border border-border text-xs rounded-full px-3 py-1 shadow-sm text-muted-foreground">
               <span>
@@ -606,10 +609,10 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
           >
             <SubmitClaimsDrawer
               arenaId={node.id}
-              theoryAEn={node.metadata.competingTheories[0].assertionEn}
-              theoryAHe={node.metadata.competingTheories[0].assertionHe ?? node.metadata.competingTheories[0].assertionEn}
-              theoryBEn={node.metadata.competingTheories[1].assertionEn}
-              theoryBHe={node.metadata.competingTheories[1].assertionHe ?? node.metadata.competingTheories[1].assertionEn}
+              theoryAEn={competingTheoryDisplayAssertion(node.metadata.competingTheories[0], "en")}
+              theoryAHe={competingTheoryDisplayAssertion(node.metadata.competingTheories[0], "he")}
+              theoryBEn={competingTheoryDisplayAssertion(node.metadata.competingTheories[1], "en")}
+              theoryBHe={competingTheoryDisplayAssertion(node.metadata.competingTheories[1], "he")}
               hasGenesisAnchor={hasGenesisAnchor}
               onLockedClick={() => setSbtCodexOpen(true)}
             />
@@ -911,10 +914,10 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
           >
             <SubmitClaimsDrawer
               arenaId={node.id}
-              theoryAEn={node.metadata.competingTheories[0].assertionEn}
-              theoryAHe={node.metadata.competingTheories[0].assertionHe ?? node.metadata.competingTheories[0].assertionEn}
-              theoryBEn={node.metadata.competingTheories[1].assertionEn}
-              theoryBHe={node.metadata.competingTheories[1].assertionHe ?? node.metadata.competingTheories[1].assertionEn}
+              theoryAEn={competingTheoryDisplayAssertion(node.metadata.competingTheories[0], "en")}
+              theoryAHe={competingTheoryDisplayAssertion(node.metadata.competingTheories[0], "he")}
+              theoryBEn={competingTheoryDisplayAssertion(node.metadata.competingTheories[1], "en")}
+              theoryBHe={competingTheoryDisplayAssertion(node.metadata.competingTheories[1], "he")}
               hasGenesisAnchor={hasGenesisAnchor}
               onLockedClick={() => setSbtCodexOpen(true)}
             />
