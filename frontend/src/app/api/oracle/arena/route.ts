@@ -6,6 +6,11 @@ import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getDisplayAssertion } from "@/lib/utils/truthParser";
 import {
+  buildArenaDrafterPrompt,
+  ARENA_SYSTEM,
+  buildArenaHandoffBlock,
+} from "@/lib/core/prompts";
+import {
   DraftEpistemicNodeV2HeArenaSchema,
   DraftEpistemicNodeV2LooseSchema,
 } from "@/lib/truth/rosettaSchemas";
@@ -23,36 +28,6 @@ const EpistemicTriageSchema = z.object({
     ),
 });
 
-
-// ---------------------------------------------------------------------------
-// Arena Drafter: neutral root title only (no RAG, no intent router)
-// ---------------------------------------------------------------------------
-
-const ARENA_DRAFTER_PROMPT = (topic: string, hebrewStrict: boolean) =>
-  hebrewStrict
-    ? `You are the Arena Architect (Rosetta V2, Hebrew UI — IRON DISCIPLINE).
-
-Topic: "${topic}"
-
-Output MUST satisfy strict JSON:
-- source_locale: exactly "he"
-- canonical_en: FULL English block — assertion, reasoning (min 1 sentence), challengePrompt (min 1 sentence), hiddenAssumptions (array, [] if none)
-- local_translation: FULL Hebrew mirror of canonical_en — same four fields, all real Hebrew (never copy-paste English)
-- logicalCoherenceScore: 50
-- thematicTags: include "macro-arena"
-- relationshipToContext: "supports"
-- competingTheories: EXACTLY 2 entries. Each entry: canonical_en (full English block) + local_translation (full Hebrew block). Every reasoning and challengePrompt required in BOTH languages.`
-    : `You are the Arena Architect (Rosetta V2).
-
-Topic: "${topic}"
-
-- canonical_en: English root question + reasoning + challengePrompt
-- source_locale: "en"
-- local_translation: optional
-- competingTheories: 2 theories, English in canonical_en
-- thematicTags: include "macro-arena"
-- logicalCoherenceScore: 50, relationshipToContext: "supports"`;
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -67,6 +42,17 @@ function getMessageText(msg: { parts?: Array<{ type: string; text?: string }>; c
     .join(" ")
     .trim();
   return (parts || (msg as { content?: string }).content || "").trim().slice(0, MAX_MESSAGE_TEXT_LENGTH);
+}
+
+/** Last N turns for drafter — so refinements apply to the prior topic, not the critique sentence. */
+function getChatPreview(msgs: UIMessage[], maxMessages = 10): string {
+  const slice = msgs.slice(-maxMessages);
+  return slice
+    .map((m) => {
+      const t = getMessageText(m as Parameters<typeof getMessageText>[0]).slice(0, 3500);
+      return `${m.role}: ${t}`;
+    })
+    .join("\n");
 }
 
 /** High threshold for Arena deduplication: only catch actual overlaps. */
@@ -167,12 +153,19 @@ export async function POST(request: Request) {
   // ---------------------------------------------------------------------------
   let newDraftsForTriage: ArenaDraft[] = [];
 
+  const chatHistoryForDrafter = getChatPreview(messages, 12);
+
   if (topic.length > 0 && existingMatches.length === 0) {
     try {
       const result = await generateObject({
         model: google("gemini-2.5-flash"),
         schema: arenaDrafterSchema,
-        prompt: ARENA_DRAFTER_PROMPT(topic, locale === "he"),
+        prompt: buildArenaDrafterPrompt({
+          chatHistory: chatHistoryForDrafter,
+          latestUser: lastUserText,
+          hebrewStrict: locale === "he",
+          optionalContext: contextBlock,
+        }),
       });
       const draft = arenaDrafterSchema.parse(result.object);
       const flipped = fixDraftRosettaV2Flip(draft);
@@ -188,51 +181,10 @@ export async function POST(request: Request) {
     }
   }
 
-  const ARENA_SYSTEM = `You are the Arena Architect. Converse in the user's language (Hebrew or English). Never leave the user with a blank message.
-
-You have ONE tool: \`epistemic_triage\`. Call it exactly once per turn. Output ONLY \`socraticMessage\` (your conversational reply). The server injects draft cards or existing-arena portals into the tool result—do not stream JSON.`;
-
-  let handoffBlock: string;
-  if (existingMatches.length > 0) {
-    handoffBlock = `
-=========================================
-ARENA DEDUPLICATION — SIMILAR ARENA(S) EXIST
-=========================================
-The user asked to create a new debate arena, but highly similar arena(s) already exist in the weave. Display them as Portals so they enter the existing arena instead of fragmenting the community.
-
-EXISTING ARENAS TO DISPLAY (pass these as existingNodesToDisplay; leave newDrafts EMPTY):
-${JSON.stringify(existingMatches)}
-
-YOUR TASK:
-1. Write a warm Socratic message in the user's language. Explain that a very similar debate arena already exists in the weave and invite them to enter it instead of creating a duplicate.
-2. Call \`epistemic_triage\` EXACTLY ONCE. Pass your text to \`socraticMessage\`.
-3. The server will inject the existing arenas into \`existingNodesToDisplay\` and leave \`newDrafts\` empty. Do not generate a new arena card.`;
-  } else if (newDraftsForTriage.length > 0) {
-    handoffBlock = `
-=========================================
-ARENA CREATION (GENERATIVE UI)
-=========================================
-No duplicate arena was found. The backend has formulated the full Arena package: the neutral root question AND the two competing theories (Theory A vs Theory B).
-APPROVED DRAFT JSON: ${JSON.stringify(newDraftsForTriage)}
-
-YOUR TASK:
-1. Write a short, warm Socratic response in the user's language. Say that you formulated the neutral root question and extracted the two main competing theories for the debate; if it accurately captures the arena, they can click to anchor.
-2. Call \`epistemic_triage\` EXACTLY ONCE.
-3. Pass your text to \`socraticMessage\`.
-4. The server will inject the APPROVED DRAFT into the tool result. You do not pass newDrafts; the server attaches it.`;
-  } else {
-    handoffBlock = `
-=========================================
-ARENA — AWAITING TOPIC
-=========================================
-The user has not yet sent a topic (or the message was empty).
-
-YOUR TASK:
-1. Write a short, warm prompt in the user's language asking what topic they would like to open for debate (e.g. "What arena would you like to open? Name the root question or theme.").
-2. Call \`epistemic_triage\` EXACTLY ONCE. Pass your text to \`socraticMessage\`. The server will attach empty newDrafts.
-`;
-  }
-
+  const handoffBlock = buildArenaHandoffBlock({
+    existingMatches,
+    newDraftsForTriage,
+  });
   const systemPrompt = `${ARENA_SYSTEM}${contextBlock}\n\n${handoffBlock}`;
 
   const epistemicTriageTool = {

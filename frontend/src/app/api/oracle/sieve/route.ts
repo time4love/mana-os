@@ -15,6 +15,7 @@ import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { SieveProcessedClaim, SieveSupportedTheory, SieveTelemetry } from "@/types/truth";
+import { buildExtractorPrompt, buildLogicianAlignerPrompt } from "@/lib/core/prompts";
 import {
   CanonicalRosettaBlockStrictSchema,
   LocalRosettaBlockSchema,
@@ -33,23 +34,6 @@ const MAX_CLAIMS_TO_PROCESS = 10;
 const ExtractorClaimsSchema = z.object({
   claims: z.array(z.string()).max(MAX_CLAIMS_TO_PROCESS).describe("Core logical arguments that directly support, attack, or relate to Theory A or Theory B"),
 });
-
-function buildExtractorPrompt(transcript: string, theoryA: string, theoryB: string): string {
-  return `You are the Epistemic Extractor for a specific debate arena.
-
-THEORY A: "${theoryA}"
-THEORY B: "${theoryB}"
-
-Analyze the following transcript strictly through the lens of this debate.
-Extract ONLY the core logical arguments that directly support, attack, or actively relate to Theory A or Theory B.
-DO NOT atomize the text into trivial micro-facts, background stories, or conversational filler.
-If the speaker is using rhetorical sarcasm (e.g., "The plane WOULD need to dip, but it doesn't"), extract the actual underlying argument ("The lack of a 9.5-mile dip proves the Earth is not a curved globe").
-Combine premises with their conclusions into robust, standalone claims.
-Target 3 to 8 high-quality, comprehensive arguments.
-
-TRANSCRIPT:
-"${transcript.slice(0, 500_000)}"`;
-}
 
 const BodySchema = z.object({
   transcript: z.string().min(1).max(MAX_TRANSCRIPT_LENGTH),
@@ -90,29 +74,6 @@ const LogicianAlignerEnSchema = z.object({
 
 const LogicianOutputHeSchema = LogicianAlignerHeSchema.omit({ matchedExistingNodeId: true });
 const LogicianOutputEnSchema = LogicianAlignerEnSchema.omit({ matchedExistingNodeId: true });
-
-function buildLogicianAlignerPrompt(
-  claim: string,
-  theoryA: string,
-  theoryB: string,
-  userLanguage: string
-): string {
-  return `You are the Epistemic Logician. Evaluate this extracted claim against the Arena's competing theories.
-
-Theory A: "${theoryA}"
-Theory B: "${theoryB}"
-Extracted Claim: "${claim}"
-
-CRITICAL — RHETORICAL CONTEXT (Speaker's Intent):
-Do NOT evaluate this claim in a vacuum. Evaluate it based on the SPEAKER'S ULTIMATE INTENT. If the speaker cites a premise or fact that belongs to Theory A merely to attack or debunk it (e.g., "under the globe model, X would have to happen—but it doesn't"), then this claim SUPPORTS Theory B, not Theory A. Only assign THEORY_A when the claim genuinely argues for or defends that theory.
-
-CRITICAL — ROSETTA V2 — NO LAZY OUTPUT:
-- \`canonical_en\`: PURE ENGLISH — assertion, reasoning, challengePrompt ALL required (full sentences).
-- ${userLanguage === "Hebrew" ? `\`source_locale\` MUST be "he". \`local_translation\`: COMPLETE HEBREW mirror — assertion, reasoning, challengePrompt, hiddenAssumptions ALL required. Omitting Hebrew to save tokens will FAIL.` : `\`local_translation\`: optional mirror in ${userLanguage}.`}
-4. Assign supportedTheory: THEORY_A, THEORY_B, or NEUTRAL.
-
-CRITICAL SCORING — "THE DECOUPLING TEST" (logicalCoherenceScore 0-100): penalize appeal to authority and circular tech proof; reward empirical observation and falsifiability.`;
-}
 
 export const maxDuration = 60;
 
