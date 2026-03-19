@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useRef, useTransition } from "react";
 import { Shield, Swords, Fingerprint, Activity, Lock, Check } from "lucide-react";
 import { useAccount } from "wagmi";
-import { getTruthNodeWithEdges, toggleNodeResonance, checkUserResonance, type EndlessDiveInitialData, type TruthNodeRow } from "@/app/actions/truthWeaver";
+import { getTruthNodeWithEdges, toggleNodeResonance, checkUserResonance, type EndlessDiveInitialData, type TruthNodeRow, type TruthEdgeWithNodes } from "@/app/actions/truthWeaver";
 import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent } from "@/lib/utils/truthParser";
 import { getArenaAvatar } from "@/lib/utils/avatar";
@@ -70,6 +70,7 @@ export function DiveColumn({
   const [isPending, startTransition] = useTransition();
   const [hasResonated, setHasResonated] = useState(false);
   const [sbtCodexOpen, setSbtCodexOpen] = useState(false);
+  const [sortMode, setSortMode] = useState<"score" | "recent">("score");
   const authorWallet = address ?? walletAddress ?? "";
 
   // Synthetic ID: "arenaId::THEORY_A" or "arenaId::THEORY_B" → open a dedicated theory column
@@ -196,18 +197,25 @@ export function DiveColumn({
   const supportingEdges = childEdges.filter((e) => e.relationship === "supports");
   const challengingEdges = childEdges.filter((e) => e.relationship === "challenges");
 
-  // Sort by strength (pulse/score descending): strongest claim first
   const pulseFor = (node: TruthNodeRow) => parseNodeContent(node.content, lang).pulse ?? -1;
-  const sortedSupportingEdges = [...supportingEdges].sort((a, b) => {
-    const pa = a.target_node ? pulseFor(a.target_node) : -1;
-    const pb = b.target_node ? pulseFor(b.target_node) : -1;
-    return pb - pa;
-  });
-  const sortedChallengingEdges = [...challengingEdges].sort((a, b) => {
-    const pa = a.target_node ? pulseFor(a.target_node) : -1;
-    const pb = b.target_node ? pulseFor(b.target_node) : -1;
-    return pb - pa;
-  });
+
+  function sortEdges(edgesToSort: TruthEdgeWithNodes[], parentId: string): TruthEdgeWithNodes[] {
+    return [...edgesToSort].sort((a, b) => {
+      const childA = a.source_id === parentId ? a.target_node : a.source_node;
+      const childB = b.source_id === parentId ? b.target_node : b.source_node;
+      if (sortMode === "score") {
+        const scoreA = childA ? pulseFor(childA) : -1;
+        const scoreB = childB ? pulseFor(childB) : -1;
+        return scoreB - scoreA;
+      }
+      const dateA = new Date(childA?.created_at ?? 0).getTime();
+      const dateB = new Date(childB?.created_at ?? 0).getTime();
+      return dateB - dateA;
+    });
+  }
+
+  const sortedSupportingEdges = sortEdges(supportingEdges, actualNodeId);
+  const sortedChallengingEdges = sortEdges(challengingEdges, actualNodeId);
 
   // Theory column: filter edges by theory and cluster by first thematic tag
   const theoryEdges = theoryKey === "THEORY_A" ? supportingEdges : theoryKey === "THEORY_B" ? challengingEdges : [];
@@ -245,6 +253,27 @@ export function DiveColumn({
     if (e.target_node) challengeMass += childMass(e.target_node, lang);
   });
   const currentValidity = Math.max(0, Math.min(100, baseScore + supportMass - challengeMass));
+
+  const SortingToggle = () => (
+    <div className="flex justify-center mb-4 sticky top-0 z-10 bg-card/95 backdrop-blur py-2">
+      <div className="inline-flex bg-secondary/30 p-1 rounded-full border border-border/50 shadow-sm">
+        <button
+          type="button"
+          onClick={() => setSortMode("score")}
+          className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-full transition-all ${sortMode === "score" ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          <span aria-hidden>⚖️</span> {locale === "he" ? "עוצמה לוגית" : "Logical Power"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setSortMode("recent")}
+          className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-full transition-all ${sortMode === "recent" ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          <span aria-hidden>🌱</span> {locale === "he" ? "זרעים חדשים" : "Fresh Seeds"}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="w-[90vw] md:w-[450px] max-h-full shrink-0 bg-card rounded-3xl border border-border/50 shadow-soft-md min-h-[320px] flex flex-col snap-center relative overflow-hidden transition-all duration-300">
@@ -317,16 +346,13 @@ export function DiveColumn({
         <>
           <div className="p-4 overflow-y-auto custom-scrollbar flex-1 min-h-0 pb-24 pt-4">
             <div className="flex flex-col gap-6 shrink-0 min-h-min">
+              <SortingToggle />
               {sortedClusters.map(([tagName, edges]) => {
-                const sortedByPulse = [...edges].sort((a, b) => {
-                  const pa = a.target_node ? pulseFor(a.target_node) : -1;
-                  const pb = b.target_node ? pulseFor(b.target_node) : -1;
-                  return pb - pa;
-                });
+                const sortedEdges = sortEdges(edges, actualNodeId);
                 return (
                   <div key={tagName} className="flex flex-col gap-2">
                     <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">{tagName}</h3>
-                    {sortedByPulse.map((edge) => {
+                    {sortedEdges.map((edge) => {
                       const child = edge.target_node;
                       if (!child) return null;
                       const childParsed = parseNodeContent(child.content, lang);
@@ -449,6 +475,7 @@ export function DiveColumn({
           </div>
           <div className="p-4 overflow-y-auto custom-scrollbar flex-1 min-h-0 pb-24">
             <div className="flex flex-col gap-6 shrink-0 min-h-min">
+              <SortingToggle />
               {parsed.rationale && (
                 <div className="pt-1">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
