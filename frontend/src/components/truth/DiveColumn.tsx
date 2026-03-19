@@ -6,6 +6,7 @@ import { useAccount } from "wagmi";
 import { getTruthNodeWithEdges, toggleNodeResonance, checkUserResonance, type EndlessDiveInitialData, type TruthNodeRow } from "@/app/actions/truthWeaver";
 import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent } from "@/lib/utils/truthParser";
+import { getArenaAvatar } from "@/lib/utils/avatar";
 import { competingTheoryDisplayAssertion } from "@/lib/utils/truthRosetta";
 import type { CompetingTheoryV2 } from "@/types/truth";
 import { SupportClaimDrawer } from "./SupportClaimDrawer";
@@ -31,6 +32,8 @@ interface DiveColumnProps {
   onDive: (nodeId: string, colIndex: number, label: string) => void;
   isFirst?: boolean;
   initialData?: EndlessDiveInitialData;
+  /** Root arena ID for Arena-Scoped Identity (stack[0]); same wallet gets same avatar per arena. */
+  arenaId?: string;
   /** ID of the child that opened the next column — highlighted in this column. */
   activeChildId?: string;
   /** Report this column's label when loaded (for global breadcrumb bar). */
@@ -57,6 +60,7 @@ export function DiveColumn({
   onDive,
   isFirst,
   initialData,
+  arenaId,
   activeChildId,
   onRegisterLabel,
 }: DiveColumnProps) {
@@ -328,6 +332,7 @@ export function DiveColumn({
                       const childParsed = parseNodeContent(child.content, lang);
                       const isActive = child.id === activeChildId;
                       const score = childParsed.pulse;
+                      const avatar = getArenaAvatar(child.author_wallet, arenaId ?? actualNodeId);
                       return (
                         <button
                           key={edge.id}
@@ -341,11 +346,20 @@ export function DiveColumn({
                           <p className={`text-sm font-medium transition-colors ps-2 ${isActive ? "text-primary" : "text-foreground group-hover:text-primary"}`}>
                             {childParsed.assertion || ""}
                           </p>
-                          {score != null && (
-                            <span className="self-start text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary/50 text-muted-foreground ms-2">
-                              {locale === "he" ? SCORE_LABEL.he : SCORE_LABEL.en}: {score}/100
-                            </span>
-                          )}
+                          <div className="flex items-center justify-between mt-2 pt-3 border-t border-border/30">
+                            {score != null && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary/50 text-muted-foreground">
+                                {locale === "he" ? SCORE_LABEL.he : SCORE_LABEL.en}: {score}/100
+                              </span>
+                            )}
+                            <div
+                              className="flex items-center justify-center size-6 rounded-full shadow-sm border shrink-0"
+                              style={{ background: avatar.background, borderColor: avatar.borderColor }}
+                              title={locale === "he" ? "זהות אפימרית בזירה זו" : "Ephemeral Arena Identity"}
+                            >
+                              <span className="text-[10px] leading-none">{avatar.emoji}</span>
+                            </div>
+                          </div>
                         </button>
                       );
                     })}
@@ -471,6 +485,7 @@ export function DiveColumn({
                     const childParsed = parseNodeContent(child.content, lang);
                     const isActive = child.id === activeChildId;
                     const score = childParsed.pulse;
+                    const avatar = getArenaAvatar(child.author_wallet, arenaId ?? actualNodeId);
                     return (
                       <button
                         key={edge.id}
@@ -479,14 +494,23 @@ export function DiveColumn({
                         className={`text-start p-3 rounded-xl border shrink-0 flex flex-col gap-2 ${isActive ? "border-emerald-500 bg-emerald-500/5" : "border-border/50 bg-background hover:border-emerald-500/30"}`}
                       >
                         <p className="text-xs font-medium ps-1">{childParsed.assertion || ""}</p>
-                        {score != null && (
-                          <span
-                            className="self-start text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary/50 text-muted-foreground"
-                            aria-label={locale === "he" ? `ציון לוגי ${score}` : `Coherence ${score}`}
+                        <div className="flex items-center justify-between mt-2 pt-3 border-t border-border/30">
+                          {score != null && (
+                            <span
+                              className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary/50 text-muted-foreground"
+                              aria-label={locale === "he" ? `ציון לוגי ${score}` : `Coherence ${score}`}
+                            >
+                              {locale === "he" ? SCORE_LABEL.he : SCORE_LABEL.en}: {score}/100
+                            </span>
+                          )}
+                          <div
+                            className="flex items-center justify-center size-6 rounded-full shadow-sm border shrink-0"
+                            style={{ background: avatar.background, borderColor: avatar.borderColor }}
+                            title={locale === "he" ? "זהות אפימרית בזירה זו" : "Ephemeral Arena Identity"}
                           >
-                            {locale === "he" ? SCORE_LABEL.he : SCORE_LABEL.en}: {score}/100
-                          </span>
-                        )}
+                            <span className="text-[10px] leading-none">{avatar.emoji}</span>
+                          </div>
+                        </div>
                       </button>
                     );
                   })}
@@ -504,6 +528,7 @@ export function DiveColumn({
                     const childParsed = parseNodeContent(child.content, lang);
                     const isActive = child.id === activeChildId;
                     const score = childParsed.pulse;
+                    const avatar = getArenaAvatar(child.author_wallet, arenaId ?? actualNodeId);
                     return (
                       <button
                         key={edge.id}
@@ -512,14 +537,23 @@ export function DiveColumn({
                         className={`text-start p-3 rounded-xl border shrink-0 flex flex-col gap-2 ${isActive ? "border-amber-500 bg-amber-500/5" : "border-border/50 bg-background hover:border-amber-500/30"}`}
                       >
                         <p className="text-xs font-medium ps-1">{childParsed.assertion || ""}</p>
-                        {score != null && (
-                          <span
-                            className="self-start text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary/50 text-muted-foreground"
-                            aria-label={locale === "he" ? `ציון לוגי ${score}` : `Coherence ${score}`}
+                        <div className="flex items-center justify-between mt-2 pt-3 border-t border-border/30">
+                          {score != null && (
+                            <span
+                              className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary/50 text-muted-foreground"
+                              aria-label={locale === "he" ? `ציון לוגי ${score}` : `Coherence ${score}`}
+                            >
+                              {locale === "he" ? SCORE_LABEL.he : SCORE_LABEL.en}: {score}/100
+                            </span>
+                          )}
+                          <div
+                            className="flex items-center justify-center size-6 rounded-full shadow-sm border shrink-0"
+                            style={{ background: avatar.background, borderColor: avatar.borderColor }}
+                            title={locale === "he" ? "זהות אפימרית בזירה זו" : "Ephemeral Arena Identity"}
                           >
-                            {locale === "he" ? SCORE_LABEL.he : SCORE_LABEL.en}: {score}/100
-                          </span>
-                        )}
+                            <span className="text-[10px] leading-none">{avatar.emoji}</span>
+                          </div>
+                        </div>
                       </button>
                     );
                   })}

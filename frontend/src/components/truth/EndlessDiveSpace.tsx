@@ -136,8 +136,9 @@ export function EndlessDiveSpace({ initialNodeId, initialNodeData }: EndlessDive
             onDive={handleDive}
             isFirst={index === 0}
             initialData={index === 0 ? initialNodeData : undefined}
-          activeChildId={stack[index + 1]?.id}
-          onRegisterLabel={handleRegisterLabel}
+            arenaId={stack[0]?.id}
+            activeChildId={stack[index + 1]?.id}
+            onRegisterLabel={handleRegisterLabel}
           />
         ))}
       </div>

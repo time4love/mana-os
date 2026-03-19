@@ -33,6 +33,8 @@ This does not violate Unconditional Basic Abundance; the community never uses fo
 10. **Sanctuary Privacy & Anonymous Resonance:**
 Transparency is for resources; privacy is for souls. There is no “last seen”. A user in “Winter” wears the **Winter Cloak**, which shields them from social surveillance. Votes on proposals are fully anonymous (ZKP) to prevent ego competition, and the community is connected through shared discourse circles.
 
+- **Ego Death & Arena-Scoped Identities:** To prevent clout-chasing, influencer culture, and the "Appeal to Authority" fallacy, Mana OS absolutely bans global usernames and profiles in the Truth Engine. Instead, users are assigned an ephemeral **Arena-Scoped Identity** (e.g., "Amber Leaf" or "Azure Wave"). This identity is a cryptographic hash of their wallet and the specific Macro-Arena ID. It allows the community to follow a train of thought *locally* within a single debate, but once the user enters a different Arena, their avatar changes entirely. The ego dies; only the epistemic purity of the argument remains.
+
 11. **The Fractal Economy & Surplus Overflow:**
 We reject transactional barter between communities. The model is based on the “overflowing cup”: a community that has produced surplus abundance simply resonates it outward to **The Weave**, and other communities take what they need without recording debt. Abundance flows naturally from surplus to deficit.
 
