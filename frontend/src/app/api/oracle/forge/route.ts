@@ -9,7 +9,7 @@ import {
   buildForgeIntentPrompt,
   buildForgeDrafterPrompt,
   SOCRATES_SYSTEM,
-  SOVEREIGN_OVERRIDE_SYSTEM,
+  SOCRATIC_EDITOR_SYSTEM,
   buildForgeHandoffDraftRequest,
   buildForgeHandoffExploreChat,
   FORGE_DEBATE_SUPPORT_OVERRIDE,
@@ -175,7 +175,12 @@ export async function POST(request: Request) {
       const intentResult = await generateObject({
         model: google("gemini-2.5-flash"),
         schema: IntentSchema,
-        prompt: buildForgeIntentPrompt(getChatPreview(messages), lastUserText),
+        prompt: buildForgeIntentPrompt({
+          chatPreview: getChatPreview(messages),
+          lastUserText,
+          targetNodeContext: targetNodeContext ?? null,
+          debateIntent: debateIntent ?? null,
+        }),
       });
       userIntent = intentResult.object.intent;
       claimToDraft = intentResult.object.targetClaimToDraft?.trim() || undefined;
@@ -260,8 +265,10 @@ export async function POST(request: Request) {
         schema: drafterSchema,
         prompt: buildForgeDrafterPrompt({
           claim,
-          existingMatchesPreview: JSON.stringify(existingMatches.slice(0, 3)),
+          existingMatchesPreview: existingMatches.length > 0 ? JSON.stringify(existingMatches.slice(0, 3)) : undefined,
           locale,
+          targetNodeContext: targetNodeContext ?? null,
+          debateIntent: debateIntent ?? null,
         }),
       })
     );
@@ -296,7 +303,7 @@ export async function POST(request: Request) {
       : buildForgeHandoffExploreChat(existingMatches, coachDirective);
 
   const dynamicSystemPrompt =
-    userIntent === "DRAFT_REQUEST" ? SOVEREIGN_OVERRIDE_SYSTEM : SOCRATES_SYSTEM;
+    userIntent === "DRAFT_REQUEST" ? SOCRATIC_EDITOR_SYSTEM : SOCRATES_SYSTEM;
   const systemPrompt = `${dynamicSystemPrompt}${contextBlock}\n\n${handoffBlock}`;
 
   const epistemicTriageTool = {

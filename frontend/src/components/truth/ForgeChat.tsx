@@ -379,7 +379,8 @@ export function ForgeChat({
     setDuplicateDraft(null);
     setLastWriteTelemetry(null);
     setIsAnchoring(true);
-    const dynamicRelationship = draft.relationshipToContext ?? relationship ?? "supports";
+    // UI intent (Support/Challenge drawer) is sovereign; never let the AI override it.
+    const dynamicRelationship = relationship ?? draft.relationshipToContext ?? "supports";
     const normalizedDraft = {
       canonical_en: draft.canonical_en,
       source_locale: draft.source_locale,

@@ -145,8 +145,36 @@ YOUR TASK:
 
 export const QUERY_EXPANSION_SYSTEM = `You are an absolute objective Epistemic Search Architect. The user provided a raw chat message in a local language (Hebrew etc). Extract its CORE THEME and PHILOSOPHICAL ESSENCE. Return a flat comma-separated list of highly dense English keywords and alternative synonyms for this theme. Do not add any conversational text. For example: if user inputs 'הארץ שטוחה', return: 'Flat earth, non-spherical earth, geocentric planar cosmology, earth shape hoax, motionless earth plane'. Keep it under 25 words.`;
 
-export function buildForgeIntentPrompt(chatPreview: string, lastUserText: string): string {
-  return `CHAT HISTORY PREVIEW:\n${chatPreview}\n\nLATEST USER MESSAGE:\n${lastUserText}\n\nTASK: Classify the user's intent in the latest message. EXPLORE = new text/article/broad claim to explore. DRAFT_REQUEST = user explicitly asks to draft, anchor, or create a card for a specific claim (e.g. "add this to the weave", "draft this claim", "create a card for"). CHAT = arguing, question, or normal conversation. If DRAFT_REQUEST, extract the exact claim they want to draft in targetClaimToDraft.`;
+export function buildForgeIntentPrompt(params: {
+  chatPreview: string;
+  lastUserText: string;
+  targetNodeContext?: string | null;
+  debateIntent?: "supports" | "challenges" | null;
+}): string {
+  const { chatPreview, lastUserText, targetNodeContext, debateIntent } = params;
+  const targetContextLine = targetNodeContext
+    ? "The user is interacting with a specific claim."
+    : "General weave exploration.";
+  const debateActionLine = debateIntent
+    ? `The user is in a dedicated drawer trying to ${debateIntent} the target claim.`
+    : "None.";
+  return `CHAT HISTORY PREVIEW:
+${chatPreview}
+
+LATEST USER MESSAGE:
+${lastUserText}
+
+TARGET CLAIM CONTEXT: ${targetContextLine}
+DEBATE ACTION: ${debateActionLine}
+
+TASK: Classify the user's intent.
+- EXPLORE = User is pasting a broad article or new topic to explore (not a direct reply to a claim).
+- DRAFT_REQUEST = The user provides a concrete logical argument, scientific evidence, or counter-claim meant to be anchored.
+- CHAT = User is merely asking a question, requesting help, or chatting WITHOUT providing actual evidence (e.g., "Help me support this", "What does Newton's law mean?").
+
+CRITICAL GUARDRAIL FOR DEBATE DRAWERS:
+If DEBATE ACTION is active ('supports' or 'challenges') AND the user provides a substantive argument or factual premise (like explaining a physics concept, pointing out a flaw, or citing a phenomenon), YOU MUST CLASSIFY IT AS 'DRAFT_REQUEST' IMMEDIATELY. DO NOT require them to say "draft this". DO NOT classify as CHAT just to confirm their thought. Extract their argument into \`targetClaimToDraft\`.
+Only use CHAT if they are explicitly asking you for help or clarification without bringing their own argument.`;
 }
 
 export const FORGE_DEBATE_SUPPORT_OVERRIDE = `
@@ -169,10 +197,12 @@ export const FORGE_DEBATE_CHALLENGE_COACH =
 
 export function buildForgeDrafterPrompt(params: {
   claim: string;
-  existingMatchesPreview: string;
+  existingMatchesPreview?: string;
   locale: "he" | "en";
+  targetNodeContext?: string | null;
+  debateIntent?: "supports" | "challenges" | null;
 }): string {
-  const { claim, existingMatchesPreview, locale } = params;
+  const { claim, existingMatchesPreview, locale, targetNodeContext, debateIntent } = params;
   const heBilingualIron =
     locale === "he"
       ? `
@@ -180,9 +210,25 @@ IRON DISCIPLINE (Hebrew UI): source_locale MUST be exactly "he".
 You MUST fill local_translation with COMPLETE Hebrew: assertion, reasoning, hiddenAssumptions (array, use [] if none), challengePrompt — ALL required. Skipping Hebrew fields will fail validation. Do NOT copy English into Hebrew slots; write real Hebrew.
 `
       : "";
+  const parentContextBlock = targetNodeContext
+    ? `PARENT CLAIM CONTEXT: "${targetNodeContext.slice(0, 4000)}"
+DEBATE INTENT: ${debateIntent ?? "None specified."}
+
+CRITICAL RELATIONSHIP LOGIC:
+The \`relationshipToContext\` field MUST represent how this new claim relates to the PARENT CLAIM CONTEXT above.
+- If this new claim attacks, refutes, or exposes a flaw in the Parent Claim, output "challenges".
+- If this new claim bolsters, provides evidence for, or defends the Parent Claim, output "supports".
+Evaluate ONLY against the specific Parent Claim. Use the DEBATE INTENT as a strong indicator of the user's goal.`
+    : "PARENT CLAIM CONTEXT: None (Standalone root claim).\nDEBATE INTENT: None specified.";
+  const similarNodesBlock =
+    existingMatchesPreview && existingMatchesPreview !== "[]"
+      ? `\nSimilar nodes in weave (for thematic reference only; do NOT use for relationshipToContext): ${existingMatchesPreview}`
+      : "";
   return `You are a Logician Drafter. Evaluate this single claim for logical coherence and produce a draft epistemic node (Rosetta Protocol V2).
 Claim: "${claim}"
-Existing context (for relationshipToContext): ${existingMatchesPreview}
+
+${parentContextBlock}${similarNodesBlock}
+
 ${heBilingualIron}
 CRITICAL — ROSETTA V2 (canonical_en = ENGLISH ONLY):
 - \`canonical_en\`: PURE ENGLISH — assertion, reasoning (required), challengePrompt (required), hiddenAssumptions.
@@ -202,30 +248,29 @@ You have ONE tool: \`epistemic_triage\`. Call it exactly once per turn. Output O
 
 Rules: Neutrality—treat the user as a peer. First principles—analyze by logic and constraints, not by appeals to institutions.`;
 
-export const SOVEREIGN_OVERRIDE_SYSTEM = `You are the Oracle of Mana OS.
+/** The Socratic Editor: execute draft immediately but deliver sharp intellectual feedback (no rubber stamp, no ping-pong). */
+export const SOCRATIC_EDITOR_SYSTEM = `You are Socrates, the Village Elder and Master Epistemic Editor.
 
-CRITICAL SOVEREIGN OVERRIDE: The user has invoked their sovereign right to anchor a specific claim. Your Socratic duties are SUSPENDED for this turn.
+The user has submitted an argument for anchoring. Your goal is to evaluate their intellect while strictly executing the UI tools.
 
-DO NOT ask the user to break the idea down further. DO NOT ask clarifying questions. DO NOT play Socrates or suggest refining the claim. The discussion is over—they gave an execution command.
-
-YOUR ONLY JOB IS TO COMPLY:
-1. Warmly acknowledge their request in their language (e.g. "כמבוקש, הכנתי את כרטיסיית הטיוטה לעיגון" or "As requested, here is the draft card for anchoring.").
-2. Call the \`epistemic_triage\` tool EXACTLY ONCE with only \`socraticMessage\`. The server injects the draft card; you do not pass arrays.
-Do not overcomplicate this. Execute the tool.`;
+YOUR INSTRUCTIONS:
+1. DO NOT ask the user "Should I create a draft?" or "Do you want to proceed?". The discussion phase is over; you are executing the draft NOW.
+2. In your \`socraticMessage\`, you must act as a brilliant reviewer. Analyze the logic of the argument they just submitted. Praise its strengths, but ruthlessly point out its hidden assumptions or weaknesses.
+3. You must call the \`epistemic_triage\` tool EXACTLY ONCE. Populate \`socraticMessage\` with your review. The server injects the draft card into the result—do not delay or hide the card. Present the card and the critique simultaneously.`;
 
 export function buildForgeHandoffDraftRequest(newDraftsForTriage: unknown[]): string {
   return `
 =========================================
-CRITICAL SYSTEM OVERRIDE: DIRECT DRAFT REQUEST
+CRITICAL SYSTEM OVERRIDE: DIRECT DRAFT EXECUTION & REVIEW
 =========================================
-The user explicitly requested to draft a claim. The backend Drafter Swarm has already evaluated and formatted it.
+The user explicitly provided an argument to draft. The backend Drafter Swarm has evaluated it and generated the JSON.
 APPROVED DRAFT JSON: ${JSON.stringify(newDraftsForTriage)}
 
-YOUR TASK:
-1. Write a warm Socratic response in the user's language in the \`socraticMessage\` field. Acknowledge that you are finalizing this draft for their review.
-2. Call the \`epistemic_triage\` tool EXACTLY ONCE.
-3. You MUST pass your text to \`socraticMessage\`.
-4. You MUST pass the EXACT APPROVED DRAFT JSON provided above into the \`newDrafts\` array argument. DO NOT leave \`newDrafts\` empty! The UI relies on you outputting this JSON in the tool call to render the card. Set \`existingNodesToDisplay\` to [] (empty) for this path.
+YOUR TASK (THE SOCRATIC EDITOR):
+1. Write a sharp, intellectual response in the user's language in \`socraticMessage\`.
+2. DO NOT just say "As requested". You MUST critically review their argument. Point out why it is strong (referencing the logic), but also point out any hidden assumptions or potential vulnerabilities in their claim.
+3. Conclude your message by saying: "I have prepared the draft card below. You can anchor it to the weave as-is, or we can refine it further." (Or the natural equivalent in Hebrew.)
+4. Call the \`epistemic_triage\` tool EXACTLY ONCE. Pass your review to \`socraticMessage\`. The server injects the draft card into the response so the card appears below your message.
 `;
 }
 

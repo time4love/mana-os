@@ -358,7 +358,7 @@ export function DiveColumn({
                       const childParsed = parseNodeContent(child.content, lang);
                       const isActive = child.id === activeChildId;
                       const score = childParsed.pulse;
-                      const avatar = getArenaAvatar(child.author_wallet, arenaId ?? actualNodeId);
+                      const avatar = getArenaAvatar(child.author_wallet, arenaId ?? "");
                       return (
                         <button
                           key={edge.id}
@@ -512,7 +512,7 @@ export function DiveColumn({
                     const childParsed = parseNodeContent(child.content, lang);
                     const isActive = child.id === activeChildId;
                     const score = childParsed.pulse;
-                    const avatar = getArenaAvatar(child.author_wallet, arenaId ?? actualNodeId);
+                    const avatar = getArenaAvatar(child.author_wallet, arenaId ?? "");
                     return (
                       <button
                         key={edge.id}
@@ -555,7 +555,7 @@ export function DiveColumn({
                     const childParsed = parseNodeContent(child.content, lang);
                     const isActive = child.id === activeChildId;
                     const score = childParsed.pulse;
-                    const avatar = getArenaAvatar(child.author_wallet, arenaId ?? actualNodeId);
+                    const avatar = getArenaAvatar(child.author_wallet, arenaId ?? "");
                     return (
                       <button
                         key={edge.id}
