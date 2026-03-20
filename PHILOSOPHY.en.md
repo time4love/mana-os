@@ -44,7 +44,14 @@ Mana OS allows its citizens to reprogram it even without code. Users hold a Socr
 13. **The Fractal Truth Engine (Epistemic Freedom & The Crossfire Arena):**
 In the Matrix, algorithms and corporate fact-checkers dictate consensus through 'Appeal to Authority'. In Mana OS, we provide the Truth Engine—a Semantic Directed Acyclic Graph (DAG) operating as a pure logical arena, backed by the blockchain as a Trust Machine for objective reality. Truth is not a grade; it is a **state of survival against refutation**.
 
-- *The Crossfire Arena (No Arbitrary Scores):* We reject the arbitrary 0–100 "Logical Coherence Score". Truth is binary in its survival. Claims in Mana OS exist in one of three **Epistemic States**:
+- *The End of Arbitrary Scoring:* We reject subjective 0–100 "Logical Coherence Scores". Such scores are flawed and often trigger the LLM's consensus bias. Truth is evaluated through **categorical Epistemic Moves**—the system classifies *how* a theory is being defended or attacked, forcing the AI (Socrates) to act as an objective referee of formal logic rather than a defender of mainstream consensus.
+- *Categorizing the Crossfire (Epistemic Moves):* When users submit arguments (transcripts or manual claims), the AI strictly categorizes them into tactical moves:
+  - ⚔️ **Empirical Contradiction (סתירה תצפיתית):** A direct, observable, and reproducible event that shatters a theory's core geometric or physical prediction (e.g., observing a lighthouse at 50 miles when Earth's curvature math dictates it should be hidden).
+  - ⚔️ **Internal Inconsistency (כשל לוגי פנימי):** A demonstration that a theory's own rules contradict each other.
+  - 🛡️ **Empirical Verification (ביסוס תצפיתי):** A direct, unmediated observation proving a claim.
+  - 🛡️ **The Ad-Hoc Rescue (טלאי אד-הוק):** When a theory faces an Empirical Contradiction, its defenders often invent unobservable, unprovable, or perfectly tailored constructs (e.g., "Dark Matter", "Perfect Atmospheric Refraction matching curvature") just to save the model. The AI must tag these defenses as "Ad-Hoc Constructs". A theory held together by too many Ad-Hoc patches is visually exposed as fragile.
+  - 🚫 **Appeal to Authority (הטיית סמכות):** Automatically flagged and weakened. Arguments relying purely on "NASA says so" or "Textbooks claim" are categorized as invalid epistemic moves.
+- *Epistemic States:* Claims in Mana OS exist in one of three **Epistemic States**:
   1. **Solid (יציבה):** A claim that has no active, community-validated refutations against it.
   2. **Contested (מעורערת):** A claim that is currently under direct attack by a counter-claim from an opposing theory.
   3. **Shattered (הופרכה):** A claim where the community (via Epistemic Resonance) has validated the refutation. Shattered claims are not deleted; they remain as educational scars in the weave.

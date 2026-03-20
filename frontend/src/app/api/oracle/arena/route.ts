@@ -172,7 +172,7 @@ export async function POST(request: Request) {
       const tags = (flipped as { thematicTags?: string[] }).thematicTags ?? [];
       const normalized = {
         ...flipped,
-        logicalCoherenceScore: 50,
+        epistemicState: "SOLID" as const,
         thematicTags: [...new Set([...tags, "macro-arena"])],
       };
       newDraftsForTriage = arenaTriageArr.parse([normalized]);

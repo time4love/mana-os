@@ -8,6 +8,7 @@ import { useLocale } from "@/lib/i18n/context";
 import { Button } from "@/components/ui/button";
 import type { SieveProcessedClaim, SieveSupportedTheory } from "@/types/truth";
 import { getDisplayBlock } from "@/lib/utils/truthRosetta";
+import { EpistemicStateBadge } from "@/components/truth/EpistemicStateBadge";
 
 const LABELS = {
   runSieve: { he: "הפעל נפה", en: "Run Sieve" },
@@ -332,12 +333,7 @@ function HarvestColumn({
               {getClaimAssertion(claim, locale)}
             </p>
             <div className="mt-2 flex items-center justify-between gap-2">
-              <span
-                className="font-mono text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded"
-                aria-label={`Coherence ${claim.logicalCoherenceScore}`}
-              >
-                {claim.logicalCoherenceScore}
-              </span>
+              <EpistemicStateBadge state={claim.epistemicState ?? "SOLID"} locale={locale} />
             </div>
             {getClaimReasoning(claim, locale).trim() && (
               <p className="mt-2 text-xs text-muted-foreground line-clamp-2">

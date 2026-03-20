@@ -223,11 +223,15 @@ export function normalizeRawDraft(c: Record<string, unknown>): NormalizedForgeDr
       ? asRosettaBlock(ce)
       : { assertion: "", reasoning: "" };
 
+  const epistemicState =
+    c.epistemicState === "SOLID" || c.epistemicState === "CONTESTED" || c.epistemicState === "SHATTERED"
+      ? c.epistemicState
+      : "SOLID";
   return {
     canonical_en,
     source_locale: typeof c.source_locale === "string" ? c.source_locale : "en",
     local_translation: c.local_translation ? asRosettaBlock(c.local_translation) : undefined,
-    logicalCoherenceScore: typeof c.logicalCoherenceScore === "number" ? c.logicalCoherenceScore : 0,
+    epistemicState,
     supportedTheory: c.supportedTheory as DraftEpistemicNodeV2["supportedTheory"],
     thematicTags: Array.isArray(c.thematicTags) ? (c.thematicTags as string[]) : [],
     matchedExistingNodeId:

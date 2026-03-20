@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { useLocale } from "@/lib/i18n/context";
 import { getLocalized } from "@/components/truth/forgeChatLib";
 import { getDisplayAssertion } from "@/lib/utils/truthParser";
+import { EpistemicStateBadge } from "@/components/truth/EpistemicStateBadge";
+import { getMoveBadge } from "@/components/truth/EpistemicMoveBadge";
 import type { MatchTruthNodeResult } from "@/types/truth";
 import type { DraftEpistemicNodeV2, RosettaBlock } from "@/types/truth";
 
@@ -81,11 +83,6 @@ const PORTAL_EXISTING_CTA = {
   en: "This claim exists in the Weave — dive into discussion",
 };
 
-const SOVEREIGN_LOW_SCORE_WARNING = {
-  he: "האורקל מצביע על פערים לוגיים מהותיים בטיוטה זו. זכותך הריבונית לעגן אותה כפי שהיא, אך מומלץ להיעזר בשאלות ההפרכה כדי ללטש אותה.",
-  en: "The Oracle indicates significant logical gaps in this draft. It is your sovereign right to anchor it as is, but refining it via the challenge prompts is recommended.",
-};
-
 interface DraftNodeCardProps {
   draft: ForgeDraft;
   onAnchor: () => void;
@@ -139,10 +136,8 @@ export function DraftNodeCard({
   const rationaleLabel = getLocalized(RATIONALE_LABEL, locale);
   const scoutLabel = getLocalized(SCOUT_LABEL, locale);
 
-  const pulse = Math.min(100, Math.max(0, draft.logicalCoherenceScore));
-  const isBelowAnchoringThreshold = pulse < 40;
   const portalLabel = getLocalized(PORTAL_EXISTING_CTA, locale);
-  const sovereignWarningLabel = getLocalized(SOVEREIGN_LOW_SCORE_WARNING, locale);
+  const epistemicState = draft.epistemicState ?? "SOLID";
 
   const rel = draft.relationshipToContext;
   const supportsLabel = getLocalized(BADGE_SUPPORTS, locale);
@@ -199,15 +194,11 @@ export function DraftNodeCard({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {!isMacroArena && (
-            <span
-              className="font-mono text-sm text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded"
-              aria-label={`Coherence ${pulse}`}
-            >
-              {pulse}/100
-            </span>
+            <EpistemicStateBadge state={epistemicState} locale={locale} />
           )}
+          {getMoveBadge(draft.epistemicMoveType ?? null, locale === "he" ? "he" : "en")}
           {hasDetails && (
             <button
               type="button"
@@ -320,16 +311,6 @@ export function DraftNodeCard({
           </div>
         ) : (
           <div className="space-y-3">
-            {isBelowAnchoringThreshold && (
-              <div
-                className="rounded-lg border border-amber-300/70 bg-amber-50/80 dark:bg-amber-950/30 px-3 py-2.5 text-start"
-                role="status"
-              >
-                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                  {sovereignWarningLabel}
-                </p>
-              </div>
-            )}
             <Button
               type="button"
               onClick={onAnchor}

@@ -125,7 +125,7 @@ export async function POST(request: Request) {
     const extractedClaims: ExtractedClaim[] = [];
     for (let i = 0; i < claims.length; i++) {
       const assertion = claims[i];
-      let logic: { coherenceScore: number; logicalReasoning: string };
+      let logic: { logicalReasoning: string };
       let scout: { hiddenAssumptions: string[]; falsificationChallenge: string };
       if (architectMode) {
         const tLogician = Date.now();
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
           "The Logician",
           `Validating structural soundness of Claim ${i + 1}…`,
           Date.now() - tLogician,
-          { status: `Scored ${logic.coherenceScore}/100` }
+          { status: "Evaluated" }
         );
         const tScout = Date.now();
         scout = await findHiddenAssumptions(assertion);
@@ -152,7 +152,6 @@ export async function POST(request: Request) {
       }
       extractedClaims.push({
         assertion,
-        logicalCoherenceScore: logic.coherenceScore,
         reasoning: logic.logicalReasoning,
         hiddenAssumptions: scout.hiddenAssumptions,
         challengePrompt: scout.falsificationChallenge,

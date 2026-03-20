@@ -38,7 +38,7 @@ export function parseNodeContent(
         (block.challengePrompt ? `Falsification prompt: ${block.challengePrompt}` : "");
       return {
         assertion: block.assertion.trim(),
-        pulse: v2.pulse ?? null,
+        pulse: null,
         rationale: block.reasoning?.trim() || null,
         scoutWarning: scoutWarning.trim() || null,
       };

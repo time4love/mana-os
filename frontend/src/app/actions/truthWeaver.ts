@@ -269,7 +269,6 @@ const AnchorPrismParamsSchema = z.object({
   extractedClaims: z.array(
     z.object({
       assertion: z.string(),
-      logicalCoherenceScore: z.number(),
       reasoning: z.string(),
       hiddenAssumptions: z.array(z.string()),
       challengePrompt: z.string(),
@@ -290,7 +289,6 @@ export async function anchorPrismToGraph(
   documentThesis: string,
   extractedClaims: Array<{
     assertion: string;
-    logicalCoherenceScore: number;
     reasoning: string;
     hiddenAssumptions: string[];
     challengePrompt: string;
@@ -351,7 +349,7 @@ export async function anchorPrismToGraph(
 
     let claimsAnchored = 0;
     for (const claim of parsed.data.extractedClaims) {
-      const claimContent = `${claim.assertion}\n[Score: ${claim.logicalCoherenceScore}] ${claim.reasoning}`;
+      const claimContent = `${claim.assertion}\n\nRationale: ${claim.reasoning}`;
       try {
         const claimEmbedResult = await embed({
           model: embeddingModel,
@@ -406,7 +404,6 @@ const AnchorPrismDraftSchema = z.object({
   extractedClaims: z.array(
     z.object({
       assertion: z.string(),
-      logicalCoherenceScore: z.number(),
       reasoning: z.string(),
       hiddenAssumptions: z.array(z.string()),
       challengePrompt: z.string(),
@@ -426,10 +423,9 @@ function metadataFromForgeDraft(draft: AnchorableForgeDraft): { competingTheorie
   };
 }
 
-/** Legacy Prism claim blob (single locale; no EN translation layer). */
+/** Prism claim blob (single locale; no EN translation layer). */
 function formatClaimContent(claim: {
   assertion: string;
-  logicalCoherenceScore: number;
   reasoning: string;
   hiddenAssumptions: string[];
   challengePrompt: string;
@@ -437,7 +433,7 @@ function formatClaimContent(claim: {
   const assumptions = claim.hiddenAssumptions?.length
     ? claim.hiddenAssumptions.join(", ")
     : "—";
-  return `Content: ${claim.assertion}\n\n[Logician's Pulse: ${claim.logicalCoherenceScore}/100]\nRationale: ${claim.reasoning}\n\n[The Scout's Edge] Hidden Assumptions: ${assumptions}\nFalsification Prompt: ${claim.challengePrompt}`;
+  return `Content: ${claim.assertion}\n\nRationale: ${claim.reasoning}\n\n[The Scout's Edge] Hidden Assumptions: ${assumptions}\nFalsification Prompt: ${claim.challengePrompt}`;
 }
 
 /**
@@ -656,7 +652,6 @@ export async function anchorForgeDraft(
       canonical_en: data.canonical_en,
       source_locale: data.source_locale,
       locales: data.local_translation ? { [sl]: data.local_translation } : {},
-      pulse: data.logicalCoherenceScore,
     });
     writeTelemetry.push("[4b] Rosetta Protocol V2 JSON stored (Rosetta failsafe applied).");
     const thematicTags = Array.isArray(data.thematicTags)
@@ -672,6 +667,7 @@ export async function anchorForgeDraft(
       is_macro_root: !parentId,
       thematic_tags: thematicTags.length > 0 ? thematicTags : undefined,
       metadata,
+      epistemic_move: "epistemicMoveType" in data && data.epistemicMoveType ? data.epistemicMoveType : undefined,
     };
     const { data: rowData, error: insertError } = await supabase
       .from("truth_nodes")
@@ -819,6 +815,8 @@ export interface TruthNodeRow {
   thematic_tags?: string[] | null;
   metadata?: Record<string, unknown> | null;
   resonance_count?: number | null;
+  epistemic_state?: "SOLID" | "CONTESTED" | "SHATTERED" | null;
+  epistemic_move?: "EMPIRICAL_CONTRADICTION" | "INTERNAL_INCONSISTENCY" | "EMPIRICAL_VERIFICATION" | "AD_HOC_RESCUE" | "APPEAL_TO_AUTHORITY" | null;
 }
 
 /** truth_edges row with embedded source/target node rows for column rendering. */
@@ -847,7 +845,7 @@ export async function getTruthNodeWithEdges(nodeId: string): Promise<TruthNodeWi
 
     const { data: node, error: nodeError } = await supabase
       .from("truth_nodes")
-      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata, resonance_count")
+      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata, resonance_count, epistemic_state, epistemic_move")
       .eq("id", nodeId)
       .single();
 
@@ -881,7 +879,7 @@ export async function getTruthNodeWithEdges(nodeId: string): Promise<TruthNodeWi
 
     const { data: nodeRows } = await supabase
       .from("truth_nodes")
-      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata, resonance_count")
+      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata, resonance_count, epistemic_state, epistemic_move")
       .in("id", Array.from(allNodeIds));
 
     const nodeMap = new Map<string, TruthNodeRow>();

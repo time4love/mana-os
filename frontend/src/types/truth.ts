@@ -48,6 +48,15 @@ export interface TruthNodeMetadata {
   competingTheories?: CompetingTheoryV2[];
 }
 
+export type EpistemicState = "SOLID" | "CONTESTED" | "SHATTERED";
+
+export type EpistemicMoveType =
+  | "EMPIRICAL_CONTRADICTION"
+  | "INTERNAL_INCONSISTENCY"
+  | "EMPIRICAL_VERIFICATION"
+  | "AD_HOC_RESCUE"
+  | "APPEAL_TO_AUTHORITY";
+
 export interface TruthNode {
   id: string;
   author_wallet: string | null;
@@ -58,6 +67,8 @@ export interface TruthNode {
   thematic_tags?: string[];
   metadata?: TruthNodeMetadata;
   resonance_count?: number;
+  epistemic_state?: EpistemicState;
+  epistemic_move?: EpistemicMoveType | null;
 }
 
 export type TruthNodeInsert = Omit<TruthNode, "id" | "created_at"> & {
@@ -96,7 +107,8 @@ export interface DraftEpistemicNodeV2 {
   canonical_en: RosettaBlock;
   source_locale: string;
   local_translation?: RosettaBlock;
-  logicalCoherenceScore: number;
+  epistemicState?: EpistemicState;
+  epistemicMoveType?: EpistemicMoveType;
   supportedTheory?: "THEORY_A" | "THEORY_B" | "NEUTRAL";
   thematicTags?: string[];
   matchedExistingNodeId?: string | null;
@@ -116,7 +128,6 @@ export type ForgeDraftBilingual = DraftEpistemicNodeV2;
 
 export interface ExtractedClaim {
   assertion: string;
-  logicalCoherenceScore: number;
   reasoning: string;
   hiddenAssumptions: string[];
   challengePrompt: string;
@@ -171,9 +182,13 @@ export interface SieveProcessedClaim {
   canonical_en: RosettaBlock;
   source_locale: string;
   local_translation?: RosettaBlock;
-  logicalCoherenceScore: number;
+  epistemicState?: EpistemicState;
+  epistemicMoveType?: EpistemicMoveType;
   supportedTheory: SieveSupportedTheory;
   matchedExistingNodeId?: string | null;
+  /** Auto cross-match: if this claim directly attacks/supports an existing node, set by Sieve Logician. */
+  crossMatchTargetId?: string | null;
+  crossMatchRelationship?: "supports" | "challenges" | null;
 }
 
 export interface SieveTelemetry {

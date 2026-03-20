@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/sheet";
 import type { SieveProcessedClaim, SieveSupportedTheory, SieveTelemetry } from "@/types/truth";
 import { getDisplayBlock } from "@/lib/utils/truthRosetta";
+import { EpistemicStateBadge } from "@/components/truth/EpistemicStateBadge";
 
 const LABELS = {
   trigger: { he: "הגש כתב טענות / תמלול", en: "Submit Claims / Transcript" },
@@ -37,6 +38,8 @@ const LABELS = {
   anotherTranscript: { he: "הזן טקסט אחר", en: "Enter another transcript" },
   alreadyAnchored: { he: "טענה זו כבר מעוגנת במארג", en: "Claim already anchored in the weave" },
   summaryAlreadyExist: { he: "מהן כבר במארג", en: "of them already exist in the weave" },
+  crossMatchChallenges: { he: "תוקף טענה קיימת", en: "Challenges existing claim" },
+  crossMatchSupports: { he: "מבסס טענה קיימת", en: "Supports existing claim" },
   telemetryTitle: { he: "מעקב נחיל", en: "Swarm telemetry" },
   telemetryExtractor: { he: "חילוץ", en: "Extractor" },
   telemetryScout: { he: "סקָאוּט (כפילויות)", en: "Scout (duplicates)" },
@@ -538,15 +541,20 @@ function HarvestColumn({
                 </Link>
               </div>
             )}
+            {claim.crossMatchTargetId && claim.crossMatchRelationship && (
+              <div className="mt-2 text-[10px] font-bold text-muted-foreground flex items-center gap-1 bg-secondary/30 px-2 py-1 rounded-md border border-border/50 w-fit">
+                {claim.crossMatchRelationship === "challenges"
+                  ? (locale === "he" ? "⚔️ " + LABELS.crossMatchChallenges.he : "⚔️ " + LABELS.crossMatchChallenges.en)
+                  : (locale === "he" ? "🛡️ " + LABELS.crossMatchSupports.he : "🛡️ " + LABELS.crossMatchSupports.en)}
+                <span className="font-mono opacity-50 truncate max-w-16" title={claim.crossMatchTargetId}>
+                  {claim.crossMatchTargetId.slice(0, 8)}…
+                </span>
+              </div>
+            )}
             <p className="text-sm text-foreground leading-relaxed line-clamp-2">
               {getClaimAssertion(claim, locale)}
             </p>
-            <span
-              className="mt-1.5 inline-block font-mono text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded"
-              aria-label={`Coherence ${claim.logicalCoherenceScore}`}
-            >
-              {claim.logicalCoherenceScore}
-            </span>
+            <EpistemicStateBadge state={claim.epistemicState ?? "SOLID"} locale={locale} className="mt-1.5" />
           </motion.li>
         ))}
       </ul>

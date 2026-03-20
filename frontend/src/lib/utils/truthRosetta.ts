@@ -109,7 +109,6 @@ function normalizeLocales(raw: unknown): Record<string, RosettaBlock> {
 /** Parsed stored node content (JSONB string → object). */
 export interface TruthNodeStoredV2 extends TruthNodeContentV2 {
   schemaVersion: 2;
-  pulse?: number;
 }
 
 export function parseTruthNodeContentJson(raw: string): TruthNodeStoredV2 | null {
@@ -118,16 +117,11 @@ export function parseTruthNodeContentJson(raw: string): TruthNodeStoredV2 | null
   try {
     const p = JSON.parse(t) as Record<string, unknown>;
     if (!p.canonical_en || typeof p.canonical_en !== "object") return null;
-    const pulse =
-      typeof p.pulse === "number" && Number.isFinite(p.pulse)
-        ? Math.min(100, Math.max(0, p.pulse))
-        : undefined;
     return {
       schemaVersion: 2,
       canonical_en: normalizeBlock(p.canonical_en),
       source_locale: typeof p.source_locale === "string" ? p.source_locale.trim() : "en",
       locales: normalizeLocales(p.locales),
-      pulse,
     };
   } catch {
     return null;
@@ -172,15 +166,12 @@ export function embeddingTextFromCanonical(block: RosettaBlock): string {
   return r ? `${a}\n${r}` : a;
 }
 
-export function truthNodeContentV2ToJson(
-  body: TruthNodeContentV2 & { pulse?: number }
-): string {
+export function truthNodeContentV2ToJson(body: TruthNodeContentV2): string {
   return JSON.stringify({
     schemaVersion: 2,
     canonical_en: body.canonical_en,
     source_locale: body.source_locale,
     locales: body.locales,
-    ...(typeof body.pulse === "number" ? { pulse: body.pulse } : {}),
   });
 }
 

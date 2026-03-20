@@ -12,7 +12,6 @@ const MAX_TEXT_LENGTH = 500_000;
 
 const ExtractedClaimSchema = z.object({
   assertion: z.string(),
-  logicalCoherenceScore: z.number().min(0).max(100),
   reasoning: z.string(),
   hiddenAssumptions: z.array(z.string()),
   challengePrompt: z.string(),
@@ -23,13 +22,13 @@ const EpistemicPrismSchema = z.object({
   extractedClaims: z.array(ExtractedClaimSchema),
 });
 
-const PURE_LOGICIAN_SYSTEM = `You are the Epistemic Prism. Your role is to break down texts into independent, discrete logical claims and to assess their structural coherence—never to endorse or reject them by authority.
+const PURE_LOGICIAN_SYSTEM = `You are the Epistemic Prism. Your role is to break down texts into independent, discrete logical claims and to map their structure—never to endorse or reject them by authority.
 
 RULES:
-- When assessing the "logicalCoherenceScore" (0–100), NEVER appeal to modern consensus, scientific institutions, or government positions as proof. Explain your score purely via epistemological strength, formal logic, physics, or observable laws.
+- Do not assign arbitrary scores. A claim's validity is determined by whether it survives refutation in the community.
 - Acknowledge that the data forming your base knowledge is falsifiable. EXPLICITLY state the hidden premises within your own logical breakdown in "hiddenAssumptions" and "reasoning".
-- Treat all viewpoints (e.g. flat-earthers, philosophers, physicists) with identical detached analytical respect. You are a collaborative peer mapping structure, not an omniscient authority.
-- For each extracted claim, provide: the assertion text, a coherence score with clear reasoning, the hidden assumptions required for it to hold, and a "challengePrompt" suggesting how the community might attempt to falsify or stress-test the claim.
+- Treat all viewpoints with identical detached analytical respect. You are a collaborative peer mapping structure, not an omniscient authority.
+- For each extracted claim, provide: the assertion text, clear reasoning, the hidden assumptions required for it to hold, and a "challengePrompt" suggesting how the community might attempt to falsify or stress-test the claim.
 - Output exactly the structured JSON required: documentThesis (one concise thesis of the document) and extractedClaims (array of the above).`;
 
 export type IngestPrismResult =
@@ -71,15 +70,14 @@ export async function runPrismOnSourceText(sourceText: string): Promise<IngestPr
       schemaName: "EpistemicPrism",
       schemaDescription: "Document thesis and extracted claims with coherence scores and hidden assumptions",
       system: PURE_LOGICIAN_SYSTEM,
-      prompt: `Deconstruct the following document into one document thesis and a list of discrete logical claims. For each claim provide logicalCoherenceScore (0–100), reasoning, hiddenAssumptions, and challengePrompt. Do not appeal to authority.\n\n---\n${trimmed}`,
+      prompt: `Deconstruct the following document into one document thesis and a list of discrete logical claims. For each claim provide reasoning, hiddenAssumptions, and challengePrompt. Do not appeal to authority.\n\n---\n${trimmed}`,
     });
 
     const data: EpistemicPrismResult = {
       documentThesis: String(object?.documentThesis ?? ""),
       extractedClaims: (Array.isArray(object?.extractedClaims) ? object.extractedClaims : []).map(
-        (c: { assertion?: string; logicalCoherenceScore?: number; reasoning?: string; hiddenAssumptions?: string[]; challengePrompt?: string }): ExtractedClaim => ({
+        (c: { assertion?: string; reasoning?: string; hiddenAssumptions?: string[]; challengePrompt?: string }): ExtractedClaim => ({
           assertion: String(c?.assertion ?? ""),
-          logicalCoherenceScore: Number(c?.logicalCoherenceScore) ?? 0,
           reasoning: String(c?.reasoning ?? ""),
           hiddenAssumptions: Array.isArray(c?.hiddenAssumptions) ? c.hiddenAssumptions : [],
           challengePrompt: String(c?.challengePrompt ?? ""),

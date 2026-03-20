@@ -77,12 +77,27 @@ export const CompetingTheoryStrictSchema = z.object({
   local_translation: LocalRosettaBlockStrictSchema,
 });
 
+const EpistemicStateSchema = z.enum(["SOLID", "CONTESTED", "SHATTERED"]).optional();
+
+const EpistemicMoveTypeSchema = z
+  .enum([
+    "EMPIRICAL_CONTRADICTION",
+    "INTERNAL_INCONSISTENCY",
+    "EMPIRICAL_VERIFICATION",
+    "AD_HOC_RESCUE",
+    "APPEAL_TO_AUTHORITY",
+  ])
+  .describe(
+    "Categorize the core tactical nature of this claim. Is it a direct empirical verification? An ad-hoc rescue of a flawed theory? An empirical contradiction?"
+  );
+
 /** Hebrew Forge / single-claim draft — local_translation is mandatory. */
 export const DraftEpistemicNodeV2HeForgeSchema = z.object({
   canonical_en: CanonicalRosettaBlockStrictSchema,
   source_locale: z.literal("he"),
   local_translation: LocalRosettaBlockStrictSchema,
-  logicalCoherenceScore: z.number().min(0).max(100),
+  epistemicState: EpistemicStateSchema,
+  epistemicMoveType: EpistemicMoveTypeSchema.optional(),
   supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]).optional(),
   thematicTags: z.array(z.string()).max(10).optional(),
   matchedExistingNodeId: z.string().nullable().optional(),
@@ -95,7 +110,7 @@ export const DraftEpistemicNodeV2HeArenaSchema = z.object({
   canonical_en: CanonicalRosettaBlockStrictSchema,
   source_locale: z.literal("he"),
   local_translation: LocalRosettaBlockStrictSchema,
-  logicalCoherenceScore: z.number().min(0).max(100),
+  epistemicState: EpistemicStateSchema,
   thematicTags: z.array(z.string()).max(10),
   relationshipToContext: z.literal("supports"),
   competingTheories: z.array(CompetingTheoryStrictSchema).length(2),
@@ -114,7 +129,8 @@ export const DraftEpistemicNodeV2LooseSchema = z.object({
     .catch({ assertion: "Assertion unavailable", reasoning: "" }),
   source_locale: z.string().catch("en"),
   local_translation: LocalRosettaBlockSchema.optional(),
-  logicalCoherenceScore: z.number().min(0).max(100).catch(50),
+  epistemicState: EpistemicStateSchema,
+  epistemicMoveType: EpistemicMoveTypeSchema.optional(),
   supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]).optional(),
   thematicTags: z.array(z.string()).max(10).optional().catch([]),
   matchedExistingNodeId: z.string().nullable().optional().catch(null),

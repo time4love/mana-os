@@ -5,35 +5,28 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ExtractedClaim } from "@/types/truth";
+import { EpistemicStateBadge } from "@/components/truth/EpistemicStateBadge";
 
 const REASONING_LABEL = { he: "נימוק", en: "Rationale" };
 const ASSUMPTIONS_LABEL = { he: "הנחות מובלעות", en: "Hidden assumptions" };
 const CHALLENGE_LABEL = { he: "אתגר לקהילה", en: "Challenge for the community" };
-const SCORE_LABEL = { he: "ציון קוהרנטיות", en: "Coherence score" };
 
 interface ClaimEvaluationCardProps {
   claim: ExtractedClaim;
   index: number;
   locale: "he" | "en";
-  /** Score >= 80: emerald; else: gray-amber (fallacy / weaker logic). */
-  coherenceHighThreshold?: number;
 }
 
 export function ClaimEvaluationCard({
   claim,
   index,
   locale,
-  coherenceHighThreshold = 80,
 }: ClaimEvaluationCardProps) {
   const [rationaleOpen, setRationaleOpen] = useState(false);
   const t = locale === "he" ? "he" : "en";
   const reasoningLabel = t === "he" ? REASONING_LABEL.he : REASONING_LABEL.en;
   const assumptionsLabel = t === "he" ? ASSUMPTIONS_LABEL.he : ASSUMPTIONS_LABEL.en;
   const challengeLabel = t === "he" ? CHALLENGE_LABEL.he : CHALLENGE_LABEL.en;
-  const scoreLabel = t === "he" ? SCORE_LABEL.he : SCORE_LABEL.en;
-
-  const score = Math.min(100, Math.max(0, claim.logicalCoherenceScore));
-  const isHighCoherence = score >= coherenceHighThreshold;
 
   return (
     <motion.li
@@ -49,30 +42,7 @@ export function ClaimEvaluationCard({
             {claim.assertion}
           </p>
 
-          {/* Coherence score + progress bar */}
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">
-              {scoreLabel}: {score}/100
-            </p>
-            <div
-              role="progressbar"
-              aria-valuenow={score}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              className="h-2 w-full overflow-hidden rounded-full bg-muted"
-            >
-              <motion.div
-                initial={{ inlineSize: 0 }}
-                animate={{ inlineSize: `${score}%` }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className={`h-full rounded-full ${
-                  isHighCoherence
-                    ? "bg-emerald-500"
-                    : "bg-amber-400/80"
-                }`}
-              />
-            </div>
-          </div>
+          <EpistemicStateBadge state="SOLID" locale={locale} />
 
           {/* Accordion: Rationale (Logician reasoning) */}
           <div>

@@ -25,9 +25,10 @@ const AnchorBodySchema = z.object({
         canonical_en: RosettaBlockSchema,
         source_locale: z.string(),
         local_translation: RosettaBlockSchema.optional(),
-        logicalCoherenceScore: z.number().min(0).max(100),
         supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]),
         matchedExistingNodeId: z.string().nullable().optional(),
+        crossMatchTargetId: z.string().uuid().nullable().optional(),
+        crossMatchRelationship: z.enum(["supports", "challenges"]).nullable().optional(),
       })
     )
     .max(100),
@@ -53,7 +54,6 @@ function buildSieveClaimContent(claim: SieveAnchorClaim): string {
     canonical_en: claim.canonical_en,
     source_locale: claim.source_locale,
     locales: claim.local_translation ? { [sl]: claim.local_translation } : {},
-    pulse: claim.logicalCoherenceScore,
   });
 }
 
@@ -127,11 +127,17 @@ export async function POST(request: Request) {
       if (insertError || !row?.id) continue;
 
       createdIds.push(row.id);
-      edges.push({
-        source_id: arenaId,
-        target_id: row.id,
-        relationship: supportedTheoryToRelationship(claim.supportedTheory),
-      });
+      const crossTarget = claim.crossMatchTargetId ?? null;
+      const crossRel = claim.crossMatchRelationship ?? null;
+      if (crossTarget && (crossRel === "supports" || crossRel === "challenges")) {
+        edges.push({ source_id: crossTarget, target_id: row.id, relationship: crossRel });
+      } else {
+        edges.push({
+          source_id: arenaId,
+          target_id: row.id,
+          relationship: supportedTheoryToRelationship(claim.supportedTheory),
+        });
+      }
     } catch {
       /* skip */
     }

@@ -54,22 +54,39 @@ function localeToUserLanguage(locale: string): string {
   }
 }
 
+const EpistemicMoveTypeSchema = z
+  .enum([
+    "EMPIRICAL_CONTRADICTION",
+    "INTERNAL_INCONSISTENCY",
+    "EMPIRICAL_VERIFICATION",
+    "AD_HOC_RESCUE",
+    "APPEAL_TO_AUTHORITY",
+  ])
+  .optional()
+  .describe("Categorize the tactical nature of this claim (empirical contradiction, ad-hoc rescue, appeal to authority, etc.).");
+
+const CrossMatchRelationshipSchema = z.enum(["supports", "challenges"]).nullable().optional();
+
 const LogicianAlignerHeSchema = z.object({
   canonical_en: CanonicalRosettaBlockStrictSchema,
   source_locale: z.literal("he"),
   local_translation: LocalRosettaBlockStrictSchema,
-  logicalCoherenceScore: z.number().min(0).max(100),
   supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]),
+  epistemicMoveType: EpistemicMoveTypeSchema,
   matchedExistingNodeId: z.string().nullable().optional().describe("Set by server; not from LLM"),
+  crossMatchTargetId: z.string().uuid().nullable().optional().describe("If this claim directly attacks or supports a specific existing node from context, its ID."),
+  crossMatchRelationship: CrossMatchRelationshipSchema,
 });
 
 const LogicianAlignerEnSchema = z.object({
   canonical_en: CanonicalRosettaBlockStrictSchema,
   source_locale: z.string().min(1),
   local_translation: LocalRosettaBlockSchema.optional(),
-  logicalCoherenceScore: z.number().min(0).max(100),
   supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]),
+  epistemicMoveType: EpistemicMoveTypeSchema,
   matchedExistingNodeId: z.string().nullable().optional().describe("Set by server; not from LLM"),
+  crossMatchTargetId: z.string().uuid().nullable().optional().describe("If this claim directly attacks or supports a specific existing node from context, its ID."),
+  crossMatchRelationship: CrossMatchRelationshipSchema,
 });
 
 const LogicianOutputHeSchema = LogicianAlignerHeSchema.omit({ matchedExistingNodeId: true });
@@ -137,12 +154,54 @@ export async function POST(request: Request) {
       return NextResponse.json({ processedClaims: [], telemetry });
     }
 
-    // Agent 2: Logician (canonical_en) then Scout (RAG on English embedding)
+    // Agent 2: Broad RAG (topical context) → Logician (with auto cross-match) → Scout (exact duplicate)
+    const SIEVE_CONTEXT_THRESHOLD = 0.65;
+    const SIEVE_CONTEXT_COUNT = 5;
     const model = google("gemini-2.5-flash");
     const supabase = createServerSupabase();
+    const embedModel = google.textEmbeddingModel("gemini-embedding-001");
     const rowResults = await Promise.all(
       claimsToProcess.map(async (claim): Promise<SieveProcessedClaim | null> => {
         try {
+          // 1. Broad RAG: topical matches to feed the Logician for auto cross-matching
+          let contextNodes: Array<{ id: string; content: string }> = [];
+          try {
+            const embedRes = await embed({
+              model: embedModel,
+              value: claim.slice(0, 8000),
+              providerOptions: { google: { outputDimensionality: 768 } },
+            });
+            if (embedRes.embedding.length > 0) {
+              const { data } = await supabase.rpc("match_truth_nodes", {
+                query_embedding: Array.from(embedRes.embedding),
+                match_threshold: SIEVE_CONTEXT_THRESHOLD,
+                match_count: SIEVE_CONTEXT_COUNT,
+              } as never);
+              const list = (data ?? []) as Array<{ id: string; content: string }>;
+              contextNodes = list.map((n) => ({ id: n.id, content: n.content ?? "" }));
+            }
+          } catch (e) {
+            // non-fatal; Logician proceeds without context
+          }
+
+          const contextBlock =
+            contextNodes.length > 0
+              ? `
+
+CRITICAL AUTO-CROSS-MATCHING:
+Here are existing claims already in the Arena (id + content):
+${JSON.stringify(contextNodes.map((n) => ({ id: n.id, content: n.content })))}
+
+Does the user's claim directly attack (refute) or support any of these specific existing claims?
+- If YES: output the exact \`crossMatchTargetId\` from the list above and \`crossMatchRelationship\` ("supports" or "challenges").
+- If NO (brand new argument, or no direct link): leave \`crossMatchTargetId\` and \`crossMatchRelationship\` null.`
+              : `
+
+CRITICAL AUTO-CROSS-MATCHING: No existing claims were found for context. Leave \`crossMatchTargetId\` and \`crossMatchRelationship\` null.`;
+
+          const logicianPrompt =
+            buildLogicianAlignerPrompt(claim, theoryA, theoryB, userLanguage) + contextBlock;
+
           const { object: logicianObject } = await generateObject({
             model,
             temperature: 0.1,
@@ -150,9 +209,9 @@ export async function POST(request: Request) {
             schemaName: "LogicianAligner",
             schemaDescription:
               locale === "he"
-                ? "Strict bilingual EN+HE — all fields required"
-                : "English canonical + optional local mirror",
-            prompt: buildLogicianAlignerPrompt(claim, theoryA, theoryB, userLanguage),
+                ? "Strict bilingual EN+HE — all fields required; cross-match when applicable"
+                : "English canonical + optional local mirror; cross-match when applicable",
+            prompt: logicianPrompt,
           });
 
           const parsedLog = logicianSchema.safeParse(logicianObject);
@@ -185,15 +244,21 @@ export async function POST(request: Request) {
                 hiddenAssumptions: fixed.local_translation.hiddenAssumptions ?? [],
               }
             : undefined;
-          const logicalCoherenceScore = Math.max(0, Math.min(100, o.logicalCoherenceScore));
           const supportedTheory = o.supportedTheory as SieveSupportedTheory;
 
-          const embedValue = embeddingTextFromCanonical(canonical_en).slice(0, 8000);
+          const crossMatchTargetId =
+            o.crossMatchTargetId && contextNodes.some((n) => n.id === o.crossMatchTargetId)
+              ? o.crossMatchTargetId
+              : null;
+          const crossMatchRelationship =
+            crossMatchTargetId && o.crossMatchRelationship ? o.crossMatchRelationship : null;
 
+          // 2. Scout: strict duplicate check on canonical_en (unchanged)
+          const embedValue = embeddingTextFromCanonical(canonical_en).slice(0, 8000);
           let matchedNodeId: string | null = null;
           try {
             const embeddingResult = await embed({
-              model: google.textEmbeddingModel("gemini-embedding-001"),
+              model: embedModel,
               value: embedValue,
               providerOptions: { google: { outputDimensionality: 768 } },
             });
@@ -212,13 +277,20 @@ export async function POST(request: Request) {
             console.error("[Sieve Scout Error]", err);
           }
 
+          const epistemicMoveType =
+            "epistemicMoveType" in o && typeof (o as { epistemicMoveType?: string }).epistemicMoveType === "string"
+              ? ((o as { epistemicMoveType: string }).epistemicMoveType as SieveProcessedClaim["epistemicMoveType"])
+              : undefined;
           const out: SieveProcessedClaim = {
             canonical_en,
             source_locale,
             local_translation,
-            logicalCoherenceScore,
+            epistemicState: "SOLID",
+            epistemicMoveType,
             supportedTheory,
             matchedExistingNodeId: matchedNodeId,
+            crossMatchTargetId: crossMatchTargetId ?? undefined,
+            crossMatchRelationship: crossMatchRelationship ?? undefined,
           };
           return out;
         } catch (e) {

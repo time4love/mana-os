@@ -385,7 +385,7 @@ export function ForgeChat({
       canonical_en: draft.canonical_en,
       source_locale: draft.source_locale,
       local_translation: draft.local_translation,
-      logicalCoherenceScore: draft.logicalCoherenceScore,
+      epistemicState: draft.epistemicState ?? "SOLID",
       thematicTags: draft.thematicTags ?? [],
       relationshipToContext: draft.relationshipToContext,
       competingTheories: draft.competingTheories,
