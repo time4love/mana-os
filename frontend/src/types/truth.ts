@@ -69,6 +69,8 @@ export interface TruthNode {
   resonance_count?: number;
   epistemic_state?: EpistemicState;
   epistemic_move?: EpistemicMoveType | null;
+  /** Sharpening lineage: prior version of this claim (append-only). */
+  previous_version_id?: string | null;
 }
 
 export type TruthNodeInsert = Omit<TruthNode, "id" | "created_at"> & {
@@ -77,7 +79,10 @@ export type TruthNodeInsert = Omit<TruthNode, "id" | "created_at"> & {
 };
 
 export type TruthNodeUpdate = Partial<
-  Pick<TruthNode, "content" | "embedding" | "author_wallet" | "is_macro_root" | "thematic_tags">
+  Pick<
+    TruthNode,
+    "content" | "embedding" | "author_wallet" | "is_macro_root" | "thematic_tags" | "previous_version_id"
+  >
 >;
 
 export interface TruthEdge {
@@ -103,6 +108,9 @@ export interface MatchTruthNodeResult {
 // Forge / Oracle drafts (AI → anchor)
 // ---------------------------------------------------------------------------
 
+/** POST `/api/oracle/forge` — `debateIntent` shapes how the drafter frames the new node / edge. */
+export type ForgeDebateIntent = "challenges" | "sharpens" | "TACTICAL_STRIKE";
+
 export interface DraftEpistemicNodeV2 {
   canonical_en: RosettaBlock;
   source_locale: string;
@@ -112,7 +120,8 @@ export interface DraftEpistemicNodeV2 {
   supportedTheory?: "THEORY_A" | "THEORY_B" | "NEUTRAL";
   thematicTags?: string[];
   matchedExistingNodeId?: string | null;
-  relationshipToContext?: "supports" | "challenges";
+  /** challenges = attack edge under parent; sharpens = upgraded claim version (linked via DB `previous_version_id`). */
+  relationshipToContext?: "challenges" | "sharpens";
   competingTheories?: Array<{
     canonical_en: RosettaBlock;
     local_translation?: RosettaBlock;

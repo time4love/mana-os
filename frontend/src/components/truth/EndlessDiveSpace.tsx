@@ -46,6 +46,20 @@ export function EndlessDiveSpace({ initialNodeId, initialNodeData }: EndlessDive
     });
   };
 
+  /** Same Miller slot, new node (e.g. sharpening lineage); drops deeper columns so children stay consistent. */
+  const handleReplaceColumn = useCallback((nodeId: string, columnIndex: number, label: string) => {
+    setStack((prev) => {
+      const next = prev.slice(0, columnIndex + 1);
+      if (next.length === 0) return prev;
+      const trimmed = label.trim();
+      next[columnIndex] = {
+        id: nodeId,
+        label: trimmed || next[columnIndex]?.label || "",
+      };
+      return next;
+    });
+  }, []);
+
   const handleRegisterLabel = useCallback((id: string, label: string) => {
     setStack((prev) =>
       prev.map((item) => (item.id === id ? { ...item, label } : item))
@@ -134,6 +148,7 @@ export function EndlessDiveSpace({ initialNodeId, initialNodeData }: EndlessDive
             nodeId={item.id}
             columnIndex={index}
             onDive={handleDive}
+            onReplaceColumn={handleReplaceColumn}
             isFirst={index === 0}
             initialData={index === 0 ? initialNodeData : undefined}
             arenaId={stack[0]?.id}

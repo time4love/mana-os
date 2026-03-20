@@ -10,7 +10,7 @@ import { getLocalized } from "@/components/truth/forgeChatLib";
 import { getDisplayAssertion } from "@/lib/utils/truthParser";
 import { EpistemicStateBadge } from "@/components/truth/EpistemicStateBadge";
 import { getMoveBadge } from "@/components/truth/EpistemicMoveBadge";
-import type { MatchTruthNodeResult } from "@/types/truth";
+import type { EdgeRelationship, MatchTruthNodeResult } from "@/types/truth";
 import type { DraftEpistemicNodeV2, RosettaBlock } from "@/types/truth";
 
 const ANCHOR_CTA = {
@@ -31,8 +31,7 @@ const MACRO_ARENA_BADGE = {
 const RATIONALE_LABEL = { he: "נימוק", en: "Rationale" };
 const SCOUT_LABEL = { he: "הנחות ואתגר פיספיקציה", en: "Hidden assumptions & falsification" };
 
-const BADGE_SUPPORTS = { he: "משמש כתומכת עמוד (Supports)", en: "Supports" };
-const BADGE_CHALLENGES = { he: "מציג חזית אתגר (Challenges)", en: "Challenges" };
+const BADGE_SHARPENS = { he: "חידוד גרסה (Sharpening)", en: "Version sharpen" };
 
 const SEMANTIC_WARNING = {
   he: "עין האורקל מאבחנת שכבר נעצץ שורש מהותי כמעט זהה במארג:",
@@ -89,7 +88,7 @@ interface DraftNodeCardProps {
   isAnchoring?: boolean;
   authorWallet: string;
   parentId?: string;
-  relationship?: "supports" | "challenges" | "ai_analysis";
+  relationship?: EdgeRelationship;
   matchedExistingNodeId?: string | null;
   semanticDuplicates?: MatchTruthNodeResult[] | null;
   onForcePlant?: () => void;
@@ -140,8 +139,7 @@ export function DraftNodeCard({
   const epistemicState = draft.epistemicState ?? "SOLID";
 
   const rel = draft.relationshipToContext;
-  const supportsLabel = getLocalized(BADGE_SUPPORTS, locale);
-  const challengesLabel = getLocalized(BADGE_CHALLENGES, locale);
+  const sharpensLabel = getLocalized(BADGE_SHARPENS, locale);
 
   const showSemanticBlock = resonanceBlock.isBlocked && resonanceBlock.duplicates.length > 0;
   const semanticWarningText = getLocalized(SEMANTIC_WARNING, locale);
@@ -165,23 +163,14 @@ export function DraftNodeCard({
             <Sparkles className="size-3" />
             {macroArenaBadgeLabel}
           </div>
-        ) : rel ? (
+        ) : rel === "sharpens" ? (
           <div className="flex flex-wrap gap-2">
-            {rel === "supports" ? (
-              <span
-                className="inline-flex items-center gap-1 rounded-md border border-emerald-300/60 bg-emerald-50/80 dark:bg-emerald-950/30 dark:border-emerald-700/50 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-200"
-                role="status"
-              >
-                🛡️ {supportsLabel}
-              </span>
-            ) : (
-              <span
-                className="inline-flex items-center gap-1 rounded-md border border-amber-300/60 bg-amber-50/70 dark:bg-amber-950/25 dark:border-amber-700/50 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-200"
-                role="status"
-              >
-                ⚔️ {challengesLabel}
-              </span>
-            )}
+            <span
+              className="inline-flex items-center gap-1 rounded-md border border-emerald-300/60 bg-emerald-50/80 dark:bg-emerald-950/30 dark:border-emerald-700/50 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:text-emerald-200"
+              role="status"
+            >
+              🔨 {sharpensLabel}
+            </span>
           </div>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">

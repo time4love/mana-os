@@ -12,8 +12,8 @@ import {
   SOCRATIC_EDITOR_SYSTEM,
   buildForgeHandoffDraftRequest,
   buildForgeHandoffExploreChat,
-  FORGE_DEBATE_SUPPORT_OVERRIDE,
-  FORGE_DEBATE_SUPPORT_COACH,
+  FORGE_DEBATE_SHARPEN_OVERRIDE,
+  FORGE_DEBATE_SHARPEN_COACH,
   FORGE_DEBATE_CHALLENGE_OVERRIDE,
   FORGE_DEBATE_CHALLENGE_COACH,
 } from "@/lib/core/prompts";
@@ -23,6 +23,7 @@ import {
   DraftEpistemicNodeV2LooseSchema,
 } from "@/lib/truth/rosettaSchemas";
 import { fixDraftRosettaV2Flip } from "@/lib/utils/truthRosetta";
+import type { ForgeDebateIntent } from "@/types/truth";
 
 const RAG_MATCH_THRESHOLD = 0.5;
 const RAG_MATCH_COUNT = 5;
@@ -88,6 +89,35 @@ interface ForgeTelemetry {
 
 const MAX_MESSAGE_TEXT_LENGTH = 8000;
 
+/** Referee-only prompt for human-in-the-loop tactical strikes (prompts.ts stays untouched). */
+function buildTacticalRefereeForgePrompt(claim: string, targetCtx: string, uiLocale: "he" | "en"): string {
+  const safeTarget = targetCtx.replace(/"""/g, "''").slice(0, 8000);
+  const safeClaim = claim.replace(/"""/g, "''").slice(0, 8000);
+  const rosettaHint =
+    uiLocale === "he"
+      ? 'source_locale MUST be "he" with a complete local_translation (Hebrew) mirroring canonical_en.'
+      : 'source_locale "en" is sufficient; local_translation optional.';
+
+  return `You are the Epistemic Referee.
+
+TARGET CLAIM: """${safeTarget}"""
+USER'S RAW ATTACK: """${safeClaim}"""
+
+YOUR JOB IS STRICTLY TO REFEREE THE USER'S MOVE.
+1. Analyze the user's raw attack only against the target claim.
+2. If the user supplied recognizable logical or empirical counter-material: extract it into a sharp Rosetta premise (canonical_en in English; ${rosettaHint}).
+3. If the text is weak, off-topic, or non-counter: still produce a valid schema object that faithfully reflects what they wrote and why it fails as a refutation (in reasoning fields).
+4. Categorize strictly into one epistemicMoveType: EMPIRICAL_CONTRADICTION | INTERNAL_INCONSISTENCY | EMPIRICAL_VERIFICATION | AD_HOC_RESCUE | APPEAL_TO_AUTHORITY.
+   This field is REQUIRED and must never be omitted or null.
+4b. CRITICAL THEORY ASSIGNMENT: output supportedTheory as THEORY_A or THEORY_B according to the side this counter-claim strengthens.
+5. relationshipToContext MUST be "challenges".
+
+FORBIDDEN: Inventing empirical facts not clearly grounded in USER'S RAW ATTACK. Structural clarification only.
+FORBIDDEN: Any numeric 0–100 coherence, validity, or confidence score.
+
+Output MUST satisfy the provided Zod schema (Rosetta V2 + epistemicMoveType + relationshipToContext).`;
+}
+
 function getMessageText(msg: { parts?: Array<{ type: string; text?: string }>; content?: string }): string {
   if (!msg) return "";
   const parts = (msg.parts ?? [])
@@ -122,7 +152,9 @@ export async function POST(request: Request) {
     architectMode?: boolean;
     targetNodeContext?: string;
     locale?: string;
-    debateIntent?: "supports" | "challenges";
+    debateIntent?: ForgeDebateIntent;
+    arenaId?: string;
+    tacticalSupportedTheoryHint?: "THEORY_A" | "THEORY_B";
   };
   try {
     body = await request.json();
@@ -130,21 +162,41 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
+  const tacticalStrike = body.debateIntent === "TACTICAL_STRIKE";
+  const tacticalSupportedTheoryHint =
+    body.tacticalSupportedTheoryHint === "THEORY_A" || body.tacticalSupportedTheoryHint === "THEORY_B"
+      ? body.tacticalSupportedTheoryHint
+      : undefined;
+
   const architectMode = body.architectMode === true;
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const targetNodeContext = typeof body.targetNodeContext === "string" ? body.targetNodeContext.trim() : null;
   const locale = body.locale === "he" ? "he" : "en";
-  const drafterSchema = locale === "he" ? DraftEpistemicNodeV2HeForgeSchema : DraftEpistemicNodeV2LooseSchema;
+  const drafterSchema =
+    locale === "he"
+      ? DraftEpistemicNodeV2HeForgeSchema.refine((obj) => !!obj.epistemicMoveType, {
+          message: "epistemicMoveType is required for draft cards",
+          path: ["epistemicMoveType"],
+        })
+      : DraftEpistemicNodeV2LooseSchema.refine((obj) => !!obj.epistemicMoveType, {
+          message: "epistemicMoveType is required for draft cards",
+          path: ["epistemicMoveType"],
+        });
   const triageDraftArrSchema = z.array(drafterSchema).max(1);
-  type DraftEpistemicNode = z.infer<typeof drafterSchema>;
-  const debateIntent = body.debateIntent === "supports" || body.debateIntent === "challenges" ? body.debateIntent : undefined;
+  type DraftEpistemicNode = z.infer<typeof DraftEpistemicNodeV2HeForgeSchema> | z.infer<typeof DraftEpistemicNodeV2LooseSchema>;
+  const debateIntent =
+    body.debateIntent === "sharpens" || body.debateIntent === "challenges" ? body.debateIntent : undefined;
+
+  if (tacticalStrike && (!targetNodeContext || targetNodeContext.length === 0)) {
+    return NextResponse.json({ error: "targetNodeContext is required for TACTICAL_STRIKE" }, { status: 400 });
+  }
 
   let debateOverride = "";
   let coachDirective = "";
   if (targetNodeContext && debateIntent) {
-    if (debateIntent === "supports") {
-      debateOverride = "\n\n" + FORGE_DEBATE_SUPPORT_OVERRIDE;
-      coachDirective = FORGE_DEBATE_SUPPORT_COACH;
+    if (debateIntent === "sharpens") {
+      debateOverride = "\n\n" + FORGE_DEBATE_SHARPEN_OVERRIDE;
+      coachDirective = FORGE_DEBATE_SHARPEN_COACH;
     } else if (debateIntent === "challenges") {
       debateOverride = "\n\n" + FORGE_DEBATE_CHALLENGE_OVERRIDE;
       coachDirective = FORGE_DEBATE_CHALLENGE_COACH;
@@ -152,7 +204,7 @@ export async function POST(request: Request) {
   }
 
   const contextBlock = targetNodeContext
-    ? "\n\nThe user is challenging or supporting the following existing claim (use this to frame your Socratic dialogue):\n---\n"
+    ? "\n\nThe user is interacting with the following existing claim — sharpen (upgrade) or challenge it (use this to frame your Socratic dialogue):\n---\n"
       + targetNodeContext.slice(0, 8000)
       + "\n---"
       + debateOverride
@@ -166,11 +218,18 @@ export async function POST(request: Request) {
   const hasMultipleTurns = firstUserText.length > 0 && lastUserText.length > 0 && firstUserText !== lastUserText;
   const textToEmbedBase = hasMultipleTurns ? `${firstUserText}\n\n${lastUserText}`.slice(0, 8000) : lastUserText;
 
+  if (tacticalStrike && !lastUserText.trim()) {
+    return NextResponse.json({ error: "TACTICAL_STRIKE requires a non-empty user message" }, { status: 400 });
+  }
+
   // ========== 0. SEMANTIC INTENT ROUTER (pre-flight classification) ==========
   let userIntent: UserIntent = "CHAT";
   let claimToDraft: string | undefined;
 
-  if (lastUserText.trim().length > 0) {
+  if (tacticalStrike && targetNodeContext && lastUserText.trim().length > 0) {
+    userIntent = "DRAFT_REQUEST";
+    claimToDraft = lastUserText.trim();
+  } else if (lastUserText.trim().length > 0) {
     try {
       const intentResult = await generateObject({
         model: google("gemini-2.5-flash"),
@@ -263,13 +322,16 @@ export async function POST(request: Request) {
       generateObject({
         model: google("gemini-2.5-flash"),
         schema: drafterSchema,
-        prompt: buildForgeDrafterPrompt({
-          claim,
-          existingMatchesPreview: existingMatches.length > 0 ? JSON.stringify(existingMatches.slice(0, 3)) : undefined,
-          locale,
-          targetNodeContext: targetNodeContext ?? null,
-          debateIntent: debateIntent ?? null,
-        }),
+        prompt:
+          tacticalStrike && targetNodeContext
+            ? buildTacticalRefereeForgePrompt(claim, targetNodeContext, locale)
+            : buildForgeDrafterPrompt({
+                claim,
+                existingMatchesPreview: existingMatches.length > 0 ? JSON.stringify(existingMatches.slice(0, 3)) : undefined,
+                locale,
+                targetNodeContext: targetNodeContext ?? null,
+                debateIntent: debateIntent ?? null,
+              }),
       })
     );
     const results = await Promise.allSettled(drafterPromises);
@@ -283,10 +345,20 @@ export async function POST(request: Request) {
       }
       const parsed = drafterSchema.safeParse(r.value.object);
       if (!parsed.success) {
-        errors.push(`claim ${i + 1}: invalid schema — ${parsed.error.issues.map((x) => x.message).join("; ")}`);
+        errors.push(`claim ${i + 1}: invalid schema — ${parsed.error.issues.map((x: { message: string }) => x.message).join("; ")}`);
         continue;
       }
-      drafts.push(fixDraftRosettaV2Flip(parsed.data) as DraftEpistemicNode);
+      const flipped = fixDraftRosettaV2Flip(parsed.data) as DraftEpistemicNode;
+      const withTacticalRel = tacticalStrike
+        ? ({
+            ...flipped,
+            relationshipToContext: "challenges" as const,
+            supportedTheory: tacticalSupportedTheoryHint ?? flipped.supportedTheory,
+          } satisfies DraftEpistemicNode)
+        : debateIntent === "sharpens"
+          ? ({ ...flipped, relationshipToContext: "sharpens" as const } satisfies DraftEpistemicNode)
+          : flipped;
+      drafts.push(withTacticalRel);
     }
     telemetry.drafterProcessed = newClaimsToDraft.length;
     telemetry.drafterPassed = drafts.length;

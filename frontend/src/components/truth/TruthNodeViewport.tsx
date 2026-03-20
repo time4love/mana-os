@@ -4,7 +4,7 @@ import { useMemo, useTransition, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ChevronRight, ArrowUp, Shield, Swords, Fingerprint, Activity, Lock, Check } from "lucide-react";
+import { ChevronRight, ArrowUp, Swords, Fingerprint, Activity, Lock, Check } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useGenesisAnchor } from "@/hooks/useGenesisAnchor";
 import { CodexSheet } from "@/components/ui/CodexSheet";
@@ -12,11 +12,20 @@ import { useLocale } from "@/lib/i18n/context";
 import { parseNodeContent, truncateAssertion } from "@/lib/utils/truthParser";
 import { competingTheoryDisplayAssertion } from "@/lib/utils/truthRosetta";
 import { Button } from "@/components/ui/button";
-import { SupportClaimDrawer } from "@/components/truth/SupportClaimDrawer";
-import { ChallengeClaimDrawer } from "@/components/truth/ChallengeClaimDrawer";
+import { TacticalMoveDrawer } from "@/components/truth/TacticalMoveDrawer";
+import { SharpenClaimDrawer } from "@/components/truth/SharpenClaimDrawer";
 import { SubmitClaimsDrawer } from "@/components/truth/SubmitClaimsDrawer";
+import { EpistemicStateBadge } from "@/components/truth/EpistemicStateBadge";
+import { getMoveBadge } from "@/components/truth/EpistemicMoveBadge";
 import { toggleNodeResonance, checkUserResonance } from "@/app/actions/truthWeaver";
-import type { TruthNodeWithRelations, TruthNode, TruthNodeMetadata, ChildrenByRelationship } from "@/types/truth";
+import type {
+  TruthNodeWithRelations,
+  TruthNode,
+  TruthNodeMetadata,
+  ChildrenByRelationship,
+  EpistemicState,
+  EpistemicMoveType,
+} from "@/types/truth";
 
 const CHILD_ASSERTION_MAX_LEN = 180;
 
@@ -75,14 +84,6 @@ export interface ArenaBubblingStats {
   theoryBPercentage: number;
 }
 
-/** Dynamic validity bar for standard claims (Bubbling Algorithm). */
-export interface ValidityBarData {
-  baseScore: number;
-  supportMass: number;
-  challengeMass: number;
-  currentValidity: number;
-}
-
 function FocalPivot({
   content,
   thematicTags,
@@ -90,7 +91,8 @@ function FocalPivot({
   metadata,
   arenaBubbling,
   arenaNodeId,
-  validityBar,
+  epistemicState,
+  epistemicMove,
   resonanceCount,
 }: {
   content: string;
@@ -99,15 +101,14 @@ function FocalPivot({
   metadata?: TruthNodeMetadata;
   arenaBubbling?: ArenaBubblingStats;
   arenaNodeId?: string;
-  /** When set, standard claim shows dynamic Validity Health Bar instead of static pulse. */
-  validityBar?: ValidityBarData;
-  /** Epistemic Resonance votes (community overrule multiplier). */
+  epistemicState?: EpistemicState;
+  epistemicMove?: EpistemicMoveType | null;
   resonanceCount?: number;
 }) {
   const parsed = parseNodeContent(content, locale);
   const isMacroArena = thematicTags?.includes("macro-arena");
   const competingTheories = metadata?.competingTheories;
-  const hasPulse = !isMacroArena && parsed.pulse != null && validityBar == null;
+  const lang = locale === "he" ? "he" : "en";
   const tags = thematicTags?.filter((t): t is string => typeof t === "string" && t.trim().length > 0) ?? [];
 
   const theoryAPct = arenaBubbling?.theoryAPercentage ?? 50;
@@ -139,6 +140,21 @@ function FocalPivot({
         <p className="text-lg sm:text-xl text-foreground leading-relaxed font-medium">
           {parsed.assertion}
         </p>
+        {!isMacroArena && (
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            <EpistemicStateBadge state={epistemicState ?? "SOLID"} locale={locale} />
+            {getMoveBadge(epistemicMove ?? null, lang)}
+            {(resonanceCount ?? 0) > 0 && (
+              <span
+                className="flex items-center gap-1 text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full text-xs font-medium"
+                title={locale === "he" ? "הדהוד קהילתי" : "Community resonance"}
+              >
+                <Fingerprint className="size-3" aria-hidden />
+                {resonanceCount}
+              </span>
+            )}
+          </div>
+        )}
         {isMacroArena ? (
           <div className="mt-6 flex flex-col gap-4">
             {/* Tug-of-War: Sky (Theory A) vs Amber (Theory B); bar order matches boxes (RTL: A=start, B=end) */}
@@ -208,74 +224,7 @@ function FocalPivot({
               </div>
             )}
           </div>
-        ) : validityBar ? (
-          <div className="mt-6 flex flex-col gap-2">
-            <div className="flex justify-between items-end mb-1">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                {locale === "he" ? "תוקף לוגי נוכחי" : "Current Validity"}
-              </span>
-              <div className="flex items-center gap-3 text-xs font-medium flex-wrap">
-                <span className="text-muted-foreground" title="Base Score">
-                  {locale === "he" ? "בסיס" : "Base"}: {validityBar.baseScore}
-                </span>
-                {(resonanceCount ?? 0) > 0 && (
-                  <span
-                    className="flex items-center gap-1 text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full"
-                    title={locale === "he" ? "הדהוד קהילתי (מכפיל כוח)" : "Community resonance (mass multiplier)"}
-                  >
-                    <Fingerprint className="size-3" aria-hidden />
-                    {resonanceCount}
-                  </span>
-                )}
-                {validityBar.supportMass > 0 && (
-                  <span className="text-emerald-600 dark:text-emerald-400">+{validityBar.supportMass}</span>
-                )}
-                {validityBar.challengeMass > 0 && (
-                  <span className="text-amber-600 dark:text-amber-400">-{validityBar.challengeMass}</span>
-                )}
-                <span className="text-lg font-black text-foreground ms-2">
-                  {validityBar.currentValidity}/100
-                </span>
-              </div>
-            </div>
-            <div
-              role="progressbar"
-              aria-valuenow={validityBar.currentValidity}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              className="h-3 w-full bg-secondary/30 rounded-full overflow-hidden flex"
-            >
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${validityBar.currentValidity}%` }}
-                transition={{ duration: 1, ease: "easeOut" }}
-                className="h-full bg-primary rounded-full"
-              />
-            </div>
-          </div>
-        ) : (
-          hasPulse && (
-            <div className="space-y-1.5">
-              <div
-                role="progressbar"
-                aria-valuenow={parsed.pulse ?? 0}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                className="h-2 w-full overflow-hidden rounded-full bg-muted"
-              >
-                <motion.div
-                  initial={{ inlineSize: 0 }}
-                  animate={{ inlineSize: `${parsed.pulse ?? 0}%` }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                  className="h-full rounded-full bg-emerald-500"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground font-mono">
-                Logician&apos;s Pulse: {parsed.pulse}/100
-              </p>
-            </div>
-          )
-        )}
+        ) : null}
         {parsed.rationale && (
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
@@ -317,13 +266,21 @@ function ChildCard({
   node,
   relationship,
   locale,
+  authorWallet,
+  hasGenesisAnchor,
+  onLockedClick,
 }: {
   node: TruthNode;
   relationship: "supports" | "challenges" | "ai_analysis";
   locale: "he" | "en";
+  authorWallet?: string;
+  hasGenesisAnchor?: boolean;
+  onLockedClick?: () => void;
 }) {
   const parsed = parseNodeContent(node.content, locale);
   const isRtl = locale === "he";
+  const lang = locale === "he" ? "he" : "en";
+  const fullAssertion = (parsed.assertion ?? "").trim();
 
   const variant =
     relationship === "supports"
@@ -333,51 +290,61 @@ function ChildCard({
         : "bg-amber-50/80 dark:bg-amber-950/25 border-amber-300/50";
 
   return (
-    <Link
-      href={`/truth/node/${node.id}`}
-      className={`block rounded-lg border p-4 text-start shadow-soft transition-shadow hover:shadow-soft-md ${variant}`}
-    >
-      <p className="text-sm text-foreground leading-relaxed line-clamp-3">
-        {truncateAssertion(parsed.assertion, CHILD_ASSERTION_MAX_LEN)}
-      </p>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+    <div className={`rounded-lg border shadow-soft ${variant}`}>
+      <Link
+        href={`/truth/node/${node.id}`}
+        className="block p-4 text-start transition-shadow hover:shadow-soft-md text-inherit no-underline"
+      >
+        <p className="text-sm text-foreground leading-relaxed line-clamp-3">
+          {truncateAssertion(parsed.assertion, CHILD_ASSERTION_MAX_LEN)}
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <EpistemicStateBadge state={node.epistemic_state ?? "SOLID"} locale={locale} />
+          {getMoveBadge(node.epistemic_move ?? null, lang)}
+        </div>
+        <div className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
           {isRtl ? "היכנס לצומת" : "Enter node"}
           <ChevronRight className={`size-3.5 ${isRtl ? "rotate-180" : ""}`} aria-hidden />
-        </span>
-        {parsed.pulse != null && (
-          <span
-            className="font-mono text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded shrink-0"
-            aria-label={`Coherence ${parsed.pulse}`}
-          >
-            {parsed.pulse}
-          </span>
-        )}
-      </div>
-    </Link>
+        </div>
+      </Link>
+      {authorWallet ? (
+        <div className="flex flex-wrap items-center justify-end gap-2 px-4 pb-4 pt-0">
+          <SharpenClaimDrawer
+            targetNodeId={node.id}
+            targetAssertion={fullAssertion || truncateAssertion(parsed.assertion, CHILD_ASSERTION_MAX_LEN)}
+            authorWallet={authorWallet}
+            hasGenesisAnchor={hasGenesisAnchor ?? false}
+            onLockedClick={onLockedClick}
+          />
+          <TacticalMoveDrawer
+            targetNodeId={node.id}
+            targetAssertion={fullAssertion || truncateAssertion(parsed.assertion, CHILD_ASSERTION_MAX_LEN)}
+            authorWallet={authorWallet}
+            hasGenesisAnchor={hasGenesisAnchor ?? false}
+            onLockedClick={onLockedClick}
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
-function childMassForBubbling(child: TruthNode, locale: "he" | "en"): number {
-  const base = parseNodeContent(child.content, locale).pulse ?? 0;
+function childMassForBubbling(child: TruthNode): number {
   const resonance = child.resonance_count ?? 0;
-  return Math.round(base * (1 + resonance * 0.2));
+  return Math.max(1, Math.round(1 + resonance * 0.2));
 }
 
-function computeArenaBubbling(
-  childrenByRelationship: ChildrenByRelationship,
-  locale: "he" | "en"
-): ArenaBubblingStats {
+function computeArenaBubbling(childrenByRelationship: ChildrenByRelationship): ArenaBubblingStats {
   let theoryAMass = 0;
   let theoryBMass = 0;
   const theoryACount = childrenByRelationship.supports.length;
   const theoryBCount = childrenByRelationship.challenges.length;
 
   childrenByRelationship.supports.forEach((child) => {
-    theoryAMass += childMassForBubbling(child, locale);
+    theoryAMass += childMassForBubbling(child);
   });
   childrenByRelationship.challenges.forEach((child) => {
-    theoryBMass += childMassForBubbling(child, locale);
+    theoryBMass += childMassForBubbling(child);
   });
 
   const totalMass = theoryAMass + theoryBMass;
@@ -415,29 +382,9 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
   const focalAssertion = parsedFocal.assertion || node.content.slice(0, 500);
   const isMacroArena = node.thematic_tags?.includes("macro-arena");
 
-  // Rich context for Support/Challenge drawers: assertion + score + rationale so Socrates can explain and defend
-  const richContextForDrawer =
-    locale === "he"
-      ? `טענה: ${parsedFocal.assertion}\nציון לוגי נוכחי: ${parsedFocal.pulse ?? "—"}/100\nנימוק הציון (Rationale): ${parsedFocal.rationale ?? "לא סופק נימוק."}`
-      : `Claim: ${parsedFocal.assertion}\nCurrent Logical Score: ${parsedFocal.pulse ?? "—"}/100\nScore Rationale: ${parsedFocal.rationale ?? "No rationale provided."}`;
-  const arenaBubbling = isMacroArena ? computeArenaBubbling(childrenByRelationship, locale) : undefined;
+  const arenaBubbling = isMacroArena ? computeArenaBubbling(childrenByRelationship) : undefined;
 
-  // Bubbling Algorithm: Node Mass = Base Score * (1 + resonance_count * 0.2) — community overrule
-  const supportingChildren = childrenByRelationship.supports;
   const challengingChildren = childrenByRelationship.challenges;
-  const baseScore = !isMacroArena
-    ? parseNodeContent(node.content, locale).pulse ?? 0
-    : 0;
-  const supportMass = supportingChildren.reduce((sum, child) => sum + childMassForBubbling(child, locale), 0);
-  const challengeMass = challengingChildren.reduce((sum, child) => sum + childMassForBubbling(child, locale), 0);
-  const currentValidity = Math.max(
-    0,
-    Math.min(100, baseScore + supportMass - challengeMass)
-  );
-  const validityBar: ValidityBarData | undefined =
-    !isMacroArena
-      ? { baseScore, supportMass, challengeMass, currentValidity }
-      : undefined;
 
   // For claims under a Macro-Arena: detect arena parent and theory for context-aware breadcrumbs
   const connectedArena = !isMacroArena
@@ -561,33 +508,50 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {claimsInGroup.map((child) => {
                         const parsed = parseNodeContent(child.content, locale);
+                        const lang = locale === "he" ? "he" : "en";
+                        const assertionFull = (parsed.assertion ?? "").trim();
                         return (
-                          <Link
+                          <div
                             key={child.id}
-                            href={`/truth/node/${child.id}`}
-                            className="block group no-underline"
+                            className="rounded-xl border border-border/50 bg-card hover:border-primary/50 hover:shadow-soft transition-all h-full flex flex-col"
                           >
-                            <div className="p-4 rounded-xl border border-border/50 bg-card hover:border-primary/50 hover:shadow-soft transition-all h-full flex flex-col">
-                              <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors flex-1">
+                            <Link href={`/truth/node/${child.id}`} className="block p-4 pb-2 no-underline text-inherit group flex-1">
+                              <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
                                 {parsed.assertion}
                               </p>
-                              <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/30">
-                                {parsed.pulse != null ? (
-                                  <span
-                                    className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary/50 text-muted-foreground"
-                                    aria-label={`Coherence ${parsed.pulse}`}
-                                  >
-                                    {locale === "he" ? "ציון לוגי:" : "Score:"} {parsed.pulse}/100
-                                  </span>
-                                ) : (
-                                  <span />
-                                )}
-                                <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                              <div className="flex flex-wrap items-center justify-between mt-4 pt-3 border-t border-border/30 gap-2">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <EpistemicStateBadge state={child.epistemic_state ?? "SOLID"} locale={locale} />
+                                  {getMoveBadge(child.epistemic_move ?? null, lang)}
+                                </div>
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                                   {locale === "he" ? "צלול לטענה זו" : "Dive into claim"} →
                                 </span>
                               </div>
-                            </div>
-                          </Link>
+                            </Link>
+                            {address ? (
+                              <div className="px-4 pb-4 pt-0 flex flex-wrap justify-end gap-2">
+                                <SharpenClaimDrawer
+                                  targetNodeId={child.id}
+                                  targetAssertion={assertionFull}
+                                  authorWallet={address}
+                                  hasGenesisAnchor={hasGenesisAnchor}
+                                  onLockedClick={() => setSbtCodexOpen(true)}
+                                />
+                                <TacticalMoveDrawer
+                                  targetNodeId={child.id}
+                                  targetAssertion={assertionFull}
+                                  arenaId={node.id}
+                                  tacticalSupportedTheoryHint={
+                                    currentTheory === "THEORY_A" ? "THEORY_B" : "THEORY_A"
+                                  }
+                                  authorWallet={address}
+                                  hasGenesisAnchor={hasGenesisAnchor}
+                                  onLockedClick={() => setSbtCodexOpen(true)}
+                                />
+                              </div>
+                            ) : null}
+                          </div>
                         );
                       })}
                     </div>
@@ -717,28 +681,39 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
           metadata={node.metadata}
           arenaBubbling={arenaBubbling}
           arenaNodeId={isMacroArena ? node.id : undefined}
-          validityBar={validityBar}
+          epistemicState={node.epistemic_state}
+          epistemicMove={node.epistemic_move}
           resonanceCount={node.resonance_count}
         />
 
         {/* Macro-Arena: no inline Submit Claims here; it lives in the sticky bottom bar below */}
 
-        {/* Mini-Arena: tactical Support / Challenge + two-column debate layout (standard claims only) */}
+        {/* Mini-Arena: tactical move drawer + two-column debate layout (standard claims only) */}
         {!isMacroArena && (
           <div className="flex flex-col gap-6 mt-8">
             {address && (
               <div className="flex flex-wrap items-center gap-3 mt-8 border-t border-border/50 pt-6">
                 {hasGenesisAnchor ? (
                   <>
-                    <SupportClaimDrawer
+                    <SharpenClaimDrawer
+                      targetNodeId={node.id}
+                      targetAssertion={focalAssertion}
                       authorWallet={address}
-                      parentId={node.id}
-                      targetNodeContext={richContextForDrawer}
+                      hasGenesisAnchor
                     />
-                    <ChallengeClaimDrawer
+                    <TacticalMoveDrawer
+                      targetNodeId={node.id}
+                      targetAssertion={focalAssertion}
+                      arenaId={connectedArena?.node.id}
+                      tacticalSupportedTheoryHint={
+                        supportedTheoryKey === "THEORY_A"
+                          ? "THEORY_B"
+                          : supportedTheoryKey === "THEORY_B"
+                            ? "THEORY_A"
+                            : undefined
+                      }
                       authorWallet={address}
-                      parentId={node.id}
-                      targetNodeContext={richContextForDrawer}
+                      hasGenesisAnchor
                     />
                     <div className="flex items-center gap-2">
                       <span
@@ -782,28 +757,28 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
                   </>
                 ) : (
                   <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setSbtCodexOpen(true)}
-                      className="gap-2 rounded-full border-border/50 text-muted-foreground hover:bg-muted/50 cursor-not-allowed opacity-80"
-                      aria-label={locale === "he" ? "בסס טענה זו (נעול)" : "Support Claim (locked)"}
-                      title={locale === "he" ? "נדרש חותם מאנה (SBT)" : "Genesis Anchor (SBT) required"}
-                    >
-                      <Lock className="size-4" aria-hidden />
-                      {locale === "he" ? "בסס טענה זו" : "Support Claim"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setSbtCodexOpen(true)}
-                      className="gap-2 rounded-full border-border/50 text-muted-foreground hover:bg-muted/50 cursor-not-allowed opacity-80"
-                      aria-label={locale === "he" ? "הפרך טענה זו (נעול)" : "Challenge Claim (locked)"}
-                      title={locale === "he" ? "נדרש חותם מאנה (SBT)" : "Genesis Anchor (SBT) required"}
-                    >
-                      <Lock className="size-4" aria-hidden />
-                      {locale === "he" ? "הפרך טענה זו" : "Challenge Claim"}
-                    </Button>
+                    <SharpenClaimDrawer
+                      targetNodeId={node.id}
+                      targetAssertion={focalAssertion}
+                      authorWallet={address}
+                      hasGenesisAnchor={false}
+                      onLockedClick={() => setSbtCodexOpen(true)}
+                    />
+                    <TacticalMoveDrawer
+                      targetNodeId={node.id}
+                      targetAssertion={focalAssertion}
+                      arenaId={connectedArena?.node.id}
+                      tacticalSupportedTheoryHint={
+                        supportedTheoryKey === "THEORY_A"
+                          ? "THEORY_B"
+                          : supportedTheoryKey === "THEORY_B"
+                            ? "THEORY_A"
+                            : undefined
+                      }
+                      authorWallet={address}
+                      hasGenesisAnchor={false}
+                      onLockedClick={() => setSbtCodexOpen(true)}
+                    />
                     <div className="flex items-center gap-2">
                       <span
                         className="flex items-center gap-1 text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full text-xs font-medium"
@@ -833,35 +808,12 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
               chapterId="sybil-resistance"
             />
 
-            {/* Two-column tactical debate: Supports vs Challenges */}
             <motion.section
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.1 }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12"
+              className="mt-12"
             >
-              <div className="flex flex-col gap-4">
-                <h3 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2 border-b border-border/50 pb-2">
-                  <Shield className="size-4" aria-hidden />
-                  {locale === "he"
-                    ? `מבססים (${supportingChildren.length})`
-                    : `Supports (${supportingChildren.length})`}
-                </h3>
-                {supportingChildren.length > 0 ? (
-                  <ul className="space-y-3">
-                    {supportingChildren.map((child) => (
-                      <li key={child.id}>
-                        <ChildCard node={child} relationship="supports" locale={locale} />
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic py-4">
-                    {locale === "he" ? "אין טענות מבססות עדיין." : "No supporting claims yet."}
-                  </p>
-                )}
-              </div>
-
               <div className="flex flex-col gap-4">
                 <h3 className="text-sm font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2 border-b border-border/50 pb-2">
                   <Swords className="size-4" aria-hidden />
@@ -873,7 +825,14 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
                   <ul className="space-y-3">
                     {challengingChildren.map((child) => (
                       <li key={child.id}>
-                        <ChildCard node={child} relationship="challenges" locale={locale} />
+                        <ChildCard
+                          node={child}
+                          relationship="challenges"
+                          locale={locale}
+                          authorWallet={address}
+                          hasGenesisAnchor={hasGenesisAnchor}
+                          onLockedClick={() => setSbtCodexOpen(true)}
+                        />
                       </li>
                     ))}
                   </ul>
@@ -894,7 +853,14 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
                 <ul className="space-y-3">
                   {childrenByRelationship.ai_analysis.map((child) => (
                     <li key={child.id}>
-                      <ChildCard node={child} relationship="ai_analysis" locale={locale} />
+                      <ChildCard
+                        node={child}
+                        relationship="ai_analysis"
+                        locale={locale}
+                        authorWallet={address}
+                        hasGenesisAnchor={hasGenesisAnchor}
+                        onLockedClick={() => setSbtCodexOpen(true)}
+                      />
                     </li>
                   ))}
                 </ul>

@@ -21,7 +21,12 @@ export default async function TruthNodePage({ params }: PageProps) {
     notFound();
   }
 
-  const initialData = { node: result.node, edges: result.edges };
+  const initialData = {
+    node: result.node,
+    edges: result.edges,
+    lineage: result.lineage,
+    hasNewerVersion: result.hasNewerVersion,
+  };
 
   return <EndlessDiveSpace initialNodeId={id} initialNodeData={initialData} />;
 }

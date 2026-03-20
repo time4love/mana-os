@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useRef, useTransition } from "react";
-import { Shield, Swords, Fingerprint, Activity, Lock, Check } from "lucide-react";
+import { Swords, Fingerprint, Activity, Lock, Check, History, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAccount } from "wagmi";
 import { getTruthNodeWithEdges, toggleNodeResonance, checkUserResonance, type EndlessDiveInitialData, type TruthNodeRow, type TruthEdgeWithNodes } from "@/app/actions/truthWeaver";
 import { useLocale } from "@/lib/i18n/context";
@@ -12,6 +12,8 @@ import { EpistemicStateBadge } from "@/components/truth/EpistemicStateBadge";
 import { getMoveBadge } from "@/components/truth/EpistemicMoveBadge";
 import type { CompetingTheoryV2 } from "@/types/truth";
 import { SubmitClaimsDrawer } from "./SubmitClaimsDrawer";
+import { TacticalMoveDrawer } from "@/components/truth/TacticalMoveDrawer";
+import { SharpenClaimDrawer } from "@/components/truth/SharpenClaimDrawer";
 import { CodexSheet } from "@/components/ui/CodexSheet";
 import { Button } from "@/components/ui/button";
 import { useGenesisAnchor } from "@/hooks/useGenesisAnchor";
@@ -26,6 +28,13 @@ const SHOWN_IN_EN = { he: "מוצג באנגלית", en: "Shown in English" };
 const RESONANCE_COUNT = { he: "הדהודים קהילתיים", en: "Community Resonances" };
 const RESONATED_SUCCESS = { he: "הודהד בהצלחה", en: "Resonated" };
 const SBT_REQUIRED = { he: "נדרש חותם מאנה (SBT)", en: "Genesis Anchor SBT required" };
+const SHARPENING_HISTORY = { he: "היסטוריית ליטושים", en: "Sharpening history" };
+const NEWER_SHARPENED_EXISTS = {
+  he: "קיימת גרסה מעודכנת יותר לטענה זו.",
+  en: "A newer sharpened version exists.",
+};
+const VERSION_CAROUSEL_PREV = { he: "גרסה קודמת", en: "Older version" };
+const VERSION_CAROUSEL_NEXT = { he: "גרסה מאוחרת יותר", en: "Newer version" };
 
 interface CompetingTheoriesMeta {
   competingTheories?: CompetingTheoryV2[];
@@ -35,6 +44,8 @@ interface DiveColumnProps {
   nodeId: string;
   columnIndex: number;
   onDive: (nodeId: string, colIndex: number, label: string) => void;
+  /** Replace this column’s node (same Miller slot); truncates the stack after this index. */
+  onReplaceColumn: (nodeId: string, colIndex: number, label: string) => void;
   isFirst?: boolean;
   initialData?: EndlessDiveInitialData;
   /** Root arena ID for Arena-Scoped Identity (stack[0]); same wallet gets same avatar per arena. */
@@ -52,18 +63,11 @@ function getThematicTags(raw: unknown): string[] {
   return [];
 }
 
-/** Order for sort by state: SOLID=0, CONTESTED=1, SHATTERED=2. */
-function stateOrder(node: TruthNodeRow): number {
-  const s = node.epistemic_state ?? "SOLID";
-  if (s === "SOLID") return 0;
-  if (s === "CONTESTED") return 1;
-  return 2;
-}
-
 export function DiveColumn({
   nodeId,
   columnIndex,
   onDive,
+  onReplaceColumn,
   isFirst,
   initialData,
   arenaId,
@@ -76,7 +80,8 @@ export function DiveColumn({
   const [isPending, startTransition] = useTransition();
   const [hasResonated, setHasResonated] = useState(false);
   const [sbtCodexOpen, setSbtCodexOpen] = useState(false);
-  const [sortMode, setSortMode] = useState<"state" | "recent">("recent");
+  const [sortMode, setSortMode] = useState<"resonance" | "recent">("recent");
+  const [arenaDetailsOpen, setArenaDetailsOpen] = useState(false);
   const authorWallet = address ?? walletAddress ?? "";
 
   const actualNodeId = nodeId.includes("::") ? nodeId.split("::")[0] ?? nodeId : nodeId;
@@ -91,14 +96,25 @@ export function DiveColumn({
   const lastReportedRef = useRef<{ id: string; label: string } | null>(null);
   onRegisterLabelRef.current = onRegisterLabel;
 
-  useEffect(() => {
-    if (initialData && !nodeId.includes("::")) return;
+  const refreshCurrentColumn = useCallback(() => {
     setLoading(true);
     getTruthNodeWithEdges(actualNodeId).then((res) => {
-      if (res.success) setData({ node: res.node, edges: res.edges });
+      if (res.success) {
+        setData({
+          node: res.node,
+          edges: res.edges,
+          lineage: res.lineage,
+          hasNewerVersion: res.hasNewerVersion,
+        });
+      }
       setLoading(false);
     });
-  }, [actualNodeId, initialData, nodeId]);
+  }, [actualNodeId]);
+
+  useEffect(() => {
+    if (initialData && !nodeId.includes("::")) return;
+    refreshCurrentColumn();
+  }, [actualNodeId, initialData, nodeId, refreshCurrentColumn]);
 
   // Initial resonance state for standard claims (non-arena)
   useEffect(() => {
@@ -195,10 +211,10 @@ export function DiveColumn({
     return [...edgesToSort].sort((a, b) => {
       const childA = a.source_id === parentId ? a.target_node : a.source_node;
       const childB = b.source_id === parentId ? b.target_node : b.source_node;
-      if (sortMode === "state") {
-        const orderA = childA ? stateOrder(childA) : 99;
-        const orderB = childB ? stateOrder(childB) : 99;
-        return orderA - orderB;
+      if (sortMode === "resonance") {
+        const rA = childA?.resonance_count ?? 0;
+        const rB = childB?.resonance_count ?? 0;
+        return rB - rA;
       }
       const dateA = new Date(childA?.created_at ?? 0).getTime();
       const dateB = new Date(childB?.created_at ?? 0).getTime();
@@ -213,12 +229,15 @@ export function DiveColumn({
   const theoryAEdges = sortedSupportingEdges;
   const theoryBEdges = sortedChallengingEdges;
 
-  // Arena balance: count of supports vs challenges (no score weighting)
-  const theoryAMass = supportingEdges.length;
-  const theoryBMass = challengingEdges.length;
-  const totalArenaMass = theoryAMass + theoryBMass;
-  const theoryAPercentage = totalArenaMass === 0 ? 50 : Math.round((theoryAMass / totalArenaMass) * 100);
-  const theoryBPercentage = totalArenaMass === 0 ? 50 : Math.round((theoryBMass / totalArenaMass) * 100);
+  const arenaV2 = parseTruthNodeContentJson(data.node.content);
+  const arenaDisplayBlock = arenaV2
+    ? getDisplayBlock(arenaV2, lang)
+    : { assertion: assertionText, reasoning: parsed.rationale ?? "", hiddenAssumptions: [], isFallback: false };
+  const arenaHiddenAssumptions = arenaDisplayBlock.hiddenAssumptions ?? [];
+  const hasArenaDetails = Boolean(
+    (arenaDisplayBlock.reasoning && arenaDisplayBlock.reasoning.trim().length > 0) ||
+      arenaHiddenAssumptions.length > 0
+  );
 
   // War Room gets a wide panorama on desktop; standard columns stay narrow. Mobile always 90vw.
   const isWarRoomView = isMacroArena && hasArenaTheories;
@@ -232,20 +251,64 @@ export function DiveColumn({
       {isMacroArena && hasArenaTheories && (
         <>
           <div className="p-6 border-b border-border/50 bg-secondary/5 shrink-0">
-            <h2 className="font-bold text-foreground text-lg leading-relaxed">{assertionText}</h2>
-            <div
-              className="relative w-full h-3 rounded-full overflow-hidden bg-secondary/30 flex flex-row mt-6"
-              role="img"
-              aria-label={locale === "he" ? "מאזני כוח" : "Mass Balance"}
-            >
-              <div className="h-full bg-sky-500/60 transition-all duration-1000 ease-out" style={{ width: `${theoryAPercentage}%` }} />
-              <div className="h-full bg-amber-500/60 transition-all duration-1000 ease-out" style={{ width: `${theoryBPercentage}%` }} />
-              <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-background/80 z-10" aria-hidden />
-            </div>
-            <div className="flex justify-between text-xs font-bold mt-1 px-1">
-              <span className="text-sky-600 dark:text-sky-400">{theoryAPercentage}%</span>
-              <span className="text-muted-foreground font-medium">{locale === "he" ? "מאזני כוח" : "Mass Balance"}</span>
-              <span className="text-amber-600 dark:text-amber-400">{theoryBPercentage}%</span>
+            <h2 className="font-bold text-foreground text-xl leading-relaxed text-center">
+              {arenaDisplayBlock.assertion || assertionText}
+            </h2>
+            {hasArenaDetails && (
+              <div className="mt-3 flex flex-col items-center">
+                <button
+                  type="button"
+                  onClick={() => setArenaDetailsOpen((v) => !v)}
+                  className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
+                >
+                  {arenaDetailsOpen
+                    ? locale === "he"
+                      ? "− הסתר פרטים"
+                      : "− Hide details"
+                    : locale === "he"
+                      ? "+ פרטים והקשר לוגי"
+                      : "+ Details & context"}
+                </button>
+                {arenaDetailsOpen && (
+                  <div className="mt-3 bg-background border border-border/50 rounded-xl p-4 text-start shadow-sm w-full text-sm text-foreground leading-relaxed">
+                    {arenaDisplayBlock.reasoning?.trim() && <p>{arenaDisplayBlock.reasoning}</p>}
+                    {arenaHiddenAssumptions.length > 0 && (
+                      <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg mt-3">
+                        <span className="text-xs font-bold text-amber-700 dark:text-amber-400 block mb-1">
+                          {locale === "he" ? "הנחות מובלעות:" : "Hidden assumptions:"}
+                        </span>
+                        <ul className="list-disc list-inside text-xs text-amber-900/80 dark:text-amber-100/80">
+                          {arenaHiddenAssumptions.map((a, i) => (
+                            <li key={`${i}-${a.slice(0, 16)}`}>{a}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="mt-4 flex justify-center">
+              <div className="inline-flex items-center gap-1 rounded-lg border border-border/50 bg-background p-1">
+                <button
+                  type="button"
+                  onClick={() => setSortMode("recent")}
+                  className={`px-2.5 py-1 text-[11px] rounded-md transition-colors ${
+                    sortMode === "recent" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {locale === "he" ? "חדשים" : "Newest"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortMode("resonance")}
+                  className={`px-2.5 py-1 text-[11px] rounded-md transition-colors ${
+                    sortMode === "resonance" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {locale === "he" ? "הדהוד" : "Resonance"}
+                </button>
+              </div>
             </div>
             {isFirst && (
               <div className="mt-6">
@@ -289,7 +352,8 @@ export function DiveColumn({
                 className={`flex flex-col gap-4 border-t-4 border-sky-500/50 pt-4 rounded-xl bg-sky-500/5 p-2 md:p-4 ${activeTheoryFilter === "THEORY_B" ? "hidden md:flex" : "flex"}`}
               >
                 <h3 className="text-sm font-black text-sky-700 dark:text-sky-400 text-center mb-2">
-                  {theoryALabel}
+                  {theoryALabel}{" "}
+                  <span className="text-[11px] font-semibold text-muted-foreground">({theoryAEdges.length})</span>
                 </h3>
                 {theoryAEdges.length === 0 ? (
                   <p className="text-sm text-muted-foreground italic text-center py-6">
@@ -302,31 +366,54 @@ export function DiveColumn({
                     const childAssertion = parseNodeContent(child.content, lang).assertion || "";
                     const isActive = child.id === activeChildId;
                     return (
-                      <button
+                      <div
                         key={edge.id}
-                        type="button"
-                        onClick={() => onDive(child.id, columnIndex, childAssertion.slice(0, 200) + (childAssertion.length > 200 ? "…" : ""))}
-                        className={`w-full text-start p-4 rounded-xl border transition-all group relative overflow-hidden flex flex-col gap-4 shadow-sm ${
+                        className={`w-full rounded-xl border transition-all group relative overflow-hidden flex flex-col shadow-sm ${
                           isActive
                             ? "border-primary bg-primary/5 ring-1 ring-primary/20"
                             : "border-border/50 bg-card hover:border-primary/40 hover:shadow-soft"
                         }`}
-                        aria-label={locale === "he" ? "צלול לטענה" : "Dive to claim"}
                       >
                         <div className={`absolute top-0 start-0 w-1 h-full transition-colors ${isActive ? "bg-primary" : "bg-transparent group-hover:bg-primary/30"}`} aria-hidden />
-                        <p className={`text-sm font-medium transition-colors ps-2 ${isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`}>
-                          {childAssertion}
-                        </p>
-                        <div className="flex flex-wrap items-center justify-between border-t border-border/30 pt-3 gap-2 w-full ps-2">
+                        <button
+                          type="button"
+                          onClick={() => onDive(child.id, columnIndex, childAssertion.slice(0, 200) + (childAssertion.length > 200 ? "…" : ""))}
+                          className="text-start p-4 pb-2 flex flex-col gap-2 w-full bg-transparent border-none cursor-pointer font-inherit"
+                          aria-label={locale === "he" ? "צלול לטענה" : "Dive to claim"}
+                        >
+                          <p className={`text-sm font-medium transition-colors ps-2 ${isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`}>
+                            {childAssertion}
+                          </p>
+                        </button>
+                        <div className="flex flex-wrap items-center justify-between border-t border-border/30 pt-3 gap-2 w-full px-4 pb-4 ps-6">
                           <div className="flex items-center gap-2">
                             <EpistemicStateBadge state={child.epistemic_state ?? "SOLID"} locale={locale} />
                             {getMoveBadge(child.epistemic_move ?? null, lang)}
                           </div>
-                          <span className="text-[10px] font-bold text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                            {locale === "he" ? READ_RATIONALE.he + " ←" : READ_RATIONALE.en + " →"}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-2 justify-end">
+                            <SharpenClaimDrawer
+                              targetNodeId={child.id}
+                              targetAssertion={childAssertion}
+                              authorWallet={authorWallet}
+                              hasGenesisAnchor={hasGenesisAnchor}
+                              onLockedClick={() => setSbtCodexOpen(true)}
+                            />
+                            <TacticalMoveDrawer
+                              targetNodeId={child.id}
+                              targetAssertion={childAssertion}
+                              arenaId={arenaId ?? actualNodeId}
+                              tacticalSupportedTheoryHint="THEORY_B"
+                              authorWallet={authorWallet}
+                              hasGenesisAnchor={hasGenesisAnchor}
+                              onLockedClick={() => setSbtCodexOpen(true)}
+                              onAnchored={refreshCurrentColumn}
+                            />
+                            <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
+                              {locale === "he" ? READ_RATIONALE.he + " ←" : READ_RATIONALE.en + " →"}
+                            </span>
+                          </div>
                         </div>
-                      </button>
+                      </div>
                     );
                   })
                 )}
@@ -337,7 +424,8 @@ export function DiveColumn({
                 className={`flex flex-col gap-4 border-t-4 border-amber-500/50 pt-4 rounded-xl bg-amber-500/5 p-2 md:p-4 ${activeTheoryFilter === "THEORY_A" ? "hidden md:flex" : "flex"}`}
               >
                 <h3 className="text-sm font-black text-amber-700 dark:text-amber-400 text-center mb-2">
-                  {theoryBLabel}
+                  {theoryBLabel}{" "}
+                  <span className="text-[11px] font-semibold text-muted-foreground">({theoryBEdges.length})</span>
                 </h3>
                 {theoryBEdges.length === 0 ? (
                   <p className="text-sm text-muted-foreground italic text-center py-6">
@@ -350,31 +438,54 @@ export function DiveColumn({
                     const childAssertion = parseNodeContent(child.content, lang).assertion || "";
                     const isActive = child.id === activeChildId;
                     return (
-                      <button
+                      <div
                         key={edge.id}
-                        type="button"
-                        onClick={() => onDive(child.id, columnIndex, childAssertion.slice(0, 200) + (childAssertion.length > 200 ? "…" : ""))}
-                        className={`w-full text-start p-4 rounded-xl border transition-all group relative overflow-hidden flex flex-col gap-4 shadow-sm ${
+                        className={`w-full rounded-xl border transition-all group relative overflow-hidden flex flex-col shadow-sm ${
                           isActive
                             ? "border-primary bg-primary/5 ring-1 ring-primary/20"
                             : "border-border/50 bg-card hover:border-primary/40 hover:shadow-soft"
                         }`}
-                        aria-label={locale === "he" ? "צלול לטענה" : "Dive to claim"}
                       >
                         <div className={`absolute top-0 start-0 w-1 h-full transition-colors ${isActive ? "bg-primary" : "bg-transparent group-hover:bg-primary/30"}`} aria-hidden />
-                        <p className={`text-sm font-medium transition-colors ps-2 ${isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`}>
-                          {childAssertion}
-                        </p>
-                        <div className="flex flex-wrap items-center justify-between border-t border-border/30 pt-3 gap-2 w-full ps-2">
+                        <button
+                          type="button"
+                          onClick={() => onDive(child.id, columnIndex, childAssertion.slice(0, 200) + (childAssertion.length > 200 ? "…" : ""))}
+                          className="text-start p-4 pb-2 flex flex-col gap-2 w-full bg-transparent border-none cursor-pointer font-inherit"
+                          aria-label={locale === "he" ? "צלול לטענה" : "Dive to claim"}
+                        >
+                          <p className={`text-sm font-medium transition-colors ps-2 ${isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"}`}>
+                            {childAssertion}
+                          </p>
+                        </button>
+                        <div className="flex flex-wrap items-center justify-between border-t border-border/30 pt-3 gap-2 w-full px-4 pb-4 ps-6">
                           <div className="flex items-center gap-2">
                             <EpistemicStateBadge state={child.epistemic_state ?? "SOLID"} locale={locale} />
                             {getMoveBadge(child.epistemic_move ?? null, lang)}
                           </div>
-                          <span className="text-[10px] font-bold text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                            {locale === "he" ? READ_RATIONALE.he + " ←" : READ_RATIONALE.en + " →"}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-2 justify-end">
+                            <SharpenClaimDrawer
+                              targetNodeId={child.id}
+                              targetAssertion={childAssertion}
+                              authorWallet={authorWallet}
+                              hasGenesisAnchor={hasGenesisAnchor}
+                              onLockedClick={() => setSbtCodexOpen(true)}
+                            />
+                            <TacticalMoveDrawer
+                              targetNodeId={child.id}
+                              targetAssertion={childAssertion}
+                              arenaId={arenaId ?? actualNodeId}
+                              tacticalSupportedTheoryHint="THEORY_A"
+                              authorWallet={authorWallet}
+                              hasGenesisAnchor={hasGenesisAnchor}
+                              onLockedClick={() => setSbtCodexOpen(true)}
+                              onAnchored={refreshCurrentColumn}
+                            />
+                            <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
+                              {locale === "he" ? READ_RATIONALE.he + " ←" : READ_RATIONALE.en + " →"}
+                            </span>
+                          </div>
                         </div>
-                      </button>
+                      </div>
                     );
                   })
                 )}
@@ -389,8 +500,91 @@ export function DiveColumn({
         const v2 = parseTruthNodeContentJson(data.node.content);
         const displayBlock = v2 ? getDisplayBlock(v2, lang) : { assertion: parsed.assertion, reasoning: parsed.rationale ?? "", isFallback: false };
         const rationaleText = displayBlock.reasoning?.trim() ?? parsed.rationale ?? "";
+        const lineage = data.lineage?.length ? data.lineage : [data.node];
+        const isOutdated = data.hasNewerVersion;
+        const versionIndex = Math.max(0, lineage.findIndex((v) => v.id === data.node.id));
+        const totalVersions = lineage.length;
+        const attackingTargetEdges = data.edges.filter((e) => {
+          if (e.target_id !== data.node.id || e.relationship !== "challenges" || !e.source_node) {
+            return false;
+          }
+          // Exclude arena/theory-level placement edges (macro root), keep only claim-to-claim attacks.
+          return !getThematicTags(e.source_node.thematic_tags).includes("macro-arena");
+        });
+        const goVersion = (row: TruthNodeRow) => {
+          const assertionFromRow = parseNodeContent(row.content, lang).assertion || "";
+          const label =
+            assertionFromRow.slice(0, 200) + (assertionFromRow.length > 200 ? "…" : "");
+          onReplaceColumn(row.id, columnIndex, label);
+        };
+
         return (
           <div className="p-6 h-full flex flex-col overflow-y-auto custom-scrollbar pb-24 min-h-0">
+            {(totalVersions > 1 || isOutdated) && (
+              <div className="mb-4 flex flex-col gap-2">
+                {isOutdated && (
+                  <div
+                    className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-md bg-amber-500/10 text-amber-800 dark:text-amber-200 border border-amber-500/20"
+                    role="status"
+                  >
+                    <AlertTriangle className="size-3 shrink-0" aria-hidden />
+                    {locale === "he" ? NEWER_SHARPENED_EXISTS.he : NEWER_SHARPENED_EXISTS.en}
+                  </div>
+                )}
+                {totalVersions > 1 && (
+                  <div
+                    className="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground bg-secondary/20 w-fit max-w-full px-3 py-1.5 rounded-full border border-border/50"
+                    dir="ltr"
+                  >
+                    <History className="size-3 shrink-0" aria-hidden />
+                    <span className="whitespace-nowrap">
+                      {locale === "he" ? SHARPENING_HISTORY.he : SHARPENING_HISTORY.en}:
+                    </span>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => versionIndex > 0 && goVersion(lineage[versionIndex - 1])}
+                        disabled={versionIndex <= 0}
+                        className="p-1 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:pointer-events-none"
+                        aria-label={locale === "he" ? VERSION_CAROUSEL_PREV.he : VERSION_CAROUSEL_PREV.en}
+                      >
+                        <ChevronLeft className="size-4" aria-hidden />
+                      </button>
+                      <div className="flex flex-wrap items-center gap-1 px-0.5">
+                        {lineage.map((v, i) => {
+                          const isActive = v.id === data.node.id;
+                          return (
+                            <button
+                              type="button"
+                              key={v.id}
+                              onClick={() => goVersion(v)}
+                              className={`px-1.5 py-0.5 rounded text-[10px] transition-colors ${
+                                isActive
+                                  ? "bg-primary text-primary-foreground font-bold"
+                                  : "hover:bg-secondary hover:text-foreground"
+                              }`}
+                            >
+                              v1.{i}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          versionIndex < totalVersions - 1 && goVersion(lineage[versionIndex + 1])
+                        }
+                        disabled={versionIndex >= totalVersions - 1}
+                        className="p-1 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40 disabled:pointer-events-none"
+                        aria-label={locale === "he" ? VERSION_CAROUSEL_NEXT.he : VERSION_CAROUSEL_NEXT.en}
+                      >
+                        <ChevronRight className="size-4" aria-hidden />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <EpistemicStateBadge state={nodeEpistemicState} locale={locale} />
               {getMoveBadge(data.node.epistemic_move ?? null, lang)}
@@ -409,6 +603,44 @@ export function DiveColumn({
                 </span>
               )}
             </div>
+            {attackingTargetEdges.length > 0 && (
+              <div className="mt-1 mb-4 flex flex-col gap-2">
+                {attackingTargetEdges.map((edge) => {
+                  const targetNode = edge.source_node;
+                  if (!targetNode) return null;
+                  const targetV2 = parseTruthNodeContentJson(targetNode.content);
+                  const targetAssertion = targetV2
+                    ? getDisplayBlock(targetV2, lang).assertion
+                    : parseNodeContent(targetNode.content, lang).assertion || "";
+                  const targetLabel =
+                    targetAssertion.slice(0, 200) + (targetAssertion.length > 200 ? "…" : "");
+                  return (
+                    <button
+                      type="button"
+                      key={edge.id}
+                      onClick={() => onReplaceColumn(targetNode.id, columnIndex, targetLabel)}
+                      className="w-full text-start flex items-start justify-between gap-3 bg-rose-500/10 border border-rose-500/20 p-3 rounded-lg shadow-sm hover:bg-rose-500/15 transition-colors"
+                      aria-label={locale === "he" ? "מעבר לטענת היעד המותקפת" : "Open attacked target claim"}
+                    >
+                      <div className="flex items-start gap-2 min-w-0">
+                        <span className="text-xl leading-none">🎯</span>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[10px] font-bold text-rose-700 dark:text-rose-400 uppercase">
+                            {locale === "he" ? "תוקף את הטענה:" : "Attacks claim:"}
+                          </span>
+                          <p className="text-xs font-medium text-foreground line-clamp-2 mt-0.5">
+                            {targetAssertion}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-300 shrink-0 self-center">
+                        {locale === "he" ? "מעבר" : "Open"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             <h2 className="font-bold text-foreground text-xl leading-relaxed mb-6">
               {displayBlock.assertion || assertionText}
@@ -438,42 +670,6 @@ export function DiveColumn({
                 </p>
               </div>
             )}
-            {supportingEdges.length > 0 && (
-              <div className="flex flex-col gap-2 mb-6">
-                <h3 className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                  <Shield className="size-3" />
-                  {locale === "he" ? "מבססים" : "Supports"} ({supportingEdges.length})
-                </h3>
-                {sortedSupportingEdges.map((edge) => {
-                  const child = edge.target_node;
-                  if (!child) return null;
-                  const childParsed = parseNodeContent(child.content, lang);
-                  const avatar = getArenaAvatar(child.author_wallet, arenaId ?? "");
-                  return (
-                    <div
-                      key={edge.id}
-                      className="text-start p-3 rounded-xl border border-border/50 bg-background shrink-0 flex flex-col gap-2"
-                      role="article"
-                    >
-                      <p className="text-xs font-medium ps-1">{childParsed.assertion || ""}</p>
-                      <div className="flex items-center justify-between mt-2 pt-3 border-t border-border/30">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <EpistemicStateBadge state={child.epistemic_state ?? "SOLID"} locale={locale} />
-                          {getMoveBadge(child.epistemic_move, lang)}
-                        </div>
-                        <div
-                          className="flex items-center justify-center size-6 rounded-full shadow-sm border shrink-0"
-                          style={{ background: avatar.background, borderColor: avatar.borderColor }}
-                          title={locale === "he" ? "זהות אפימרית בזירה זו" : "Ephemeral Arena Identity"}
-                        >
-                          <span className="text-[10px] leading-none">{avatar.emoji}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
             {challengingEdges.length > 0 && (
               <div className="flex flex-col gap-2 mb-6">
                 <h3 className="text-xs font-bold text-amber-600 flex items-center gap-1">
@@ -485,11 +681,16 @@ export function DiveColumn({
                   if (!child) return null;
                   const childParsed = parseNodeContent(child.content, lang);
                   const avatar = getArenaAvatar(child.author_wallet, arenaId ?? "");
+                  const childLabel =
+                    (childParsed.assertion || "").slice(0, 200) +
+                    ((childParsed.assertion || "").length > 200 ? "…" : "");
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={edge.id}
-                      className="text-start p-3 rounded-xl border border-border/50 bg-background shrink-0 flex flex-col gap-2"
-                      role="article"
+                      onClick={() => onDive(child.id, columnIndex, childLabel)}
+                      className="w-full text-start p-3 rounded-xl border border-border/50 bg-background shrink-0 flex flex-col gap-2 hover:border-primary/40 hover:shadow-soft transition-all"
+                      aria-label={locale === "he" ? "צלול לטענה מערערת" : "Dive to challenging claim"}
                     >
                       <p className="text-xs font-medium ps-1">{childParsed.assertion || ""}</p>
                       <div className="flex items-center justify-between mt-2 pt-3 border-t border-border/30">
@@ -505,24 +706,42 @@ export function DiveColumn({
                           <span className="text-[10px] leading-none">{avatar.emoji}</span>
                         </div>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
             )}
-            {childEdges.length === 0 && !rationaleText && !parsed.scoutWarning && (
+            {challengingEdges.length === 0 && !rationaleText && !parsed.scoutWarning && (
               <p className="text-sm text-muted-foreground italic text-center p-8">
-                {locale === "he" ? "קצה הענף הלוגי. טרם נטענו ראיות." : "End of branch. No evidence anchored yet."}
+                {locale === "he" ? "קצה הענף הלוגי. טרם נטענו הפרכות." : "End of branch. No refutations anchored yet."}
               </p>
             )}
 
             <div className="mt-auto border-t border-border/50 pt-4 flex items-center justify-between flex-wrap gap-3">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Fingerprint className="size-3" aria-hidden />
-                {locale === "he"
-                  ? `${data.node.resonance_count ?? 0} ${RESONANCE_COUNT.he}`
-                  : `${data.node.resonance_count ?? 0} ${RESONANCE_COUNT.en}`}
-              </span>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Fingerprint className="size-3" aria-hidden />
+                  {locale === "he"
+                    ? `${data.node.resonance_count ?? 0} ${RESONANCE_COUNT.he}`
+                    : `${data.node.resonance_count ?? 0} ${RESONANCE_COUNT.en}`}
+                </span>
+                <SharpenClaimDrawer
+                  targetNodeId={actualNodeId}
+                  targetAssertion={displayBlock.assertion || assertionText}
+                  authorWallet={authorWallet}
+                  hasGenesisAnchor={hasGenesisAnchor}
+                  onLockedClick={() => setSbtCodexOpen(true)}
+                />
+                <TacticalMoveDrawer
+                  targetNodeId={actualNodeId}
+                  targetAssertion={displayBlock.assertion || assertionText}
+                  arenaId={arenaId ?? actualNodeId}
+                  authorWallet={authorWallet}
+                  hasGenesisAnchor={hasGenesisAnchor}
+                  onLockedClick={() => setSbtCodexOpen(true)}
+                  onAnchored={refreshCurrentColumn}
+                />
+              </div>
               {hasGenesisAnchor ? (
                 <Button
                   variant="ghost"

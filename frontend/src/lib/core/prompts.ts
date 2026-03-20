@@ -149,14 +149,14 @@ export function buildForgeIntentPrompt(params: {
   chatPreview: string;
   lastUserText: string;
   targetNodeContext?: string | null;
-  debateIntent?: "supports" | "challenges" | null;
+  debateIntent?: "sharpens" | "challenges" | null;
 }): string {
   const { chatPreview, lastUserText, targetNodeContext, debateIntent } = params;
   const targetContextLine = targetNodeContext
     ? "The user is interacting with a specific claim."
     : "General weave exploration.";
   const debateActionLine = debateIntent
-    ? `The user is in a dedicated drawer trying to ${debateIntent} the target claim.`
+    ? `The user is in a dedicated drawer trying to ${debateIntent === "sharpens" ? "sharpen (upgrade the wording/substance of)" : "challenge"} the target claim.`
     : "None.";
   return `CHAT HISTORY PREVIEW:
 ${chatPreview}
@@ -170,21 +170,39 @@ DEBATE ACTION: ${debateActionLine}
 TASK: Classify the user's intent.
 - EXPLORE = User is pasting a broad article or new topic to explore (not a direct reply to a claim).
 - DRAFT_REQUEST = The user provides a concrete logical argument, scientific evidence, or counter-claim meant to be anchored.
-- CHAT = User is merely asking a question, requesting help, or chatting WITHOUT providing actual evidence (e.g., "Help me support this", "What does Newton's law mean?").
+- CHAT = User is merely asking a question, requesting help, or chatting WITHOUT providing actual evidence (e.g., "Help me phrase this", "What does Newton's law mean?").
 
 CRITICAL GUARDRAIL FOR DEBATE DRAWERS:
-If DEBATE ACTION is active ('supports' or 'challenges') AND the user provides a substantive argument or factual premise (like explaining a physics concept, pointing out a flaw, or citing a phenomenon), YOU MUST CLASSIFY IT AS 'DRAFT_REQUEST' IMMEDIATELY. DO NOT require them to say "draft this". DO NOT classify as CHAT just to confirm their thought. Extract their argument into \`targetClaimToDraft\`.
-Only use CHAT if they are explicitly asking you for help or clarification without bringing their own argument.`;
+If DEBATE ACTION is active ('sharpens' or 'challenges') AND the user provides substantive refinement material or a factual premise (like new data, nuance, or a counter to the target), YOU MUST CLASSIFY IT AS 'DRAFT_REQUEST' IMMEDIATELY. DO NOT require them to say "draft this". DO NOT classify as CHAT just to confirm their thought. Extract their material into \`targetClaimToDraft\`.
+Only use CHAT if they are explicitly asking you for help or clarification without bringing their own refinements or argumentative substance.`;
 }
 
-export const FORGE_DEBATE_SUPPORT_OVERRIDE = `
-CRITICAL CONTEXT: The user is in the "Support Claim" drawer. The target claim context (assertion, rationale) is provided below. Use it to answer their questions.
-RULE OF SOCRATIC MIDWIFERY & EDUCATION:
-- If the user asks for clarification about physics, logic, or WHY the claim has its rationale, YOU MUST ANSWER DIRECTLY AND COMPREHENSIVELY. Act as an objective science/logic tutor. Explain the physics (e.g. Newton's laws) clearly and defend or explain the rationale.
-- When it comes to creating the actual NEW draft card to support the claim, YOU MUST NOT invent the evidence. The user must provide the counter-argument or data. You only refine and format what they provide.`;
+/** Logical Blacksmith — persona for Socratic layer + drafter preface (Sharpening drawer). */
+export const BLACKSMITH_SYSTEM = `You are the Logical Blacksmith of Mana OS.
+The user wants to upgrade, refine, or fortify an existing claim.
 
-export const FORGE_DEBATE_SUPPORT_COACH =
-  "Act as Debate Coach and tutor. When they ask about the rationale or the science behind the claim, explain fully. When they want to add a new supporting claim, they must provide the raw material; you refine and format it.";
+YOUR INSTRUCTIONS:
+1. DO NOT invent new evidence. The user must provide the new data, nuance, or logical clarification.
+2. Merge the user's new input with the Original Claim to forge a stronger, more bulletproof, and unified V2 of the claim.
+3. Call the \`epistemic_triage\` tool exactly once with your Socratic message praising their contribution. The server injects the upgraded draft.`;
+
+export function buildBlacksmithPrompt(originalClaimContext: string): string {
+  const safe = originalClaimContext.replace(/"""/g, "''").slice(0, 8000);
+  return `You are forging an upgraded version of the following claim.
+
+ORIGINAL CLAIM:
+"""${safe}"""
+
+TASK: Integrate the user's new input to create a robust, upgraded version (Rosetta Protocol V2). Ensure the new assertion is razor-sharp. Determine the \`epistemicMoveType\` that best fits the upgraded claim (e.g., EMPIRICAL_VERIFICATION if they added hard data, or keep neutral logic otherwise).
+
+relationshipToContext MUST be exactly "sharpens" (version upgrade — not a supporting child edge).`;
+}
+
+export const FORGE_DEBATE_SHARPEN_OVERRIDE = `
+CRITICAL CONTEXT: The user is in the "Sharpen Claim" drawer (Logical Blacksmith). The target claim context is provided below.
+RULE OF SOCRATIC MIDWIFERY & EDUCATION:
+- If the user asks for clarification about physics, logic, or WHY the claim is phrased as it is, YOU MUST ANSWER DIRECTLY AND COMPREHENSIVELY. Act as an objective tutor.
+- When forging the upgraded draft, YOU MUST NOT invent evidence. The user must supply the new datum, nuance, or clarification; you merge it with the original into one stronger version.`;
 
 export const FORGE_DEBATE_CHALLENGE_OVERRIDE = `
 CRITICAL CONTEXT: The user is in the "Challenge Claim" drawer. The target claim context (assertion, rationale) is provided below. Use it to answer their questions.
@@ -195,12 +213,15 @@ RULE OF SOCRATIC MIDWIFERY & EDUCATION:
 export const FORGE_DEBATE_CHALLENGE_COACH =
   "Act as Debate Coach and tutor. When they ask about the rationale or the science, explain fully. When they want to add a challenge claim, they must provide the flaw or counter-evidence; you refine and format it.";
 
+export const FORGE_DEBATE_SHARPEN_COACH =
+  "Act as a Logical Blacksmith. Ask the user what specific data or nuance they want to add to fortify the claim. Do not invent it for them.";
+
 export function buildForgeDrafterPrompt(params: {
   claim: string;
   existingMatchesPreview?: string;
   locale: "he" | "en";
   targetNodeContext?: string | null;
-  debateIntent?: "supports" | "challenges" | null;
+  debateIntent?: "sharpens" | "challenges" | null;
 }): string {
   const { claim, existingMatchesPreview, locale, targetNodeContext, debateIntent } = params;
   const heBilingualIron =
@@ -210,6 +231,31 @@ IRON DISCIPLINE (Hebrew UI): source_locale MUST be exactly "he".
 You MUST fill local_translation with COMPLETE Hebrew: assertion, reasoning, hiddenAssumptions (array, use [] if none), challengePrompt — ALL required. Skipping Hebrew fields will fail validation. Do NOT copy English into Hebrew slots; write real Hebrew.
 `
       : "";
+  const similarNodesBlock =
+    existingMatchesPreview && existingMatchesPreview !== "[]"
+      ? `\nSimilar nodes in weave (for thematic reference only; do NOT use for relationshipToContext): ${existingMatchesPreview}`
+      : "";
+
+  if (debateIntent === "sharpens" && targetNodeContext) {
+    return `You are the Logical Blacksmith. Output ONLY valid structured JSON matching the schema (no tool calls in this step).
+
+${buildBlacksmithPrompt(targetNodeContext)}
+
+USER REFINEMENT (verbatim — integrate with ORIGINAL CLAIM above; do not invent beyond this):
+"${claim.replace(/"""/g, "''").slice(0, 8000)}"
+${similarNodesBlock}
+
+${heBilingualIron}
+CRITICAL — ROSETTA V2 (canonical_en = ENGLISH ONLY):
+- Produce ONE upgraded claim that subsumes the original; the assertion must read as a single sharpened premise, not a reply thread.
+- \`relationshipToContext\` MUST be exactly "sharpens".
+
+CRITICAL EPISTEMIC DIRECTIVE — MOVE CATEGORIZATION (NO SCORES):
+Categorize into one \`epistemicMoveType\`: EMPIRICAL_CONTRADICTION | INTERNAL_INCONSISTENCY | EMPIRICAL_VERIFICATION | AD_HOC_RESCUE | APPEAL_TO_AUTHORITY.
+
+Output: canonical_en, source_locale, local_translation, epistemicMoveType, thematicTags, relationshipToContext.`;
+  }
+
   const parentContextBlock = targetNodeContext
     ? `PARENT CLAIM CONTEXT: "${targetNodeContext.slice(0, 4000)}"
 DEBATE INTENT: ${debateIntent ?? "None specified."}
@@ -217,13 +263,8 @@ DEBATE INTENT: ${debateIntent ?? "None specified."}
 CRITICAL RELATIONSHIP LOGIC:
 The \`relationshipToContext\` field MUST represent how this new claim relates to the PARENT CLAIM CONTEXT above.
 - If this new claim attacks, refutes, or exposes a flaw in the Parent Claim, output "challenges".
-- If this new claim bolsters, provides evidence for, or defends the Parent Claim, output "supports".
 Evaluate ONLY against the specific Parent Claim. Use the DEBATE INTENT as a strong indicator of the user's goal.`
     : "PARENT CLAIM CONTEXT: None (Standalone root claim).\nDEBATE INTENT: None specified.";
-  const similarNodesBlock =
-    existingMatchesPreview && existingMatchesPreview !== "[]"
-      ? `\nSimilar nodes in weave (for thematic reference only; do NOT use for relationshipToContext): ${existingMatchesPreview}`
-      : "";
   return `You are a Logician Drafter. Evaluate this single claim for logical coherence and produce a draft epistemic node (Rosetta Protocol V2).
 Claim: "${claim}"
 
@@ -284,7 +325,7 @@ export function buildForgeHandoffExploreChat(
   coachDirective: string
 ): string {
   const coachSuffix = coachDirective
-    ? "\nDEBATE COACH DIRECTIVE (when user is in Support or Challenge drawer): " + coachDirective + "\n"
+    ? "\nDEBATE COACH DIRECTIVE (when user is in Sharpen or Challenge drawer): " + coachDirective + "\n"
     : "";
   return (
     "\n=========================================\nEXPLORE / CHAT MODE: Epistemic Triage\n=========================================\n" +

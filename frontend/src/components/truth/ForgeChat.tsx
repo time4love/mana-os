@@ -23,7 +23,7 @@ import {
   type RagTelemetryPayload,
   type MessagePartLike,
 } from "@/components/truth/forgeChatLib";
-import type { EdgeRelationship, MatchTruthNodeResult } from "@/types/truth";
+import type { EdgeRelationship, ForgeDebateIntent, MatchTruthNodeResult } from "@/types/truth";
 
 export type { RagTelemetryPayload } from "@/components/truth/forgeChatLib";
 
@@ -220,8 +220,9 @@ function FluidForgeInput({
 }
 
 const FORGE_CACHE_KEY_ROOT = "forge_draft_root_node";
-function getForgeCacheKey(parentId: string | undefined): string {
-  return parentId ? `forge_draft_parent_${parentId}` : FORGE_CACHE_KEY_ROOT;
+function getForgeCacheKey(parentId: string | undefined, suffix?: string): string {
+  const base = parentId ? `forge_draft_parent_${parentId}` : FORGE_CACHE_KEY_ROOT;
+  return suffix ? `${base}__${suffix}` : base;
 }
 
 const FORGE_PLACEHOLDER = {
@@ -276,10 +277,16 @@ export function createArenaConfig(locale: "he" | "en"): ForgeChatConfig {
 interface ForgeChatProps {
   authorWallet: string;
   parentId?: string;
+  arenaId?: string;
   relationship?: EdgeRelationship;
   targetNodeContext?: string | null;
   /** Drives API endpoint, placeholder, submit label, and whether to show "Claim mapping below". Omit for default Forge behavior. */
   config?: ForgeChatConfig;
+  /** Sent as `debateIntent` on `/api/oracle/forge`. Tactical strike uses referee-only drafting. */
+  forgeDebateIntent?: ForgeDebateIntent;
+  tacticalSupportedTheoryHint?: "THEORY_A" | "THEORY_B";
+  /** Isolates `useChat` id / sessionStorage from other flows on the same parent. */
+  cacheKeySuffix?: string;
   onAnchored?: (nodeId: string) => void;
   onEdgeAttached?: (edgeId: string) => void;
   className?: string;
@@ -288,9 +295,13 @@ interface ForgeChatProps {
 export function ForgeChat({
   authorWallet,
   parentId,
+  arenaId,
   relationship,
   targetNodeContext,
   config,
+  forgeDebateIntent,
+  tacticalSupportedTheoryHint,
+  cacheKeySuffix,
   onAnchored,
   className = "",
 }: ForgeChatProps) {
@@ -310,7 +321,7 @@ export function ForgeChat({
   };
   const activeConfig = config ?? defaultConfig;
 
-  const cacheKey = getForgeCacheKey(parentId);
+  const cacheKey = getForgeCacheKey(parentId, cacheKeySuffix);
 
   const initialMessages = useMemo((): UIMessage[] => {
     if (typeof sessionStorage === "undefined") return [];
@@ -325,6 +336,9 @@ export function ForgeChat({
     }
   }, [cacheKey]);
 
+  const resolvedDebateIntent: ForgeDebateIntent | undefined =
+    forgeDebateIntent ?? (relationship === "challenges" ? "challenges" : undefined);
+
   const { messages, sendMessage, status, setMessages } = useChat({
     id: cacheKey,
     messages: initialMessages,
@@ -334,7 +348,9 @@ export function ForgeChat({
         locale,
         targetNodeContext: targetNodeContext ?? undefined,
         architectMode: isArchitectMode,
-        debateIntent: relationship === "supports" || relationship === "challenges" ? relationship : undefined,
+        debateIntent: resolvedDebateIntent,
+        arenaId: arenaId ?? undefined,
+        tacticalSupportedTheoryHint: tacticalSupportedTheoryHint ?? undefined,
       },
     }),
   });
@@ -379,23 +395,40 @@ export function ForgeChat({
     setDuplicateDraft(null);
     setLastWriteTelemetry(null);
     setIsAnchoring(true);
-    // UI intent (Support/Challenge drawer) is sovereign; never let the AI override it.
-    const dynamicRelationship = relationship ?? draft.relationshipToContext ?? "supports";
+    const isSharpen = forgeDebateIntent === "sharpens";
+    // UI intent (sharpen / challenge / tactical strike) is sovereign; never let the AI override edge shape.
+    const dynamicRelationship: EdgeRelationship | undefined =
+      forgeDebateIntent === "TACTICAL_STRIKE"
+        ? "challenges"
+        : isSharpen
+          ? undefined
+          : parentId
+            ? relationship ?? "challenges"
+            : undefined;
     const normalizedDraft = {
       canonical_en: draft.canonical_en,
       source_locale: draft.source_locale,
       local_translation: draft.local_translation,
       epistemicState: draft.epistemicState ?? "SOLID",
+      epistemicMoveType: draft.epistemicMoveType,
+      supportedTheory: draft.supportedTheory,
       thematicTags: draft.thematicTags ?? [],
-      relationshipToContext: draft.relationshipToContext,
+      relationshipToContext:
+        forgeDebateIntent === "TACTICAL_STRIKE"
+          ? ("challenges" as const)
+          : isSharpen
+            ? ("sharpens" as const)
+            : ("challenges" as const),
       competingTheories: draft.competingTheories,
     };
     const result = await anchorForgeDraft(
       normalizedDraft,
       authorWallet,
-      parentId,
+      isSharpen ? undefined : parentId,
       dynamicRelationship,
-      forceBypass ?? false
+      forceBypass ?? false,
+      isSharpen && parentId ? parentId : null,
+      !isSharpen ? (arenaId ?? null) : null
     );
     setLastWriteTelemetry(result.writeTelemetry ?? null);
     setIsAnchoring(false);
@@ -408,7 +441,15 @@ export function ForgeChat({
         // ignore
       }
       onAnchored?.(result.nodeId);
-      router.push(parentId ? `/truth/node/${parentId}` : "/truth");
+      if (forgeDebateIntent === "TACTICAL_STRIKE") {
+        router.refresh();
+        return;
+      }
+      if (forgeDebateIntent === "sharpens") {
+        router.push(`/truth/node/${result.nodeId}`);
+      } else {
+        router.push(parentId ? `/truth/node/${parentId}` : "/truth");
+      }
       return;
     }
     const hasSemanticResonance =

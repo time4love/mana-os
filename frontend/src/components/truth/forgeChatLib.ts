@@ -213,7 +213,7 @@ function normalizeCompetingDraft(raw: unknown): DraftEpistemicNodeV2["competingT
 /** Normalized draft for UI (Rosetta V2). */
 export type NormalizedForgeDraft = DraftEpistemicNodeV2 & {
   matchedExistingNodeId: string | null;
-  relationshipToContext: "supports" | "challenges";
+  relationshipToContext: "challenges" | "sharpens";
 };
 
 export function normalizeRawDraft(c: Record<string, unknown>): NormalizedForgeDraft {
@@ -236,7 +236,10 @@ export function normalizeRawDraft(c: Record<string, unknown>): NormalizedForgeDr
     thematicTags: Array.isArray(c.thematicTags) ? (c.thematicTags as string[]) : [],
     matchedExistingNodeId:
       typeof c.matchedExistingNodeId === "string" ? c.matchedExistingNodeId : null,
-    relationshipToContext: (c.relationshipToContext as "supports" | "challenges") ?? "supports",
+    relationshipToContext:
+      c.relationshipToContext === "sharpens"
+        ? "sharpens"
+        : ((c.relationshipToContext as "challenges" | "sharpens") ?? "challenges"),
     competingTheories: normalizeCompetingDraft(c.competingTheories),
   };
 }

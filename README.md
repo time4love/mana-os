@@ -21,4 +21,9 @@
 
 We are building an open-source, decentralized **Healing Operating System** for communities in a post-money, post-state, and post-time world. No fiat, no hours-tracking—only **Mana** (regenerative energy), **Resonance**, and **Soul Contracts**.
 
+**Truth Engine (one breath):**
+
+- In the **Crossfire Arena**, claims stay **Solid** by default; the graph grows downward through **challenges** (attacks), not through piles of “supporting” child nodes. When a community forges a stronger premise, it **Sharpens** the claim—**version history** (e.g. V1.0 → V1.1) instead of clutter—keeping the battlefield legible.
+- **The Epistemic Crucible:** Disputes can be forged into **real-world action**. Communities design **falsifiable experiments** (neutral **Experiment** nodes—not claims) with explicit outcomes for each theory; validated protocols flow to the **Mana Callings Board** so people physically run the test. Results return as empirical fact, anchored **gaslessly** on-chain, settling debates with data instead of infinite argument.
+
 👉 **Start here:** [README.en.md](README.en.md) for full philosophy and setup.

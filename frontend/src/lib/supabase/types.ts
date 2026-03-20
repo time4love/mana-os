@@ -272,6 +272,7 @@ export interface Database {
           is_macro_root: boolean;
           thematic_tags: string[];
           metadata: Record<string, unknown>;
+          previous_version_id: string | null;
         };
         Insert: {
           id?: string;
@@ -282,6 +283,7 @@ export interface Database {
           is_macro_root?: boolean;
           thematic_tags?: string[];
           metadata?: Record<string, unknown>;
+          previous_version_id?: string | null;
         };
         Update: {
           id?: string;
@@ -292,6 +294,7 @@ export interface Database {
           is_macro_root?: boolean;
           thematic_tags?: string[];
           metadata?: Record<string, unknown>;
+          previous_version_id?: string | null;
         };
         Relationships: TableRelationships;
       };

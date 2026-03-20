@@ -101,7 +101,7 @@ export const DraftEpistemicNodeV2HeForgeSchema = z.object({
   supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]).optional(),
   thematicTags: z.array(z.string()).max(10).optional(),
   matchedExistingNodeId: z.string().nullable().optional(),
-  relationshipToContext: z.enum(["supports", "challenges"]).optional(),
+  relationshipToContext: z.enum(["challenges", "sharpens"]).optional(),
   competingTheories: z.array(CompetingTheoryStrictSchema).max(2).optional(),
 });
 
@@ -134,7 +134,7 @@ export const DraftEpistemicNodeV2LooseSchema = z.object({
   supportedTheory: z.enum(["THEORY_A", "THEORY_B", "NEUTRAL"]).optional(),
   thematicTags: z.array(z.string()).max(10).optional().catch([]),
   matchedExistingNodeId: z.string().nullable().optional().catch(null),
-  relationshipToContext: z.enum(["supports", "challenges"]).optional().catch("supports"),
+  relationshipToContext: z.enum(["challenges", "sharpens"]).optional().catch("challenges"),
   competingTheories: z.array(CompetingTheoryDraftSchema).max(2).optional(),
 }).refine((d) => d.source_locale.trim().toLowerCase() !== "he", {
   message: "source_locale he must use DraftEpistemicNodeV2HeForgeSchema (strict bilingual)",

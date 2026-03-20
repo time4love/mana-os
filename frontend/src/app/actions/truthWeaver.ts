@@ -411,16 +411,25 @@ const AnchorPrismDraftSchema = z.object({
   ).max(50),
 });
 
-function metadataFromForgeDraft(draft: AnchorableForgeDraft): { competingTheories?: CompetingTheoryV2[] } {
-  if (!draft.competingTheories || draft.competingTheories.length !== 2) return {};
+function metadataFromForgeDraft(draft: AnchorableForgeDraft): {
+  competingTheories?: CompetingTheoryV2[];
+  supportedTheory?: "THEORY_A" | "THEORY_B" | "NEUTRAL";
+} {
+  const metadata: {
+    competingTheories?: CompetingTheoryV2[];
+    supportedTheory?: "THEORY_A" | "THEORY_B" | "NEUTRAL";
+  } = {};
+  if (draft.supportedTheory) {
+    metadata.supportedTheory = draft.supportedTheory;
+  }
+  if (!draft.competingTheories || draft.competingTheories.length !== 2) return metadata;
   const sl = draft.source_locale.trim().toLowerCase();
-  return {
-    competingTheories: draft.competingTheories.map((ct) => ({
-      canonical_en: ct.canonical_en,
-      source_locale: draft.source_locale,
-      locales: ct.local_translation ? { [sl]: ct.local_translation } : {},
-    })),
-  };
+  metadata.competingTheories = draft.competingTheories.map((ct) => ({
+    canonical_en: ct.canonical_en,
+    source_locale: draft.source_locale,
+    locales: ct.local_translation ? { [sl]: ct.local_translation } : {},
+  }));
+  return metadata;
 }
 
 /** Prism claim blob (single locale; no EN translation layer). */
@@ -579,7 +588,9 @@ export async function anchorForgeDraft(
   authorWallet: string,
   parentId?: string,
   relationship?: EdgeRelationship,
-  forceBypass?: boolean
+  forceBypass?: boolean,
+  sharpenOfNodeId?: string | null,
+  arenaId?: string | null
 ): Promise<AnchorForgeDraftResult> {
   const writeTelemetry: string[] = [];
 
@@ -660,14 +671,18 @@ export async function anchorForgeDraft(
 
     writeTelemetry.push("[5] Executing Supabase Insert...");
     const metadata = metadataFromForgeDraft(data);
+    const sharpenParent =
+      typeof sharpenOfNodeId === "string" && sharpenOfNodeId.trim().length > 0 ? sharpenOfNodeId.trim() : null;
+
     const nodePayload = {
       author_wallet: wallet,
       content,
       embedding,
-      is_macro_root: !parentId,
+      is_macro_root: !parentId && !sharpenParent,
       thematic_tags: thematicTags.length > 0 ? thematicTags : undefined,
       metadata,
       epistemic_move: "epistemicMoveType" in data && data.epistemicMoveType ? data.epistemicMoveType : undefined,
+      ...(sharpenParent ? { previous_version_id: sharpenParent } : {}),
     };
     const { data: rowData, error: insertError } = await supabase
       .from("truth_nodes")
@@ -681,7 +696,7 @@ export async function anchorForgeDraft(
       return { success: false, error: insertError?.message ?? "Failed to create node", writeTelemetry };
     }
 
-    if (parentId && relationship) {
+    if (!sharpenParent && parentId && relationship) {
       const { error: edgeError } = await supabase.from("truth_edges").insert({
         source_id: parentId,
         target_id: row.id,
@@ -690,9 +705,42 @@ export async function anchorForgeDraft(
       if (edgeError) {
         return { success: false, error: `Node created but edge failed: ${edgeError.message}`, writeTelemetry };
       }
+
+      if (relationship === "challenges") {
+        const { error: contestedError } = await supabase
+          .from("truth_nodes")
+          .update({ epistemic_state: "CONTESTED" } as never)
+          .eq("id", parentId)
+          .eq("epistemic_state", "SOLID");
+        if (contestedError) {
+          writeTelemetry.push(`[WARNING] Failed to mark parent as CONTESTED: ${contestedError.message}`);
+        }
+      }
+    }
+
+    // Dual-edge architecture for tactical claims inside an arena:
+    // keep the local tactical edge (target claim -> new claim), and also attach to arena root
+    // so War Room columns can render it immediately.
+    const normalizedArenaId =
+      typeof arenaId === "string" && arenaId.trim().length > 0 ? arenaId.trim() : null;
+    if (!sharpenParent && normalizedArenaId && normalizedArenaId !== parentId) {
+      const arenaRelationship: EdgeRelationship =
+        data.supportedTheory === "THEORY_A" ? "supports" : "challenges";
+      const { error: arenaEdgeError } = await supabase.from("truth_edges").insert({
+        source_id: normalizedArenaId,
+        target_id: row.id,
+        relationship: arenaRelationship,
+      } as never);
+      if (arenaEdgeError) {
+        writeTelemetry.push(`[WARNING] Arena structural edge failed: ${arenaEdgeError.message}`);
+      }
     }
 
     revalidatePath("/truth");
+    if (sharpenParent) {
+      revalidatePath(`/truth/node/${sharpenParent}`);
+    }
+    revalidatePath(`/truth/node/${row.id}`);
 
     if (thematicTags.length > 0) {
       for (const tag of thematicTags) {
@@ -802,7 +850,13 @@ export async function checkUserResonance(
 // ---------------------------------------------------------------------------
 
 export type TruthNodeWithEdgesResult =
-  | { success: true; node: TruthNodeRow; edges: TruthEdgeWithNodes[] }
+  | {
+      success: true;
+      node: TruthNodeRow;
+      edges: TruthEdgeWithNodes[];
+      lineage: TruthNodeRow[];
+      hasNewerVersion: boolean;
+    }
   | { success: false; error: string };
 
 /** truth_nodes row shape for Endless Dive (no embedding in response). */
@@ -817,6 +871,7 @@ export interface TruthNodeRow {
   resonance_count?: number | null;
   epistemic_state?: "SOLID" | "CONTESTED" | "SHATTERED" | null;
   epistemic_move?: "EMPIRICAL_CONTRADICTION" | "INTERNAL_INCONSISTENCY" | "EMPIRICAL_VERIFICATION" | "AD_HOC_RESCUE" | "APPEAL_TO_AUTHORITY" | null;
+  previous_version_id?: string | null;
 }
 
 /** truth_edges row with embedded source/target node rows for column rendering. */
@@ -833,7 +888,78 @@ export interface TruthEdgeWithNodes {
 export type EndlessDiveInitialData = {
   node: TruthNodeRow;
   edges: TruthEdgeWithNodes[];
+  lineage: TruthNodeRow[];
+  hasNewerVersion: boolean;
 };
+
+/**
+ * Same columns as `fetchMacroRoots` + resonance_count. Safe when epistemic_state / epistemic_move /
+ * previous_version_id migrations are not applied yet (hub listing still works but extended dive select fails).
+ */
+const TRUTH_NODE_DIVE_COLUMNS_MIN =
+  "id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata, resonance_count" as const;
+
+const TRUTH_NODE_DIVE_COLUMNS_EXTENDED =
+  "id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata, resonance_count, epistemic_state, epistemic_move, previous_version_id" as const;
+
+type TruthNodeDiveColumnSet =
+  | typeof TRUTH_NODE_DIVE_COLUMNS_MIN
+  | typeof TRUTH_NODE_DIVE_COLUMNS_EXTENDED;
+
+const VERSION_LINEAGE_MAX_STEPS = 24;
+
+async function fetchTruthNodeRowForDive(
+  supabase: ReturnType<typeof createServerSupabase>,
+  id: string,
+  columns: TruthNodeDiveColumnSet
+): Promise<TruthNodeRow | null> {
+  const { data, error } = await supabase
+    .from("truth_nodes")
+    .select(columns)
+    .eq("id", id)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as TruthNodeRow;
+}
+
+/**
+ * Ordered linear sharpening chain: oldest version first, newest (tip) last.
+ * Walks backward to root, then forward from the focal node to the latest successor (deterministic: newest by created_at if forked).
+ */
+async function buildSharpeningLineage(
+  supabase: ReturnType<typeof createServerSupabase>,
+  focal: TruthNodeRow,
+  columns: typeof TRUTH_NODE_DIVE_COLUMNS_EXTENDED
+): Promise<TruthNodeRow[]> {
+  const backward: TruthNodeRow[] = [];
+  let back: TruthNodeRow | null = focal;
+  let guard = VERSION_LINEAGE_MAX_STEPS;
+  while (back && guard-- > 0) {
+    backward.push(back);
+    if (!back.previous_version_id) break;
+    const prev = await fetchTruthNodeRowForDive(supabase, back.previous_version_id, columns);
+    back = prev;
+  }
+  const oldestFirstThroughFocal = backward.slice().reverse();
+
+  const successors: TruthNodeRow[] = [];
+  let tipWalker = focal;
+  guard = VERSION_LINEAGE_MAX_STEPS;
+  while (guard-- > 0) {
+    const { data: rows } = await supabase
+      .from("truth_nodes")
+      .select(columns)
+      .eq("previous_version_id", tipWalker.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const next = rows?.[0] as TruthNodeRow | undefined;
+    if (!next) break;
+    successors.push(next);
+    tipWalker = next;
+  }
+
+  return [...oldestFirstThroughFocal, ...successors];
+}
 
 /**
  * Fetches a single truth node and all edges touching it, with embedded source/target nodes.
@@ -843,15 +969,44 @@ export async function getTruthNodeWithEdges(nodeId: string): Promise<TruthNodeWi
   try {
     const supabase = createServerSupabase();
 
-    const { data: node, error: nodeError } = await supabase
+    // Cast: generated Database types may lag migrations (epistemic_* columns).
+    type NodeSingle = { data: TruthNodeRow | null; error: { message: string } | null };
+    const extendedRes = (await supabase
       .from("truth_nodes")
-      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata, resonance_count, epistemic_state, epistemic_move")
+      .select(TRUTH_NODE_DIVE_COLUMNS_EXTENDED)
       .eq("id", nodeId)
-      .single();
+      .single()) as unknown as NodeSingle;
 
-    if (nodeError || !node) {
-      return { success: false, error: nodeError?.message ?? "Node not found" };
+    let typedNode: TruthNodeRow;
+    let diveColumns: TruthNodeDiveColumnSet;
+
+    if (!extendedRes.error && extendedRes.data) {
+      typedNode = extendedRes.data;
+      diveColumns = TRUTH_NODE_DIVE_COLUMNS_EXTENDED;
+    } else {
+      const minRes = (await supabase
+        .from("truth_nodes")
+        .select(TRUTH_NODE_DIVE_COLUMNS_MIN)
+        .eq("id", nodeId)
+        .single()) as unknown as NodeSingle;
+      if (minRes.error || !minRes.data) {
+        return {
+          success: false,
+          error: minRes.error?.message ?? extendedRes.error?.message ?? "Node not found",
+        };
+      }
+      typedNode = minRes.data;
+      diveColumns = TRUTH_NODE_DIVE_COLUMNS_MIN;
     }
+
+    const lineage =
+      diveColumns === TRUTH_NODE_DIVE_COLUMNS_EXTENDED
+        ? await buildSharpeningLineage(supabase, typedNode, TRUTH_NODE_DIVE_COLUMNS_EXTENDED)
+        : [typedNode];
+    const hasNewerVersion =
+      diveColumns === TRUTH_NODE_DIVE_COLUMNS_EXTENDED &&
+      lineage.length > 0 &&
+      lineage[lineage.length - 1].id !== typedNode.id;
 
     const { data: edgesRaw, error: edgesError } = await supabase
       .from("truth_edges")
@@ -859,7 +1014,7 @@ export async function getTruthNodeWithEdges(nodeId: string): Promise<TruthNodeWi
       .or(`source_id.eq.${nodeId},target_id.eq.${nodeId}`);
 
     if (edgesError) {
-      return { success: true, node: node as TruthNodeRow, edges: [] };
+      return { success: true, node: typedNode, edges: [], lineage, hasNewerVersion };
     }
 
     const edgeList = (edgesRaw ?? []) as { id: string; source_id: string; target_id: string; relationship: string }[];
@@ -872,14 +1027,16 @@ export async function getTruthNodeWithEdges(nodeId: string): Promise<TruthNodeWi
     if (allNodeIds.size === 0) {
       return {
         success: true,
-        node: node as TruthNodeRow,
+        node: typedNode,
         edges: edgeList.map((e) => ({ ...e, source_node: null, target_node: null })),
+        lineage,
+        hasNewerVersion,
       };
     }
 
     const { data: nodeRows } = await supabase
       .from("truth_nodes")
-      .select("id, author_wallet, content, created_at, is_macro_root, thematic_tags, metadata, resonance_count, epistemic_state, epistemic_move")
+      .select(diveColumns)
       .in("id", Array.from(allNodeIds));
 
     const nodeMap = new Map<string, TruthNodeRow>();
@@ -891,7 +1048,7 @@ export async function getTruthNodeWithEdges(nodeId: string): Promise<TruthNodeWi
       target_node: nodeMap.get(e.target_id) ?? null,
     }));
 
-    return { success: true, node: node as TruthNodeRow, edges };
+    return { success: true, node: typedNode, edges, lineage, hasNewerVersion };
   } catch (err) {
     return { success: false, error: toErrorMessage(err) || "Failed to fetch node" };
   }
