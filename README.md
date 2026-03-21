@@ -23,6 +23,7 @@ We are building an open-source, decentralized **Healing Operating System** for c
 
 **Truth Engine (one breath):**
 
+- **Personal Sense-Making MVP:** You can map a messy controversy by feeding transcripts and long-form text into a **Macro-Arena**; the **Sieve** structures opposing theories and a navigable DAG. **The Cartographer** (Arena chat) reads that map in **read-only** mode—no judging, no invented evidence—and points to **Epistemic Gaps**: what is still missing on the web or in the record so you know what to research next. Multi-turn guidance over large arenas is designed for **context caching** (e.g. Gemini cache), not re-uploading the whole graph every message.
 - In the **Crossfire Arena**, claims stay **Solid** by default; the graph grows downward through **challenges** (attacks), not through piles of “supporting” child nodes. When a community forges a stronger premise, it **Sharpens** the claim—**version history** (e.g. V1.0 → V1.1) instead of clutter—keeping the battlefield legible.
 - **The Epistemic Crucible:** Disputes can be forged into **real-world action**. Communities design **falsifiable experiments** (neutral **Experiment** nodes—not claims) with explicit outcomes for each theory; validated protocols flow to the **Mana Callings Board** so people physically run the test. Results return as empirical fact, anchored **gaslessly** on-chain, settling debates with data instead of infinite argument.
 

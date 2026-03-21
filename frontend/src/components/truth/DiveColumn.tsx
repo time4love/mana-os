@@ -586,7 +586,18 @@ export function DiveColumn({
               </div>
             )}
             <div className="flex flex-wrap items-center gap-2 mb-4">
-              <EpistemicStateBadge state={nodeEpistemicState} locale={locale} />
+              <EpistemicStateBadge
+                state={
+                  nodeEpistemicState === "SHATTERED"
+                    ? "SHATTERED"
+                    : nodeEpistemicState === "CONTESTED"
+                      ? "CONTESTED"
+                      : challengingEdges.length > 0
+                        ? "CONTESTED"
+                        : "SOLID"
+                }
+                locale={locale}
+              />
               {getMoveBadge(data.node.epistemic_move ?? null, lang)}
               {"isFallback" in displayBlock && displayBlock.isFallback && (
                 <span className="text-[10px] bg-secondary text-muted-foreground px-2 py-0.5 rounded-full">

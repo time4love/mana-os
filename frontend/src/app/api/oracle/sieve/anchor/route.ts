@@ -16,6 +16,7 @@ import {
   truthNodeContentV2ToJson,
   fixRosettaV2BlockFlip,
 } from "@/lib/utils/truthRosetta";
+import { markSourcesContestedForChallenges } from "@/lib/truth/contestParents";
 
 const AnchorBodySchema = z.object({
   arenaId: z.string().uuid(),
@@ -151,6 +152,7 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+    await markSourcesContestedForChallenges(supabase, edges);
   }
 
   revalidatePath("/truth");

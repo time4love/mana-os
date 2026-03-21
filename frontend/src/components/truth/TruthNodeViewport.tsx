@@ -385,6 +385,21 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
   const arenaBubbling = isMacroArena ? computeArenaBubbling(childrenByRelationship) : undefined;
 
   const challengingChildren = childrenByRelationship.challenges;
+  const storedEpistemic = node.epistemic_state ?? "SOLID";
+  // Macro-arena "challenges" children are Theory-B column placement, not epistemic attacks on the arena root.
+  const focalEpistemicState = isMacroArena
+    ? storedEpistemic === "SHATTERED"
+      ? "SHATTERED"
+      : storedEpistemic === "CONTESTED"
+        ? "CONTESTED"
+        : "SOLID"
+    : storedEpistemic === "SHATTERED"
+      ? "SHATTERED"
+      : storedEpistemic === "CONTESTED"
+        ? "CONTESTED"
+        : challengingChildren.length > 0
+          ? "CONTESTED"
+          : "SOLID";
 
   // For claims under a Macro-Arena: detect arena parent and theory for context-aware breadcrumbs
   const connectedArena = !isMacroArena
@@ -681,7 +696,7 @@ export function TruthNodeViewport({ data, currentTheory }: TruthNodeViewportProp
           metadata={node.metadata}
           arenaBubbling={arenaBubbling}
           arenaNodeId={isMacroArena ? node.id : undefined}
-          epistemicState={node.epistemic_state}
+          epistemicState={focalEpistemicState}
           epistemicMove={node.epistemic_move}
           resonanceCount={node.resonance_count}
         />

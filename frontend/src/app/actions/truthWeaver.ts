@@ -26,6 +26,7 @@ import {
   fixDraftRosettaV2Flip,
 } from "@/lib/utils/truthRosetta";
 import type { CompetingTheoryV2 } from "@/types/truth";
+import { markSourcesContestedForChallenges } from "@/lib/truth/contestParents";
 
 const MATCH_THRESHOLD = 0.85;
 const MATCH_COUNT = 3;
@@ -140,7 +141,7 @@ export async function proposeTruthNode(
     };
   }
 
-  if (parent && rel) {
+    if (parent && rel) {
     const { error: edgeError } = await supabase.from("truth_edges").insert({
       source_id: parent,
       target_id: newNode!.id,
@@ -152,6 +153,7 @@ export async function proposeTruthNode(
         error: `Node created but edge failed: ${edgeError.message}`,
       };
     }
+    await markSourcesContestedForChallenges(supabase, [{ source_id: parent, relationship: rel }]);
   }
 
   return { status: "anchored", nodeId: newNode.id };
@@ -252,6 +254,8 @@ export async function attachTruthEdge(
         error: edgeError?.message ?? "Failed to create edge",
       };
     }
+
+    await markSourcesContestedForChallenges(supabase, [edgePayload]);
 
     return { success: true, edgeId: newEdge!.id };
   } catch (err) {
@@ -706,16 +710,7 @@ export async function anchorForgeDraft(
         return { success: false, error: `Node created but edge failed: ${edgeError.message}`, writeTelemetry };
       }
 
-      if (relationship === "challenges") {
-        const { error: contestedError } = await supabase
-          .from("truth_nodes")
-          .update({ epistemic_state: "CONTESTED" } as never)
-          .eq("id", parentId)
-          .eq("epistemic_state", "SOLID");
-        if (contestedError) {
-          writeTelemetry.push(`[WARNING] Failed to mark parent as CONTESTED: ${contestedError.message}`);
-        }
-      }
+      await markSourcesContestedForChallenges(supabase, [{ source_id: parentId, relationship }]);
     }
 
     // Dual-edge architecture for tactical claims inside an arena:
